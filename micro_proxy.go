@@ -69,7 +69,7 @@ func (a *Application) Validate() error {
 }
 
 func (a *Application) Start() error {
-	mgr, err := manager.NewSystemManager(a.appConfig.NetConfig)
+	mgr, err := manager.NewSystemManager(a.appConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create system manager: %w", err)
 	}

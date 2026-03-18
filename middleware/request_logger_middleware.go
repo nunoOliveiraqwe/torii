@@ -23,12 +23,7 @@ func (z *zapLogFormatter) LogRequest(r *http.Request) {
 	ctx := r.Context()
 	reqId := ""
 	if ctx != nil {
-		reqIdValue := ctx.Value(requestIdContextKey)
-		if reqIdValue != nil {
-			if reqIdStr, ok := reqIdValue.(string); ok {
-				reqId = reqIdStr
-			}
-		}
+		reqId = GetRequestIDFromContext(ctx)
 	} else {
 		ctx = context.Background()
 	}

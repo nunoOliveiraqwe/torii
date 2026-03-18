@@ -31,7 +31,7 @@ func RequestIDMiddleware(next http.HandlerFunc, middlewareConf MiddlewareConfigu
 		prefix = generateRequestPrefix()
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		reqId := getRequestIDFromContext(r.Context())
+		reqId := GetRequestIDFromContext(r.Context())
 		if reqId != "" {
 			next.ServeHTTP(w, r)
 			return
@@ -59,7 +59,7 @@ func generateRequestPrefix() string {
 	return fmt.Sprintf("%s/%s", hostname, b64[0:10])
 }
 
-func getRequestIDFromContext(ctx context.Context) string {
+func GetRequestIDFromContext(ctx context.Context) string {
 	if ctx == nil {
 		return ""
 	}

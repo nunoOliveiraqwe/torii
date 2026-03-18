@@ -2,7 +2,10 @@ package configuration
 
 import (
 	"fmt"
+	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -11,6 +14,31 @@ type ApplicationConfiguration struct {
 	LogConfig LogConfig            `yaml:"log" json:"log"`
 	APIServer APIServerConfig      `yaml:"apiServer" json:"apiServer"`
 	NetConfig NetworkConfiguration `yaml:"netConfig" json:"netConfig"`
+	Session   SessionConfig        `yaml:"session" json:"session"`
+}
+
+type SessionConfig struct {
+	Lifetime        time.Duration `yaml:"lifetime" json:"lifetime"`
+	IdleTimeout     time.Duration `yaml:"idleTimeout" json:"idleTimeout"`
+	CleanupInterval time.Duration `yaml:"cleanupInterval" json:"cleanupInterval"`
+	CookieDomain    string        `yaml:"cookieDomain" json:"cookieDomain"`
+	CookieSecure    bool          `yaml:"cookieSecure" json:"cookieSecure"`
+	CookieHttpOnly  bool          `yaml:"cookieHttpOnly" json:"cookieHttpOnly"`
+	CookieSameSite  string        `yaml:"cookieSameSite" json:"cookieSameSite"`
+}
+
+// SameSiteMode converts the string config value to an http.SameSite constant.
+func (c SessionConfig) SameSiteMode() http.SameSite {
+	switch strings.ToLower(c.CookieSameSite) {
+	case "strict":
+		return http.SameSiteStrictMode
+	case "none":
+		return http.SameSiteNoneMode
+	case "lax":
+		return http.SameSiteLaxMode
+	default:
+		return http.SameSiteLaxMode
+	}
 }
 
 type LogConfig struct {
@@ -39,6 +67,14 @@ func DefaultConfiguration() ApplicationConfiguration {
 			IdleTimeoutSecs:  60,
 			ReadTimeoutSecs:  60,
 			WriteTimeoutSecs: 60,
+		},
+		Session: SessionConfig{
+			Lifetime:        16 * time.Hour,
+			IdleTimeout:     60 * time.Minute,
+			CleanupInterval: 1 * time.Hour,
+			CookieSecure:    true,
+			CookieHttpOnly:  true,
+			CookieSameSite:  "lax",
 		},
 	}
 }

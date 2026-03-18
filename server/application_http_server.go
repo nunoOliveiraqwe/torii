@@ -26,7 +26,8 @@ func StartServer(conf configuration.APIServerConfig, systemManager manager.Syste
 	httpServer.ReadTimeout = time.Duration(conf.ReadTimeoutSecs) * time.Second
 	httpServer.WriteTimeout = time.Duration(conf.WriteTimeoutSecs) * time.Second
 
-	httpServer.Handler = buildMux(systemManager)
+	mux := buildMux(systemManager)
+	httpServer.Handler = systemManager.SessionRegistry().WrapWithSessionMiddleware(mux)
 	return httpServer
 
 }
@@ -41,6 +42,11 @@ func buildMux(manager manager.SystemManager) *http.ServeMux {
 		routeHandlerFunc := route.HandlerFunc(manager)
 		routeHandlerFunc = middleware.RequestIDMiddleware(routeHandlerFunc, middleware.MiddlewareConfiguration{})
 		routeHandlerFunc = middleware.RequestLoggerMiddleware(routeHandlerFunc, middleware.MiddlewareConfiguration{})
+		routeHandlerFunc = checkIfRouteIsAllowedIfFtsIsNotDone(routeHandlerFunc, route.IsAllowedAfterFts,
+			route.IsAllowedBeforeFts, manager)
+		if route.IsSecure {
+			routeHandlerFunc = isAuthenticatedRequest(routeHandlerFunc, manager)
+		}
 		mux.HandleFunc(fullPathWithMethod, routeHandlerFunc)
 		zap.S().Debugf("Route %s initialized", route.Name)
 	}

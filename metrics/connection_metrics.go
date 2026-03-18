@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type ConnectionMetricsHandler struct {
+type ConnectionMetricsManager struct {
 	connectionMetricsMap map[string]*ConnectionMetric
 	metricsChan          chan *RequestMetric
 	numberOfListeners    int
@@ -27,9 +27,9 @@ type MetricsReportFunc func(reqMetric *RequestMetric)
 
 const globalMetricsConName = "global"
 
-func NewConnectionMetricsHandler(numberOfListeners int, ctx context.Context) *ConnectionMetricsHandler {
+func NewGlobalMetricsHandler(numberOfListeners int, ctx context.Context) *ConnectionMetricsManager {
 	zap.S().Debug("Creating connection metrics handler")
-	h := ConnectionMetricsHandler{
+	h := ConnectionMetricsManager{
 		connectionMetricsMap: make(map[string]*ConnectionMetric),
 		metricsChan:          make(chan *RequestMetric),
 		numberOfListeners:    numberOfListeners,
@@ -40,12 +40,12 @@ func NewConnectionMetricsHandler(numberOfListeners int, ctx context.Context) *Co
 	return &h
 }
 
-func (h *ConnectionMetricsHandler) addConnectionMetric(c *ConnectionMetric) {
+func (h *ConnectionMetricsManager) addConnectionMetric(c *ConnectionMetric) {
 	zap.S().Debugf("Adding connection metric for connection %s", c.connectionName)
 	h.connectionMetricsMap[c.connectionName] = c
 }
 
-func (h *ConnectionMetricsHandler) startCollectingMetrics() {
+func (h *ConnectionMetricsManager) startCollectingMetrics() {
 	waitG := sync.WaitGroup{}
 	waitG.Add(h.numberOfListeners)
 	for i := 0; i < h.numberOfListeners; i++ {
@@ -58,7 +58,7 @@ func (h *ConnectionMetricsHandler) startCollectingMetrics() {
 	close(h.metricsChan)
 }
 
-func (h *ConnectionMetricsHandler) collectGlobalMetrics() {
+func (h *ConnectionMetricsManager) collectGlobalMetrics() {
 	for {
 		select {
 		case metric, ok := <-h.metricsChan:
@@ -72,7 +72,7 @@ func (h *ConnectionMetricsHandler) collectGlobalMetrics() {
 	}
 }
 
-func (h *ConnectionMetricsHandler) updateConnectionMetrics(metric *RequestMetric) {
+func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric) {
 	zap.S().Infof("Updating connection metric for connection %s", metric.connectionName)
 	conMetrics, ok := h.connectionMetricsMap[metric.connectionName]
 	if !ok {
@@ -94,7 +94,7 @@ func (h *ConnectionMetricsHandler) updateConnectionMetrics(metric *RequestMetric
 	}
 }
 
-func (h *ConnectionMetricsHandler) NewConnectionMetric(connectionName string) MetricsReportFunc {
+func (h *ConnectionMetricsManager) NewConnectionMetric(connectionName string) MetricsReportFunc {
 	zap.S().Debugf("Creating a new connection metric for connection %s", connectionName)
 	connMetric := &ConnectionMetric{
 		accumulatedMetrics: &Metric{},
@@ -108,7 +108,7 @@ func (h *ConnectionMetricsHandler) NewConnectionMetric(connectionName string) Me
 	}
 }
 
-func (h *ConnectionMetricsHandler) GetConnectionMetrics(connectionName string) *Metric {
+func (h *ConnectionMetricsManager) GetMetricForConnection(connectionName string) *Metric {
 	zap.S().Debugf("Getting connection metrics for connection %s", connectionName)
 	conMetrics, ok := h.connectionMetricsMap[connectionName]
 	if !ok {
@@ -120,6 +120,6 @@ func (h *ConnectionMetricsHandler) GetConnectionMetrics(connectionName string) *
 	return conMetrics.accumulatedMetrics.Copy()
 }
 
-func (h *ConnectionMetricsHandler) StartCollectingMetrics() {
+func (h *ConnectionMetricsManager) StartCollectingMetrics() {
 	go h.startCollectingMetrics()
 }

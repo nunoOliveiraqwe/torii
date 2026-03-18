@@ -52,26 +52,26 @@ func MetricsMiddleware(next http.HandlerFunc, middlewareConf MiddlewareConfigura
 }
 
 func getConnectionMetrics(middlewareConf MiddlewareConfiguration) metrics.MetricsReportFunc {
-	metricsHandlerT, ok := middlewareConf.Config[METRICS_HANDLER_NAME]
-	if !ok {
-		zap.S().Warnf("Metrics handler not found when configuring metrics middleware")
+
+	metricsHandler := metrics.GlobalMetricsManager()
+	if metricsHandler == nil {
+		zap.S().Warnf("No metrics manager available")
 		return nil
 	}
-	metricsHandler, ok := metricsHandlerT.(*metrics.ConnectionMetricsHandler)
-	if !ok {
-		zap.S().Warnf("Metrics handler is not of type metrics.ConnectionMetricsHandler")
-		return nil
+
+	metricsName := ""
+	if middlewareConf.Config != nil {
+		if nameVal, exists := middlewareConf.Config["name"]; exists {
+			if n, isStr := nameVal.(string); isStr {
+				metricsName = n
+			}
+		}
 	}
-	metricsNameT, ok := middlewareConf.Config["name"]
-	if !ok {
-		zap.S().Warnf("Metrics name not found when configuring metrics middleware")
-		return nil
+	if metricsName == "" {
+		zap.S().Warnf("Metrics name not found when configuring metrics middleware, defaulting to 'default'")
+		metricsName = "default"
 	}
-	metricsName, ok := metricsNameT.(string)
-	if !ok {
-		zap.S().Warnf("Metrics name is not of type string")
-		return nil
-	}
+
 	zap.S().Debugf("Creating metrics handler for connection %s", metricsName)
 	return metricsHandler.NewConnectionMetric(metricsName)
 }
