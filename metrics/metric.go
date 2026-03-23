@@ -116,3 +116,10 @@ func (m *Metric) String() string {
 		m.CacheMisses,
 	)
 }
+
+func ProxyMetricsName(iface string, port string) string {
+	if iface == "" {
+		iface = "any"
+	}
+	return fmt.Sprintf("%s-%s", iface, port)
+}

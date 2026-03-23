@@ -1,4 +1,7 @@
 {{define "title"}} – Dashboard{{end}}
+{{define "head"}}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+{{end}}
 {{define "body"}}
 <nav class="container-fluid">
     <ul>
@@ -19,6 +22,81 @@
         <p>Proxy server overview and management</p>
     </hgroup>
 
+    <!-- Stat cards -->
+    <section id="stats-section">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <p class="stat-value" id="stat-requests">–</p>
+                <p class="stat-label">Total Requests</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-value" id="stat-errors">–</p>
+                <p class="stat-label">Errors</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-value" id="stat-avg-latency">–</p>
+                <p class="stat-label">Avg Latency (ms)</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-value" id="stat-bytes-sent">–</p>
+                <p class="stat-label">Bytes Sent</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-value" id="stat-bytes-recv">–</p>
+                <p class="stat-label">Bytes Received</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-value" id="stat-active">–</p>
+                <p class="stat-label">Active Connections</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Chart -->
+    <section>
+        <div class="chart-container">
+            <div class="chart-header">
+                <h4>Metrics Over Time</h4>
+                <select id="metric-selector" aria-label="Select metric">
+                    <option value="bytesSent">Bytes Sent</option>
+                    <option value="bytesReceived">Bytes Received</option>
+                    <option value="requestCount">Request Count</option>
+                    <option value="errorCount">Error Count</option>
+                    <option value="request2xx">2xx Responses</option>
+                    <option value="request4xx">4xx Responses</option>
+                    <option value="request5xx">5xx Responses</option>
+                </select>
+            </div>
+            <div style="position:relative;height:300px;">
+                <canvas id="metricsChart"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- Status breakdown -->
+    <section>
+        <h3>Response Status Breakdown</h3>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <p class="stat-value" id="stat-2xx" style="color:#2ecc71">–</p>
+                <p class="stat-label">2xx Success</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-value" id="stat-3xx" style="color:#3498db">–</p>
+                <p class="stat-label">3xx Redirect</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-value" id="stat-4xx" style="color:#f39c12">–</p>
+                <p class="stat-label">4xx Client Error</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-value" id="stat-5xx" style="color:#e74c3c">–</p>
+                <p class="stat-label">5xx Server Error</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Proxy routes table -->
     <section>
         <h3>Proxy Routes</h3>
         <div id="proxy-routes">
@@ -27,8 +105,165 @@
     </section>
 </main>
 <script>
+    // ---------- Metric history for charting ----------
+    var MAX_POINTS = 30;
+    var metricsHistory = {
+        labels:        [],
+        bytesSent:     [],
+        bytesReceived: [],
+        requestCount:  [],
+        errorCount:    [],
+        request2xx:    [],
+        request4xx:    [],
+        request5xx:    []
+    };
+
+    var selectedMetric = 'bytesSent';
+    var chart = null;
+    var prevSnapshot = null; // previous poll snapshot for computing deltas
+
+    var metricMeta = {
+        bytesSent:     { label: 'Bytes Sent /5s',      color: 'rgba(124,110,240,1)',  bg: 'rgba(124,110,240,0.15)' },
+        bytesReceived: { label: 'Bytes Received /5s',   color: 'rgba(52,152,219,1)',   bg: 'rgba(52,152,219,0.15)' },
+        requestCount:  { label: 'Requests /5s',         color: 'rgba(46,204,113,1)',   bg: 'rgba(46,204,113,0.15)' },
+        errorCount:    { label: 'Errors /5s',            color: 'rgba(231,76,60,1)',    bg: 'rgba(231,76,60,0.15)' },
+        request2xx:    { label: '2xx /5s',               color: 'rgba(46,204,113,1)',   bg: 'rgba(46,204,113,0.15)' },
+        request4xx:    { label: '4xx /5s',               color: 'rgba(243,156,18,1)',   bg: 'rgba(243,156,18,0.15)' },
+        request5xx:    { label: '5xx /5s',               color: 'rgba(231,76,60,1)',    bg: 'rgba(231,76,60,0.15)' }
+    };
+
+    function initChart() {
+        var ctx = document.getElementById('metricsChart').getContext('2d');
+        var meta = metricMeta[selectedMetric];
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: metricsHistory.labels,
+                datasets: [{
+                    label: meta.label,
+                    data: metricsHistory[selectedMetric],
+                    borderColor: meta.color,
+                    backgroundColor: meta.bg,
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 3,
+                    pointBackgroundColor: meta.color
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255,255,255,0.06)' },
+                        ticks: { color: 'rgba(255,255,255,0.5)', maxRotation: 0, maxTicksLimit: 10 }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(255,255,255,0.06)' },
+                        ticks: { color: 'rgba(255,255,255,0.5)' }
+                    }
+                }
+            }
+        });
+    }
+
+    function switchMetric(key) {
+        selectedMetric = key;
+        var meta = metricMeta[key];
+        chart.data.datasets[0].label = meta.label;
+        chart.data.datasets[0].data = metricsHistory[key];
+        chart.data.datasets[0].borderColor = meta.color;
+        chart.data.datasets[0].backgroundColor = meta.bg;
+        chart.data.datasets[0].pointBackgroundColor = meta.color;
+        chart.update();
+    }
+
+    document.getElementById('metric-selector').addEventListener('change', function () {
+        switchMetric(this.value);
+    });
+
+    // ---------- Format helpers ----------
+    function fmtBytes(b) {
+        if (b === 0) return '0 B';
+        var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        var i = Math.floor(Math.log(b) / Math.log(1024));
+        return (b / Math.pow(1024, i)).toFixed(i ? 1 : 0) + ' ' + units[i];
+    }
+    function fmtNum(n) {
+        return n.toLocaleString();
+    }
+    function timeLabel() {
+        var d = new Date();
+        return d.getHours().toString().padStart(2, '0') + ':' +
+               d.getMinutes().toString().padStart(2, '0') + ':' +
+               d.getSeconds().toString().padStart(2, '0');
+    }
+
+    // ---------- Fetch global metrics ----------
+    function loadGlobalMetrics() {
+        fetch('/api/v1/proxy/metrics', { credentials: 'same-origin' })
+            .then(function (resp) {
+                if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+                if (!resp.ok) throw new Error(resp.statusText);
+                return resp.json();
+            })
+            .then(function (m) {
+                if (!m) return;
+
+                // Update stat cards
+                document.getElementById('stat-requests').textContent   = fmtNum(m.request_count);
+                document.getElementById('stat-errors').textContent     = fmtNum(m.error_count);
+                document.getElementById('stat-avg-latency').textContent= fmtNum(m.avg_response_time_ms);
+                document.getElementById('stat-bytes-sent').textContent = fmtBytes(m.bytes_sent);
+                document.getElementById('stat-bytes-recv').textContent = fmtBytes(m.bytes_received);
+                document.getElementById('stat-active').textContent     = fmtNum(m.active_connections);
+
+                // Status breakdown
+                document.getElementById('stat-2xx').textContent = fmtNum(m.request_2xx_count);
+                document.getElementById('stat-3xx').textContent = fmtNum(m.request_3xx_count);
+                document.getElementById('stat-4xx').textContent = fmtNum(m.request_4xx_count);
+                document.getElementById('stat-5xx').textContent = fmtNum(m.request_5xx_count);
+
+                // Push deltas to chart history (rate of change per poll interval)
+                if (prevSnapshot) {
+                    metricsHistory.labels.push(timeLabel());
+                    metricsHistory.bytesSent.push(Math.max(0, m.bytes_sent - prevSnapshot.bytes_sent));
+                    metricsHistory.bytesReceived.push(Math.max(0, m.bytes_received - prevSnapshot.bytes_received));
+                    metricsHistory.requestCount.push(Math.max(0, m.request_count - prevSnapshot.request_count));
+                    metricsHistory.errorCount.push(Math.max(0, m.error_count - prevSnapshot.error_count));
+                    metricsHistory.request2xx.push(Math.max(0, m.request_2xx_count - prevSnapshot.request_2xx_count));
+                    metricsHistory.request4xx.push(Math.max(0, m.request_4xx_count - prevSnapshot.request_4xx_count));
+                    metricsHistory.request5xx.push(Math.max(0, m.request_5xx_count - prevSnapshot.request_5xx_count));
+
+                    // Trim to max points
+                    if (metricsHistory.labels.length > MAX_POINTS) {
+                        metricsHistory.labels.shift();
+                        metricsHistory.bytesSent.shift();
+                        metricsHistory.bytesReceived.shift();
+                        metricsHistory.requestCount.shift();
+                        metricsHistory.errorCount.shift();
+                        metricsHistory.request2xx.shift();
+                        metricsHistory.request4xx.shift();
+                        metricsHistory.request5xx.shift();
+                    }
+
+                    if (chart) chart.update();
+                }
+                prevSnapshot = m;
+            })
+            .catch(function (err) {
+                console.error('Failed to load global metrics', err);
+            });
+    }
+
+    // ---------- Proxy routes ----------
     function loadProxyRoutes() {
-        fetch('/api/v1/proxy/routes', {credentials: 'same-origin'})
+        fetch('/api/v1/proxy/routes', { credentials: 'same-origin' })
             .then(function (resp) {
                 if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
                 if (!resp.ok) throw new Error(resp.statusText);
@@ -83,7 +318,13 @@
             : '<span class="badge badge-muted">No</span>';
     }
 
+    // ---------- Bootstrap ----------
+    initChart();
+    loadGlobalMetrics();
     loadProxyRoutes();
+
+    // Poll every 5 seconds for metrics, 10 seconds for routes
+    setInterval(loadGlobalMetrics, 5000);
     setInterval(loadProxyRoutes, 10000);
 </script>
 {{end}}

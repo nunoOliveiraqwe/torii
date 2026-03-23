@@ -38,6 +38,56 @@
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator { display: inline; }
         .htmx-request.htmx-indicator { display: inline; }
+
+        /* Dashboard grid & cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: var(--pico-card-background-color);
+            border: 1px solid var(--pico-muted-border-color);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            text-align: center;
+        }
+        .stat-card .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #7c6ef0;
+            margin: 0;
+        }
+        .stat-card .stat-label {
+            font-size: 0.8rem;
+            color: var(--pico-muted-color);
+            margin: 0.25rem 0 0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .chart-container {
+            position: relative;
+            background: var(--pico-card-background-color);
+            border: 1px solid var(--pico-muted-border-color);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .chart-header h4 { margin: 0; }
+        .chart-header select {
+            width: auto;
+            min-width: 180px;
+            margin: 0;
+            padding: 0.35rem 0.75rem;
+            font-size: 0.85rem;
+        }
     </style>
     {{block "head" .}}{{end}}
 </head>

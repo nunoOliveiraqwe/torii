@@ -73,4 +73,14 @@ var routes = []ApplicationRoute{
 		IsSecure:           true,
 		HandlerFunc:        handleGetProxies,
 	},
+	{
+		Name:               "Global proxy metrics",
+		Description:        "Fetches the global proxy metrics",
+		Method:             "GET",
+		Pattern:            "/proxy/metrics",
+		IsAllowedBeforeFts: false,
+		IsAllowedAfterFts:  true,
+		IsSecure:           true,
+		HandlerFunc:        handleGetGlobalMetrics,
+	},
 }

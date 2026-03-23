@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strconv"
 	"sync/atomic"
 
 	"github.com/nunoOliveiraqwe/micro-proxy/config"
@@ -57,8 +58,7 @@ func buildHttpServer(conf config.HTTPListener) (MicroHttpServer, error) {
 		IdleTimeout:                  conf.IdleTimeout,
 	}
 
-	mName := proxyMetricsName(conf.Interface, conf.Port)
-	metrics.GlobalMetricsManager.NewConnectionMetricHandler(mName)
+	mName := metrics.ProxyMetricsName(":", strconv.Itoa(conf.Port))
 	if conf.TLS != nil {
 
 		return &MicroProxyHttpsServer{
@@ -195,11 +195,4 @@ func middlewareNames(configs []middleware.Config) []string {
 		names = append(names, c.Type)
 	}
 	return names
-}
-
-func proxyMetricsName(iface string, port int) string {
-	if iface == "" {
-		iface = "any"
-	}
-	return fmt.Sprintf("%s-%d", iface, port)
 }

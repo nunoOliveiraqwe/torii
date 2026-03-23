@@ -42,6 +42,7 @@ func buildMux(svc app.SystemService) *http.ServeMux {
 		routeHandlerFunc := route.HandlerFunc(svc)
 		routeHandlerFunc = middleware.RequestIDMiddleware(routeHandlerFunc, middleware.Config{})
 		routeHandlerFunc = middleware.RequestLoggerMiddleware(routeHandlerFunc, middleware.Config{})
+		routeHandlerFunc = middleware.MetricsMiddleware(routeHandlerFunc, middleware.Config{})
 		routeHandlerFunc = checkIfRouteIsAllowedIfFtsIsNotDone(routeHandlerFunc, route.IsAllowedBeforeFts,
 			route.IsAllowedAfterFts, svc)
 		if route.IsSecure {
