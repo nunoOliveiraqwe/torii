@@ -28,8 +28,8 @@ func (w *responseWriterWithMetrics) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-func MetricsMiddleware(next http.HandlerFunc, middlewareConf MiddlewareConfiguration) http.HandlerFunc {
-	metricFunc := getConnectionMetrics(middlewareConf)
+func MetricsMiddleware(next http.HandlerFunc, middlewareConf Config) http.HandlerFunc {
+	metricFunc := getConnectionMetricsHandler(middlewareConf)
 	if metricFunc == nil {
 		zap.S().Warnf("Metrics middleware not configured properly. Skipping...")
 		return next
@@ -51,17 +51,10 @@ func MetricsMiddleware(next http.HandlerFunc, middlewareConf MiddlewareConfigura
 	}
 }
 
-func getConnectionMetrics(middlewareConf MiddlewareConfiguration) metrics.MetricsReportFunc {
-
-	metricsHandler := metrics.GlobalMetricsManager()
-	if metricsHandler == nil {
-		zap.S().Warnf("No metrics manager available")
-		return nil
-	}
-
+func getConnectionMetricsHandler(middlewareConf Config) metrics.MetricsReportFunc {
 	metricsName := ""
-	if middlewareConf.Config != nil {
-		if nameVal, exists := middlewareConf.Config["name"]; exists {
+	if middlewareConf.Options != nil {
+		if nameVal, exists := middlewareConf.Options["name"]; exists {
 			if n, isStr := nameVal.(string); isStr {
 				metricsName = n
 			}
@@ -69,11 +62,10 @@ func getConnectionMetrics(middlewareConf MiddlewareConfiguration) metrics.Metric
 	}
 	if metricsName == "" {
 		zap.S().Warnf("Metrics name not found when configuring metrics middleware, defaulting to 'default'")
-		metricsName = "default"
+		return nil
 	}
-
 	zap.S().Debugf("Creating metrics handler for connection %s", metricsName)
-	return metricsHandler.NewConnectionMetric(metricsName)
+	return metrics.GlobalMetricsManager.NewConnectionMetricHandler(metricsName)
 }
 
 func initializeRequestMetrics(r *http.Request) *metrics.RequestMetric {

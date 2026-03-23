@@ -13,7 +13,7 @@ import (
 type ConnectionMetricsManager struct {
 	connectionMetricsMap map[string]*ConnectionMetric
 	metricsChan          chan *RequestMetric
-	numberOfListeners    int
+	numberOfWorkers      int
 	context              context.Context
 }
 
@@ -25,18 +25,25 @@ type ConnectionMetric struct {
 
 type MetricsReportFunc func(reqMetric *RequestMetric)
 
+var GlobalMetricsManager *ConnectionMetricsManager
+
 const globalMetricsConName = "global"
 
-func NewGlobalMetricsHandler(numberOfListeners int, ctx context.Context) *ConnectionMetricsManager {
+func init() {
+	zap.S().Info("Initializing connection metrics package")
+	GlobalMetricsManager = NewGlobalMetricsHandler(2, context.Background())
+}
+
+func NewGlobalMetricsHandler(numberOfWorkers int, ctx context.Context) *ConnectionMetricsManager {
 	zap.S().Debug("Creating connection metrics handler")
 	h := ConnectionMetricsManager{
 		connectionMetricsMap: make(map[string]*ConnectionMetric),
 		metricsChan:          make(chan *RequestMetric),
-		numberOfListeners:    numberOfListeners,
+		numberOfWorkers:      numberOfWorkers,
 		context:              ctx,
 	}
 	zap.S().Info("Creating a new global connection metric")
-	h.NewConnectionMetric(globalMetricsConName)
+	h.NewConnectionMetricHandler(globalMetricsConName)
 	return &h
 }
 
@@ -47,8 +54,8 @@ func (h *ConnectionMetricsManager) addConnectionMetric(c *ConnectionMetric) {
 
 func (h *ConnectionMetricsManager) startCollectingMetrics() {
 	waitG := sync.WaitGroup{}
-	waitG.Add(h.numberOfListeners)
-	for i := 0; i < h.numberOfListeners; i++ {
+	waitG.Add(h.numberOfWorkers)
+	for i := 0; i < h.numberOfWorkers; i++ {
 		go func() {
 			h.collectGlobalMetrics()
 			waitG.Done()
@@ -94,7 +101,7 @@ func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric
 	}
 }
 
-func (h *ConnectionMetricsManager) NewConnectionMetric(connectionName string) MetricsReportFunc {
+func (h *ConnectionMetricsManager) NewConnectionMetricHandler(connectionName string) MetricsReportFunc {
 	zap.S().Debugf("Creating a new connection metric for connection %s", connectionName)
 	connMetric := &ConnectionMetric{
 		accumulatedMetrics: &Metric{},

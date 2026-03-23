@@ -1,4 +1,4 @@
-package microProxy
+package microproxy
 
 import (
 	"flag"

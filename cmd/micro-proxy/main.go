@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	microProxy "github.com/nunoOliveiraqwe/micro-proxy"
+	microproxy "github.com/nunoOliveiraqwe/micro-proxy"
 	"go.uber.org/zap"
 )
 
@@ -22,16 +22,16 @@ const banner = `
 
 func printBanner() {
 	fmt.Println(banner)
-	fmt.Printf("  Version:    %s\n", microProxy.Version)
-	fmt.Printf("  Build:      %s\n", microProxy.Build)
-	fmt.Printf("  Build Time: %s\n", microProxy.BuildTime)
+	fmt.Printf("  Version:    %s\n", microproxy.Version)
+	fmt.Printf("  Build:      %s\n", microproxy.Build)
+	fmt.Printf("  Build Time: %s\n", microproxy.BuildTime)
 	fmt.Println()
 }
 
 func main() {
 	printBanner()
 
-	app := microProxy.NewApplication()
+	app := microproxy.NewApplication()
 	app.ParseFlags()
 
 	if err := app.LoadConfiguration(); err != nil {

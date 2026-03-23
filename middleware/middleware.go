@@ -7,26 +7,26 @@ import (
 	"go.uber.org/zap"
 )
 
-type Middleware func(next http.HandlerFunc, middlewareConf MiddlewareConfiguration) http.HandlerFunc
+type Func func(next http.HandlerFunc, middlewareConf Config) http.HandlerFunc
 
-type MiddlewareRegistry = map[string]Middleware
+type Registry = map[string]Func
 
-type MiddlewareConfiguration struct {
-	Type   string                 `json:"type"`
-	Config map[string]interface{} `json:"-"`
+type Config struct {
+	Type    string                 `json:"type"`
+	Options map[string]interface{} `json:"-"`
 }
 
-var registry MiddlewareRegistry
+var registry Registry
 
 func init() {
-	registry = map[string]Middleware{
+	registry = map[string]Func{
 		"Metrics":    MetricsMiddleware,
 		"RequestId":  RequestIDMiddleware,
 		"RequestLog": RequestLoggerMiddleware,
 	}
 }
 
-func ApplyMiddlewares(handler http.HandlerFunc, middlewares []MiddlewareConfiguration) (http.HandlerFunc, error) {
+func ApplyMiddlewares(handler http.HandlerFunc, middlewares []Config) (http.HandlerFunc, error) {
 	if handler == nil {
 		zap.S().Errorf("Handler cannot be nil when applying middleware chain")
 		return nil, errors.New("handler cannot be nil when applying middleware chain")
@@ -51,7 +51,7 @@ func MiddlewareExists(key string) bool {
 	return exists
 }
 
-func GetMiddleware(key string) (Middleware, error) {
+func GetMiddleware(key string) (Func, error) {
 	if key == "" {
 		return nil, errors.New("middleware key cannot be empty")
 	}

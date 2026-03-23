@@ -12,7 +12,7 @@ func TestNewConnectionMetricsHandler(t *testing.T) {
 	ctx := context.Background()
 	h := NewGlobalMetricsHandler(2, ctx)
 	assert.NotNil(t, h)
-	assert.Equal(t, 2, h.numberOfListeners)
+	assert.Equal(t, 2, h.numberOfWorkers)
 	assert.NotNil(t, h.connectionMetricsMap[globalMetricsConName])
 }
 
@@ -27,7 +27,7 @@ func TestUpdateConnectionMetrics(t *testing.T) {
 		BytesReceived:  100,
 		BytesSent:      200,
 	}
-	reportTestMetrics := h.NewConnectionMetric("test")
+	reportTestMetrics := h.NewConnectionMetricHandler("test")
 	reportTestMetrics(metric)
 
 	deadLine := time.Now().Add(1 * time.Second)
@@ -76,7 +76,7 @@ func TestGlobalAccumulatesFromSeveralConMetrics(t *testing.T) {
 		BytesReceived:  100,
 		BytesSent:      200,
 	}
-	reportTestMetrics := h.NewConnectionMetric("test")
+	reportTestMetrics := h.NewConnectionMetricHandler("test")
 
 	reportTestMetrics(metricForTest)
 
@@ -85,7 +85,7 @@ func TestGlobalAccumulatesFromSeveralConMetrics(t *testing.T) {
 		BytesReceived:  102,
 		BytesSent:      201,
 	}
-	reportTestMetrics2 := h.NewConnectionMetric("test2")
+	reportTestMetrics2 := h.NewConnectionMetricHandler("test2")
 
 	reportTestMetrics2(metricForTest2)
 

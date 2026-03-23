@@ -17,10 +17,10 @@ const requestIdContextKey = "requestID"
 
 var requestIDCounter uint64
 
-func RequestIDMiddleware(next http.HandlerFunc, middlewareConf MiddlewareConfiguration) http.HandlerFunc {
+func RequestIDMiddleware(next http.HandlerFunc, middlewareConf Config) http.HandlerFunc {
 	prefix := ""
-	if middlewareConf.Config != nil {
-		requestIdPrefix := middlewareConf.Config["prefix"]
+	if middlewareConf.Options != nil {
+		requestIdPrefix := middlewareConf.Options["prefix"]
 		if requestIdPrefix != nil {
 			if prefixStr, ok := requestIdPrefix.(string); ok {
 				prefix = prefixStr
