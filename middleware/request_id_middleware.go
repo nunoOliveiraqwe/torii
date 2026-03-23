@@ -63,7 +63,7 @@ func GetRequestIDFromContext(ctx context.Context) string {
 	if ctx == nil {
 		return ""
 	}
-	val := ctx.Value(requestIDHeader)
+	val := ctx.Value(requestIdContextKey)
 	if val == nil {
 		return ""
 	}
