@@ -30,6 +30,7 @@ func (m *MicroProxyHttpServer) GetProxySnapshot() *ProxySnapshot {
 		IsStarted:       m.isStarted.Load(),
 		IsUsingHTTPS:    false,
 		IsUsingACME:     false,
+		MetricsName:     m.metricsName,
 		Metric:          metrics.GlobalMetricsManager.GetMetricForConnection(m.metricsName),
 	}
 }
@@ -88,15 +89,17 @@ func buildNetListeners(ipv4BindIf, ipv6BindIf string, port int) []net.Listener {
 		if err != nil {
 			zap.S().Errorf("Failed to listen on IPv4 interface: %s", err)
 		} else {
+			zap.S().Infof("Successfully bound to IPv4 interface: %s", addr)
 			lns = append(lns, listen)
 		}
 	}
 	if ipv6BindIf != "" {
-		addr := fmt.Sprintf("%s:%d", ipv6BindIf, port)
+		addr := fmt.Sprintf("[%s]:%d", ipv6BindIf, port)
 		listen, err := net.Listen("tcp6", addr)
 		if err != nil {
 			zap.S().Errorf("Failed to listen on IPv6 interface: %s", err)
 		} else {
+			zap.S().Infof("Successfully bound to IPv6 interface: %s", addr)
 			lns = append(lns, listen)
 		}
 	}

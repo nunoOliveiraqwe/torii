@@ -73,7 +73,7 @@ func resolveReportFunc(r *http.Request) metrics.MetricsReportFunc {
 		zap.S().Warnf("Could not parse local address %s for metrics: %v", addr.String(), err)
 		return nil
 	}
-	conName := metrics.ProxyMetricsName(":", port)
+	conName := metrics.ProxyMetricsName(port)
 	return metrics.GlobalMetricsManager.NewConnectionMetricHandler(conName)
 }
 

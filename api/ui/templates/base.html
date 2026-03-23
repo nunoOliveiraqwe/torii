@@ -52,6 +52,11 @@
             border-radius: 0.5rem;
             padding: 1.25rem;
             text-align: center;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
         }
         .stat-card .stat-value {
             font-size: 1.75rem;
@@ -154,6 +159,8 @@
             background: rgba(124,110,240,0.15);
             color: #7c6ef0;
             font-weight: 600;
+            border-left: 3px solid #7c6ef0;
+            padding-left: calc(1.25rem - 3px);
         }
         .sidebar-nav .nav-icon {
             width: 1.2em;
@@ -227,6 +234,67 @@
             .sidebar-footer { padding: 0.75rem 0.5rem; text-align: center; }
             .sidebar-footer .sidebar-user { justify-content: center; }
             .app-main { margin-left: 56px; padding: 1.5rem 1rem; }
+        }
+
+        /* Page transitions */
+        .page {
+            animation: fadeIn 0.2s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Success alert (reusable) */
+        .success-alert {
+            background: rgba(46,204,113,0.15);
+            border: 1px solid #2ecc71;
+            border-radius: 0.35rem;
+            color: #2ecc71;
+            padding: 0.75rem 1rem;
+            margin-top: 0.75rem;
+            font-size: 0.9em;
+        }
+
+        /* Loading pulse for stat values */
+        .stat-value.loading {
+            color: var(--pico-muted-color);
+            animation: pulse 1.2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; }
+            50%      { opacity: 1; }
+        }
+
+        /* Last-updated timestamp */
+        .last-updated {
+            font-size: 0.75rem;
+            color: var(--pico-muted-color);
+            text-align: right;
+            margin-top: 0.5rem;
+        }
+        .last-updated .dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #2ecc71;
+            margin-right: 0.35rem;
+            vertical-align: middle;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--pico-muted-color);
+        }
+        .empty-state .empty-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .empty-state p {
+            margin: 0.25rem 0;
         }
     </style>
     {{block "head" .}}{{end}}

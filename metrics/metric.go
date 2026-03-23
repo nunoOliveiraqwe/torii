@@ -117,9 +117,6 @@ func (m *Metric) String() string {
 	)
 }
 
-func ProxyMetricsName(iface string, port string) string {
-	if iface == "" {
-		iface = "any"
-	}
-	return fmt.Sprintf("%s-%s", iface, port)
+func ProxyMetricsName(port string) string {
+	return fmt.Sprintf("metric-port-%s", port)
 }

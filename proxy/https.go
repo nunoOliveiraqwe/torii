@@ -35,6 +35,7 @@ func (m *MicroProxyHttpsServer) GetProxySnapshot() *ProxySnapshot {
 		IsStarted:       m.isStarted.Load(),
 		IsUsingHTTPS:    true,
 		IsUsingACME:     m.useAcme,
+		MetricsName:     m.metricsName,
 		Metric:          metrics.GlobalMetricsManager.GetMetricForConnection(m.metricsName),
 	}
 }

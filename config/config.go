@@ -42,9 +42,9 @@ func (c SessionConfig) SameSiteMode() http.SameSite {
 }
 
 type LogConfig struct {
-	Debug    bool   `yaml:"debug" json:"debug"`
-	LogPath  string `yaml:"logPath" json:"logPath"`
-	LogLevel string `yaml:"logLevel" json:"logLevel"`
+	LogConfDebug bool   `yaml:"logDebug" json:"LogDebug"`
+	LogPath      string `yaml:"logPath" json:"logPath"`
+	LogLevel     string `yaml:"logLevel" json:"logLevel"`
 }
 
 type APIServerConfig struct {
@@ -58,7 +58,6 @@ type APIServerConfig struct {
 func DefaultConfiguration() AppConfig {
 	return AppConfig{
 		LogConfig: LogConfig{
-			Debug:    false,
 			LogLevel: "INFO",
 		},
 		APIServer: APIServerConfig{

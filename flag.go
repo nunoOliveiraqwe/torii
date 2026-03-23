@@ -15,7 +15,7 @@ type Flags struct {
 func RegisterFlags() *Flags {
 	f := &Flags{}
 	flag.StringVar(&f.ConfigPath, "config", "", "Path to the configuration file")
-	f.Debug = flag.Bool("debug", false, "Enable debug logging (overrides config)")
+	f.Debug = flag.Bool("debug", false, "Enable debug mode")
 	f.LogLevel = flag.String("log-level", "", "Log level (overrides config)")
 	return f
 }

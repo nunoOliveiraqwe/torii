@@ -31,7 +31,17 @@ func (d *MultiRouteHttpDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Requ
 
 func buildHttpServer(conf config.HTTPListener) (MicroHttpServer, error) {
 	zap.S().Infof("Building HTTP server with configuration: %+v", conf)
-	ipv4, ipv6, err := netutil.GetNetworkBindAddressesFromInterface(conf.Interface)
+	ifFace := "lo"
+	if conf.Interface == "" {
+		zap.S().Warn("No Interface in configuration, defaulting to loopback interface")
+		i, err := netutil.GetLoopBackInterface()
+		if err != nil {
+			zap.S().Errorf("Failed to get loopback interface: %v", err)
+			return nil, err
+		}
+		ifFace = i.Name
+	}
+	ipv4, ipv6, err := netutil.GetNetworkBindAddressesFromInterface(ifFace)
 	if err != nil {
 		zap.S().Errorf("Failed to get network bind addresses from interface %s: %v", conf.Interface, err)
 		return nil, err
@@ -58,9 +68,9 @@ func buildHttpServer(conf config.HTTPListener) (MicroHttpServer, error) {
 		IdleTimeout:                  conf.IdleTimeout,
 	}
 
-	mName := metrics.ProxyMetricsName(":", strconv.Itoa(conf.Port))
+	mName := metrics.ProxyMetricsName(strconv.Itoa(conf.Port))
+	zap.S().Infof("Built HTTP server proxy Ipv4=%s, Ipv6=%s, Port=%d", ipv4, ipv6, conf.Port)
 	if conf.TLS != nil {
-
 		return &MicroProxyHttpsServer{
 			httpServer:        srv,
 			isStarted:         atomic.Bool{},
@@ -80,7 +90,7 @@ func buildHttpServer(conf config.HTTPListener) (MicroHttpServer, error) {
 		isStarted:         atomic.Bool{},
 		bindPort:          conf.Port,
 		iPV4BindInterface: ipv4,
-		iPV6BindInterface: ipv4,
+		iPV6BindInterface: ipv6,
 		middlewareChain:   mwNames,
 		metricsName:       mName,
 	}, nil

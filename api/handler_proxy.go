@@ -29,3 +29,15 @@ func handleGetGlobalMetrics(_ app.SystemService) http.HandlerFunc {
 		WriteResponseAsJSON(globalMetrics, writer)
 	}
 }
+
+func handleGetMetricForConnection(_ app.SystemService) http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		connectionId := request.PathValue("connectionId")
+		zap.S().Infof("Fetching metric for connection %s", connectionId)
+		metric := metrics.GlobalMetricsManager.GetMetricForConnection(connectionId)
+		if metric == nil {
+			metric = &metrics.Metric{}
+		}
+		WriteResponseAsJSON(metric, writer)
+	}
+}

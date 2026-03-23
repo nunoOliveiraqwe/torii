@@ -22,6 +22,7 @@ type Application struct {
 	flags     *Flags
 	service   app.SystemService
 	apiServer *http.Server
+	debug     *debugServers
 }
 
 func NewApplication() *Application {
@@ -46,9 +47,6 @@ func (a *Application) LoadConfiguration() error {
 }
 
 func (a *Application) applyFlagOverrides() {
-	if a.flags.Debug != nil && *a.flags.Debug {
-		a.appConfig.LogConfig.Debug = true
-	}
 	if a.flags.LogLevel != nil && *a.flags.LogLevel != "" {
 		a.appConfig.LogConfig.LogLevel = *a.flags.LogLevel
 	}
@@ -86,13 +84,15 @@ func (a *Application) Start() error {
 			zap.S().Fatalf("API server failed: %v", err)
 		}
 	}()
-
+	a.RunDebugMode()
 	zap.S().Info("Application started successfully")
 	return nil
 }
 
 func (a *Application) Shutdown(ctx context.Context) error {
 	zap.S().Info("Shutting down application...")
+
+	a.ShutdownDebug(ctx)
 
 	if a.apiServer != nil {
 		zap.S().Info("Shutting down API server")

@@ -133,7 +133,7 @@ That's it. Seriously.
 
 ```
 --config <path>     Path to the YAML configuration file
---debug             Enable debug logging (overrides config)
+--debug             Enable debug mode. Starts all http proxied servers localy. Usefull for development and testing.
 --log-level <level> Set log level (overrides config)
 ```
 

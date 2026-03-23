@@ -12,7 +12,7 @@ import (
 func InitLogger(conf config.LogConfig) {
 	var cfg zap.Config
 
-	if conf.Debug {
+	if conf.LogConfDebug {
 		cfg = zap.NewDevelopmentConfig()
 	} else {
 		cfg = zap.NewProductionConfig()

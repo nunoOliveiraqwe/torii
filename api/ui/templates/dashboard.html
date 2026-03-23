@@ -48,27 +48,27 @@
             </div>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <p class="stat-value" id="stat-requests">–</p>
+                    <p class="stat-value loading" id="stat-requests">–</p>
                     <p class="stat-label">Total Requests</p>
                 </div>
                 <div class="stat-card">
-                    <p class="stat-value" id="stat-errors">–</p>
+                    <p class="stat-value loading" id="stat-errors">–</p>
                     <p class="stat-label">Errors</p>
                 </div>
                 <div class="stat-card">
-                    <p class="stat-value" id="stat-avg-latency">–</p>
+                    <p class="stat-value loading" id="stat-avg-latency">–</p>
                     <p class="stat-label">Avg Latency (ms)</p>
                 </div>
                 <div class="stat-card">
-                    <p class="stat-value" id="stat-bytes-sent">–</p>
+                    <p class="stat-value loading" id="stat-bytes-sent">–</p>
                     <p class="stat-label">Bytes Sent</p>
                 </div>
                 <div class="stat-card">
-                    <p class="stat-value" id="stat-bytes-recv">–</p>
+                    <p class="stat-value loading" id="stat-bytes-recv">–</p>
                     <p class="stat-label">Bytes Received</p>
                 </div>
                 <div class="stat-card">
-                    <p class="stat-value" id="stat-active">–</p>
+                    <p class="stat-value loading" id="stat-active">–</p>
                     <p class="stat-label">Active Connections</p>
                 </div>
             </div>
@@ -107,6 +107,9 @@
                     <p class="stat-value" id="stat-5xx" style="color:#e74c3c">–</p>
                     <p class="stat-label">5xx Server Error</p>
                 </div>
+            </div>
+            <div class="last-updated" id="last-updated">
+                <span class="dot"></span>Waiting for data…
             </div>
         </section>
 
@@ -153,7 +156,15 @@
 
     function showPage(pageId) {
         pages.forEach(function (p) {
-            p.style.display = p.getAttribute('data-page') === pageId ? '' : 'none';
+            if (p.getAttribute('data-page') === pageId) {
+                p.style.display = '';
+                // Re-trigger fade animation
+                p.style.animation = 'none';
+                p.offsetHeight; // force reflow
+                p.style.animation = '';
+            } else {
+                p.style.display = 'none';
+            }
         });
         navLinks.forEach(function (a) {
             if (a.getAttribute('data-page') === pageId) {
@@ -162,6 +173,9 @@
                 a.classList.remove('active');
             }
         });
+        // Scroll to top of main content
+        document.querySelector('.app-main').scrollTo(0, 0);
+        window.scrollTo(0, 0);
         // Chart.js needs a resize kick when its container becomes visible
         if (pageId === 'dashboard' && chart) {
             chart.resize();
@@ -285,24 +299,17 @@
                     return resp.json();
                 });
         }
-        // Per-connection: fetch fresh proxy routes to get current metrics
-        return fetch('/api/v1/proxy/routes', { credentials: 'same-origin' })
+        // Per-connection: use the dedicated metrics endpoint
+        return fetch('/api/v1/proxy/metrics/' + encodeURIComponent(selectedConnection), { credentials: 'same-origin' })
             .then(function (resp) {
                 if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
                 if (!resp.ok) throw new Error(resp.statusText);
                 return resp.json();
-            })
-            .then(function (proxies) {
-                if (!proxies) return null;
-                var snap = proxies.find(function (p) {
-                    return connectionKey(p) === selectedConnection;
-                });
-                return snap && snap.Metric ? snap.Metric : null;
             });
     }
 
     function connectionKey(proxy) {
-        return ':-' + proxy.port;
+        return proxy.metrics_name;
     }
 
     function loadMetrics() {
@@ -317,6 +324,11 @@
     }
 
     function updateDashboardWithMetrics(m) {
+        // Remove loading pulse on first data
+        document.querySelectorAll('.stat-value.loading').forEach(function (el) {
+            el.classList.remove('loading');
+        });
+
         // Update stat cards
         document.getElementById('stat-requests').textContent   = fmtNum(m.request_count);
         document.getElementById('stat-errors').textContent     = fmtNum(m.error_count);
@@ -356,6 +368,10 @@
             if (chart) chart.update();
         }
         prevSnapshot = m;
+
+        // Update last-updated indicator
+        document.getElementById('last-updated').innerHTML =
+            '<span class="dot"></span>Last updated at ' + timeLabel();
     }
 
     // Reset chart history when switching connections
@@ -419,10 +435,11 @@
         var el = document.getElementById('proxy-routes');
         if (!proxies || proxies.length === 0) {
             el.innerHTML =
-                '<article class="text-center">' +
-                '<p>No proxy routes are currently configured.</p>' +
-                '<small>Add proxy routes in your configuration file and restart the server.</small>' +
-                '</article>';
+                '<div class="empty-state">' +
+                '<div class="empty-icon">🔌</div>' +
+                '<p><strong>No proxy routes configured</strong></p>' +
+                '<p><small>Add proxy routes in your configuration file and restart the server.</small></p>' +
+                '</div>';
             return;
         }
         var h = '<div class="overflow-auto"><table class="striped">' +
@@ -510,7 +527,7 @@
                     resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to change password.') + '</div>';
                 });
             }
-            resultEl.innerHTML = '<div style="background:rgba(46,204,113,0.15);border:1px solid #2ecc71;border-radius:0.35rem;color:#2ecc71;padding:0.75rem 1rem;margin-top:0.75rem;font-size:0.9em;">Password updated successfully.</div>';
+            resultEl.innerHTML = '<div class="success-alert">Password updated successfully.</div>';
             document.getElementById('old-password').value = '';
             document.getElementById('new-password').value = '';
         })
@@ -529,4 +546,6 @@
     setInterval(loadProxyRoutes, 10000);
 </script>
 {{end}}
+
+
 

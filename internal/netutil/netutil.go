@@ -12,6 +12,19 @@ func GetNetworkIfByName(ifName string) (*net.Interface, error) {
 	return net.InterfaceByName(ifName)
 }
 
+func GetLoopBackInterface() (*net.Interface, error) {
+	zap.S().Debugf("Fetching loopback interface")
+	l, err := net.InterfaceByName("lo")
+	if err != nil {
+		l, err = net.InterfaceByName("lo0")
+		if err != nil {
+			return nil, err
+		}
+		return l, nil
+	}
+	return l, nil
+}
+
 func GetNetworkBindAddressesFromInterface(ifName string) (ipv4, ipv6 string, err error) {
 	zap.S().Debugf("Fetching network bind addresses from interface %s", ifName)
 	iface, err := GetNetworkIfByName(ifName)
