@@ -24,6 +24,7 @@ type NetworkConfig struct {
 	HTTPListeners []HTTPListener `yaml:"http"`
 	ACMEConfig    *ACMEConfig    `yaml:"acme"`
 	TCPListeners  []TCPListener  `yaml:"tcp"`
+	Global        *GlobalConfig  `yaml:"global"`
 }
 
 type HTTPListener struct {
@@ -39,6 +40,16 @@ type HTTPListener struct {
 	Default           *RouteTarget  `yaml:"default"`
 }
 
+type GlobalConfig struct {
+	Middlewares []middleware.Config `yaml:"middlewares" json:"middlewares"`
+	Handlers    []HandlerConfig     `yaml:"handlers" json:"handlers"`
+}
+
+type HandlerConfig struct {
+	Path    string `yaml:"path" json:"path"`
+	Handler string `yaml:"handler" json:"handler"`
+}
+
 type TCPListener struct {
 	Port        int                 `yaml:"port"`
 	Bind        string              `yaml:"bind"`
@@ -48,7 +59,6 @@ type TCPListener struct {
 }
 
 type Route struct {
-	Host        string              `yaml:"host"`
 	Host   string      `yaml:"host"`
 	Target RouteTarget `yaml:"target"`
 }

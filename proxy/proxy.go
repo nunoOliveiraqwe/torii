@@ -159,11 +159,11 @@ func (m *MicroProxy) StartAcmeManager(conf *config.ACMEConfig) error {
 	return nil
 }
 
-func (m *MicroProxy) AddHttpServer(conf config.HTTPListener, mgr *metrics.ConnectionMetricsManager) error {
+func (m *MicroProxy) AddHttpServer(ctx context.Context, conf config.HTTPListener, globalConf *config.GlobalConfig) error {
 	zap.S().Debugf("Adding HTTP server for listener configuration: %+v", conf)
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	httpServer, err := buildHttpServer(conf, mgr)
+	httpServer, err := buildHttpServer(ctx, conf, globalConf)
 	if err != nil {
 		zap.S().Errorf("Failed to build HTTP server: %v", err)
 		return fmt.Errorf("failed to build HTTP server: %w", err)
@@ -195,15 +195,17 @@ func (m *MicroProxy) GetProxyConfSnapshots() []*ProxySnapshot {
 	return proxySnapshots
 }
 
-func (m *MicroProxy) initializeHttpNetworkStackFromConf(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager) error {
+func (m *MicroProxy) initializeHttpNetworkStackFromConf(ctx context.Context, conf config.NetworkConfig) error {
 	zap.S().Infof("Initializing HTTP servers")
-	if conf.HTTPListeners == nil || len(conf.HTTPListeners) == 0 {
-		zap.S().Warn("No HTTP network configurations provided, skipping server initialization")
+	if (conf.HTTPListeners == nil || len(conf.HTTPListeners) == 0) &&
+		(len(conf.TCPListeners) == 0 || conf.TCPListeners == nil) &&
+		(conf.Global == nil) {
+		zap.S().Warn("No network configurations provided, skipping server initialization")
 		return nil
 	}
 	for _, ln := range conf.HTTPListeners {
 		zap.S().Debugf("Initializing HTTP server with configuration: %+v", ln)
-		m.AddHttpServer(ln, mgr)
+		m.AddHttpServer(ctx, ln, conf.Global)
 	}
 	return nil
 }
@@ -229,7 +231,7 @@ func appendDomainsFromServers(servers map[int]MicroHttpServer, domains []string)
 			continue
 		}
 
-		if dispatcher, ok := handler.(*MultiRouteHttpDispatcher); ok {
+		if dispatcher, ok := handler.(*VirtualHostDispatcher); ok {
 			for host := range dispatcher.routes {
 				domains = append(domains, host)
 			}
