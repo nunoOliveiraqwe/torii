@@ -49,15 +49,19 @@ type TCPListener struct {
 
 type Route struct {
 	Host        string              `yaml:"host"`
-	Backend     string              `yaml:"backend"`
+	Host   string      `yaml:"host"`
+	Target RouteTarget `yaml:"target"`
+}
+
+type PathRule struct {
+	Pattern     string              `yaml:"pattern"`
 	Middlewares []middleware.Config `yaml:"middlewares"`
 }
 
-// RouteTarget is the shared backend+middlewares block
-// used by both Route and Listener.Default
 type RouteTarget struct {
 	Backend     string              `yaml:"backend"`
 	Middlewares []middleware.Config `yaml:"middlewares"`
+	Paths       []PathRule          `yaml:"paths"`
 }
 
 type TLSConfig struct {
