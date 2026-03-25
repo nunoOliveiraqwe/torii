@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nunoOliveiraqwe/micro-proxy/internal/app"
+	"github.com/nunoOliveiraqwe/micro-proxy/middleware"
 	"go.uber.org/zap"
 )
 
@@ -16,6 +17,8 @@ func handleSSEGlobalMetrics(svc app.SystemService) http.HandlerFunc {
 }
 
 func serveSSE(w http.ResponseWriter, r *http.Request, broker *app.SSEBroker) {
+	logger := middleware.GetRequestLoggerFromContext(r)
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
@@ -24,7 +27,7 @@ func serveSSE(w http.ResponseWriter, r *http.Request, broker *app.SSEBroker) {
 
 	rc := http.NewResponseController(w)
 	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
-		zap.S().Warnf("SSE: could not clear write deadline: %v", err)
+		logger.Warn("SSE: could not clear write deadline", zap.Error(err))
 	}
 
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -36,7 +39,7 @@ func serveSSE(w http.ResponseWriter, r *http.Request, broker *app.SSEBroker) {
 	client := broker.Subscribe()
 	defer broker.Unsubscribe(client)
 
-	zap.S().Infof("SSE client %s connected", client.ID)
+	logger.Info("SSE client connected", zap.String("client_id", client.ID))
 
 	heartbeat := time.NewTicker(15 * time.Second)
 	defer heartbeat.Stop()
@@ -45,7 +48,7 @@ func serveSSE(w http.ResponseWriter, r *http.Request, broker *app.SSEBroker) {
 	for {
 		select {
 		case <-ctx.Done():
-			zap.S().Infof("SSE client %s disconnected", client.ID)
+			logger.Info("SSE client disconnected", zap.String("client_id", client.ID))
 			return
 		case ev, ok := <-client.Events:
 			if !ok {
@@ -53,14 +56,14 @@ func serveSSE(w http.ResponseWriter, r *http.Request, broker *app.SSEBroker) {
 			}
 			_, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", ev.Type, ev.Data)
 			if err != nil {
-				zap.S().Debugf("SSE write error for client %s: %v", client.ID, err)
+				logger.Debug("SSE write error", zap.String("client_id", client.ID), zap.Error(err))
 				return
 			}
 			flusher.Flush()
 		case <-heartbeat.C:
 			_, err := fmt.Fprintf(w, ":keepalive\n\n")
 			if err != nil {
-				zap.S().Debugf("SSE heartbeat error for client %s: %v", client.ID, err)
+				logger.Debug("SSE heartbeat error", zap.String("client_id", client.ID), zap.Error(err))
 				return
 			}
 			flusher.Flush()

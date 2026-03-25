@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var logEntryContextKey = "logEntry"
+var logEntryContextKey = "logger"
 
 type zapLogFormatter struct {
 	logger *zap.Logger
@@ -37,19 +37,19 @@ func (z *zapLogFormatter) LogRequest(r *http.Request) {
 	)
 	log.Info("Incoming request")
 	ctx = context.WithValue(ctx, logEntryContextKey, log)
-	r.WithContext(ctx)
+	*r = *r.WithContext(ctx)
 }
 
-func getRequestLoggerFromContext(r *http.Request) *zap.Logger {
+func GetRequestLoggerFromContext(r *http.Request) *zap.Logger {
 	ctx := r.Context()
 	if ctx == nil || ctx.Value(logEntryContextKey) == nil {
-		return zap.NewNop()
+		return zap.L()
 	}
 	log := ctx.Value(logEntryContextKey)
 	if logEntry, ok := log.(*zap.Logger); ok {
 		return logEntry
 	}
-	return zap.NewNop()
+	return zap.L()
 }
 
 func RequestLoggerMiddleware(_ context.Context, next http.HandlerFunc, _ Config) http.HandlerFunc {

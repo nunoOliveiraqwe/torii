@@ -6,13 +6,10 @@ import (
 
 	"github.com/nunoOliveiraqwe/micro-proxy/api/ui"
 	"github.com/nunoOliveiraqwe/micro-proxy/internal/app"
+	"github.com/nunoOliveiraqwe/micro-proxy/middleware"
 	"go.uber.org/zap"
 )
 
-// uiHandler serves the HTMX-based web UI.
-// Forms POST directly to the existing JSON API endpoints; this handler
-// only serves HTML pages, manages page-level auth/FTS guards, and handles
-// logout (which has no API route).
 type uiHandler struct {
 	svc       app.SystemService
 	templates map[string]*template.Template
@@ -38,16 +35,17 @@ func (h *uiHandler) parseTemplates() map[string]*template.Template {
 	return cache
 }
 
-func (h *uiHandler) renderPage(w http.ResponseWriter, page string, data any) {
+func (h *uiHandler) renderPage(w http.ResponseWriter, r *http.Request, page string, data any) {
+	logger := middleware.GetRequestLoggerFromContext(r)
 	t, ok := h.templates[page]
 	if !ok {
-		zap.S().Errorf("Page template %q not found in cache", page)
+		logger.Error("Page template not found in cache", zap.String("page", page))
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := t.ExecuteTemplate(w, "base", data); err != nil {
-		zap.S().Errorf("Failed to render page %q: %v", page, err)
+		logger.Error("Failed to render page", zap.String("page", page), zap.Error(err))
 	}
 }
 
@@ -82,7 +80,7 @@ func (h *uiHandler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/ui/dashboard", http.StatusSeeOther)
 		return
 	}
-	h.renderPage(w, "login", nil)
+	h.renderPage(w, r, "login", nil)
 }
 
 // handleSetupPage serves the first-time-setup form.
@@ -91,7 +89,7 @@ func (h *uiHandler) handleSetupPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/ui/login", http.StatusSeeOther)
 		return
 	}
-	h.renderPage(w, "setup", nil)
+	h.renderPage(w, r, "setup", nil)
 }
 
 // handleDashboardPage serves the main dashboard.
@@ -101,7 +99,7 @@ func (h *uiHandler) handleDashboardPage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	username := h.svc.SessionRegistry().GetValueFromSession(r, "username")
-	h.renderPage(w, "dashboard", dashboardData{Username: username})
+	h.renderPage(w, r, "dashboard", dashboardData{Username: username})
 }
 
 // handleLogout destroys the current session (HTMX POST).

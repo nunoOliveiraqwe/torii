@@ -23,8 +23,7 @@ func TestHandleGetProxies_Success(t *testing.T) {
 			IsStarted:       true,
 			IsUsingHTTPS:    false,
 			IsUsingACME:     false,
-			MetricsName:     ":-8080",
-			Metric:          &metrics.Metric{ConnectionName: "test", RequestCount: 42},
+			Metrics:         []*metrics.Metric{{ConnectionName: "test", RequestCount: 42}},
 		},
 		{
 			Port:            8443,
@@ -33,7 +32,6 @@ func TestHandleGetProxies_Success(t *testing.T) {
 			IsStarted:       true,
 			IsUsingHTTPS:    true,
 			IsUsingACME:     true,
-			MetricsName:     ":-8443",
 		},
 	}
 

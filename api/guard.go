@@ -5,25 +5,25 @@ import (
 
 	"github.com/nunoOliveiraqwe/micro-proxy/internal/app"
 	"github.com/nunoOliveiraqwe/micro-proxy/middleware"
-	"go.uber.org/zap"
 )
 
 func checkIfRouteIsAllowedIfFtsIsNotDone(next http.HandlerFunc, isAllowedBeforeFts, isAllowedAfterFts bool, svc app.SystemService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		zap.S().Debugf("Checking if route %s is allowed when FTS is not done", r.URL.Path)
+		logger := middleware.GetRequestLoggerFromContext(r)
+		logger.Debug("Checking if route is allowed when FTS is not done")
 		if isAllowedAfterFts && isAllowedBeforeFts {
 			next(w, r)
 			return
 		}
 		isFtsDone := svc.GetServiceStore().GetSystemConfigurationService().IsFirstTimeSetupCompleted()
 		if isAllowedAfterFts && isFtsDone {
-			zap.S().Debugf("Route %s is allowed because FTS is done", r.URL.Path)
+			logger.Debug("Route is allowed because FTS is done")
 			next(w, r)
 		} else if isAllowedBeforeFts && !isFtsDone {
-			zap.S().Debugf("Route %s is allowed because FTS is not done", r.URL.Path)
+			logger.Debug("Route is allowed because FTS is not done")
 			next(w, r)
 		} else {
-			zap.S().Debugf("Route %s is not allowed because FTS is not done", r.URL.Path)
+			logger.Debug("Route is not allowed because FTS is not done")
 			http.Error(w, "Forbidden", http.StatusForbidden)
 		}
 	}
@@ -31,11 +31,11 @@ func checkIfRouteIsAllowedIfFtsIsNotDone(next http.HandlerFunc, isAllowedBeforeF
 
 func isAuthenticatedRequest(next http.HandlerFunc, systemService app.SystemService) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		reqId := middleware.GetRequestIDFromContext(request.Context())
-		zap.S().Debugf("Checking if request %s is authenticated", reqId)
+		logger := middleware.GetRequestLoggerFromContext(request)
+		logger.Debug("Checking if request is authenticated")
 		isValid := systemService.SessionRegistry().HasValidSession(request)
 		if !isValid {
-			zap.S().Debugf("Request %s is not authenticated", reqId)
+			logger.Debug("Request is not authenticated")
 			http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 			return
 		}

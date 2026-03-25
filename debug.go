@@ -90,7 +90,7 @@ func httpListenerBackends(ln config.HTTPListener) []string {
 	}
 	backends := make([]string, 0, len(ln.Routes))
 	for _, r := range ln.Routes {
-		backends = append(backends, r.Backend)
+		backends = append(backends, r.Target.Backend)
 	}
 	return backends
 }

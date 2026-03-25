@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -41,21 +42,18 @@ func buildMux(port int, svc app.SystemService) *http.ServeMux {
 		fullPathWithMethod := fmt.Sprintf("%s %s%s", route.Method, APPLICATION_ROUTE_BASE_PATH, route.Pattern)
 		zap.S().Debugf("Full path for route %s is %s", route.Name, fullPathWithMethod)
 		routeHandlerFunc := route.HandlerFunc(svc)
-		routeHandlerFunc = middleware.RequestIDMiddleware(routeHandlerFunc, middleware.Config{})
-		routeHandlerFunc = middleware.RequestLoggerMiddleware(routeHandlerFunc, middleware.Config{})
 
-		confMetrics := middleware.Config{
-			Type:    "Metrics",
-			Options: make(map[string]interface{}),
-		}
-		confMetrics.Options[middleware.MgrKey] = svc.GetGlobalMetricsManager()
-		confMetrics.Options["port"] = strconv.Itoa(port)
-		routeHandlerFunc = middleware.MetricsMiddleware(routeHandlerFunc, confMetrics)
-		routeHandlerFunc = checkIfRouteIsAllowedIfFtsIsNotDone(routeHandlerFunc, route.IsAllowedBeforeFts,
-			route.IsAllowedAfterFts, svc)
+		ctx := context.WithValue(context.Background(), "port", strconv.Itoa(port))
+		//ctx = context.WithValue(ctx, "path", route.Pattern)
+		ctx = context.WithValue(ctx, middleware.MgrKey, svc.GetGlobalMetricsManager())
+		ctx = context.WithValue(ctx, "serverId", fmt.Sprintf("http-%d", port))
 		if route.IsSecure {
 			routeHandlerFunc = isAuthenticatedRequest(routeHandlerFunc, svc)
 		}
+		routeHandlerFunc = checkIfRouteIsAllowedIfFtsIsNotDone(routeHandlerFunc, route.IsAllowedBeforeFts, route.IsAllowedAfterFts, svc)
+		routeHandlerFunc = middleware.MetricsMiddleware(ctx, routeHandlerFunc, middleware.Config{})
+		routeHandlerFunc = middleware.RequestLoggerMiddleware(ctx, routeHandlerFunc, middleware.Config{})
+		routeHandlerFunc = middleware.RequestIDMiddleware(ctx, routeHandlerFunc, middleware.Config{})
 		mux.HandleFunc(fullPathWithMethod, routeHandlerFunc)
 		zap.S().Debugf("Route %s initialized", route.Name)
 	}
