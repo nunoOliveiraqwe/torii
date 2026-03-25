@@ -11,13 +11,11 @@ import (
 	"sync/atomic"
 )
 
-const requestIDHeader = "X-Request-ID"
-
 const requestIdContextKey = "requestID"
 
 var requestIDCounter uint64
 
-func RequestIDMiddleware(next http.HandlerFunc, middlewareConf Config) http.HandlerFunc {
+func RequestIDMiddleware(_ context.Context, next http.HandlerFunc, middlewareConf Config) http.HandlerFunc {
 	prefix := ""
 	if middlewareConf.Options != nil {
 		requestIdPrefix := middlewareConf.Options["prefix"]

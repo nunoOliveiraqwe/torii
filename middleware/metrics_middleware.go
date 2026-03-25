@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
@@ -53,23 +55,22 @@ func (w *responseWriterWithMetrics) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
 }
 
-func MetricsMiddleware(next http.HandlerFunc, conf Config) http.HandlerFunc {
-	reportFunc := resolveReportFunc(conf)
+func MetricsMiddleware(ctx context.Context, next http.HandlerFunc, _ Config) http.HandlerFunc {
+	reportFunc := resolveReportFunc(ctx)
 	return func(w http.ResponseWriter, r *http.Request) {
 		if reportFunc == nil {
 			next.ServeHTTP(w, r)
 			return
 		}
-
-		logger := getRequestLoggerFromContext(r)
-		logger.Debug("Recording metrics for request")
+		logger := GetRequestLoggerFromContext(r)
+		logger.Info("Applying metrics middleware for request")
 		metric := initializeRequestMetrics(r)
 		responseWriter := &responseWriterWithMetrics{ResponseWriter: w,
 			reqMetrics: metric}
 		startTime := time.Now()
 		next.ServeHTTP(responseWriter, r)
 		elapsedTime := time.Since(startTime)
-		if err := r.Context().Err(); err == context.DeadlineExceeded {
+		if err := r.Context().Err(); errors.Is(err, context.DeadlineExceeded) {
 			metric.IsTimedOut = true
 		}
 		metric.LatencyMs = elapsedTime.Milliseconds()
@@ -77,21 +78,33 @@ func MetricsMiddleware(next http.HandlerFunc, conf Config) http.HandlerFunc {
 	}
 }
 
-func resolveReportFunc(conf Config) metrics.MetricsReportFunc {
-	port := conf.Options["port"]
-	if port == "" {
+func resolveReportFunc(ctx context.Context) metrics.MetricsReportFunc {
+	port := ctx.Value("port")
+	if port == nil || port == "" {
 		zap.S().Warnf("Port not found in middleware options for metrics resolution")
 		return nil
 	}
 	portStr, ok := port.(string)
 	if !ok {
-		zap.S().Warnf("Port is not of type string")
-		return nil
+		_, isInt := port.(int)
+		if !isInt {
+			zap.S().Warnf("Port is not of type string")
+			return nil
+		}
+		portStr = strconv.Itoa(port.(int))
 	}
-	conName := metrics.ProxyMetricsName(portStr)
+	pathStr := ""
+	path := ctx.Value("path")
+	if path != nil {
+		pathStr2, ok := path.(string)
+		if ok {
+			pathStr = pathStr2
+		}
+	}
+	conName := metrics.ProxyPathMetricsName(portStr, pathStr)
 
-	mgrManager, exists := conf.Options[MgrKey]
-	if !exists {
+	mgrManager := ctx.Value(MgrKey)
+	if mgrManager == nil {
 		zap.S().Warnf("Mgr not found in middleware options for metrics resolution")
 		return nil
 	}
@@ -100,7 +113,14 @@ func resolveReportFunc(conf Config) metrics.MetricsReportFunc {
 		zap.S().Warnf("Mgr is not of type SystemService")
 		return nil
 	}
-	return mgrManagerCasted.TrackMetricsForConnection(conName)
+	serverIdStr := ""
+	serverId := ctx.Value("serverId")
+	if serverId == nil {
+		zap.S().Warnf("ServerId not found in middleware options for metrics resolution")
+		return nil
+	}
+	serverIdStr = serverId.(string)
+	return mgrManagerCasted.TrackMetricsForConnection(serverIdStr, conName)
 }
 
 func initializeRequestMetrics(r *http.Request) *metrics.RequestMetric {

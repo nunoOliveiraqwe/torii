@@ -22,7 +22,7 @@ func TestRequestIDMiddleware_GeneratesID(t *testing.T) {
 		assert.NotEmpty(t, reqID)
 	})
 
-	mw := RequestIDMiddleware(next, Config{})
+	mw := RequestIDMiddleware(context.Background(), next, Config{})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -43,7 +43,7 @@ func TestRequestIDMiddleware_UsesExistingID(t *testing.T) {
 		assert.Equal(t, existingID, reqID)
 	})
 
-	mw := RequestIDMiddleware(next, Config{})
+	mw := RequestIDMiddleware(context.Background(), next, Config{})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx := context.WithValue(req.Context(), requestIdContextKey, existingID)
@@ -67,7 +67,7 @@ func TestRequestIDMiddleware_WithPrefix(t *testing.T) {
 			"prefix": "testprefix",
 		},
 	}
-	mw := RequestIDMiddleware(next, conf)
+	mw := RequestIDMiddleware(context.Background(), next, conf)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()

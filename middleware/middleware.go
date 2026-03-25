@@ -1,16 +1,16 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"net/http"
-	"strconv"
 
 	"go.uber.org/zap"
 )
 
 const MgrKey = "metricsManager"
 
-type Func func(next http.HandlerFunc, middlewareConf Config) http.HandlerFunc
+type Func func(ctx context.Context, next http.HandlerFunc, middlewareConf Config) http.HandlerFunc
 
 type Registry = map[string]Func
 
@@ -26,10 +26,11 @@ func init() {
 		"Metrics":    MetricsMiddleware,
 		"RequestId":  RequestIDMiddleware,
 		"RequestLog": RequestLoggerMiddleware,
+		"Headers":    HeadersMiddleware,
 	}
 }
 
-func ApplyMiddlewares(port int, handler http.HandlerFunc, middlewares []Config, mgr *metrics.ConnectionMetricsManager) (http.HandlerFunc, error) {
+func ApplyMiddlewares(ctx context.Context, handler http.HandlerFunc, middlewares []Config) (http.HandlerFunc, error) {
 	if handler == nil {
 		zap.S().Errorf("Handler cannot be nil when applying middleware chain")
 		return nil, errors.New("handler cannot be nil when applying middleware chain")
@@ -45,15 +46,7 @@ func ApplyMiddlewares(port int, handler http.HandlerFunc, middlewares []Config, 
 			zap.S().Warnf("Middleware options for middleware of type %s is nil. Initializing it as an empty map", middlewares[i].Type)
 			middlewares[i].Options = make(map[string]interface{})
 		}
-		_, exists := middlewares[i].Options[MgrKey]
-		if exists {
-			zap.S().Warn("Middleware options should not contain 'systemService' key as it is reserved for internal use. Clearing it")
-			middlewares[i].Options[MgrKey] = nil
-		}
-		middlewares[i].Options["port"] = strconv.Itoa(port)
-
-		middlewares[i].Options[MgrKey] = mgr //mgr is always injected
-		handler = middleware(handler, middlewares[i])
+		handler = middleware(ctx, handler, middlewares[i])
 	}
 	return handler, nil
 }

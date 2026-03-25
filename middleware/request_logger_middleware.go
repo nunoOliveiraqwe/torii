@@ -52,7 +52,7 @@ func getRequestLoggerFromContext(r *http.Request) *zap.Logger {
 	return zap.NewNop()
 }
 
-func RequestLoggerMiddleware(next http.HandlerFunc, middleware Config) http.HandlerFunc {
+func RequestLoggerMiddleware(_ context.Context, next http.HandlerFunc, _ Config) http.HandlerFunc {
 	newZapLogFormatter := newZapLogFormatter()
 	return func(w http.ResponseWriter, r *http.Request) {
 		newZapLogFormatter.LogRequest(r)

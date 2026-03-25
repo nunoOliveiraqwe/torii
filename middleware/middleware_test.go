@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -72,14 +73,14 @@ func TestGetAvailableMiddlewares(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestApplyMiddlewares_NilHandler(t *testing.T) {
-	_, err := ApplyMiddlewares(nil, []Config{{Type: "RequestId"}}, nil)
+	_, err := ApplyMiddlewares(context.Background(), nil, []Config{{Type: "RequestId"}})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "nil")
 }
 
 func TestApplyMiddlewares_UnknownMiddleware(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-	_, err := ApplyMiddlewares(handler, []Config{{Type: "Unknown"}}, nil)
+	_, err := ApplyMiddlewares(context.Background(), handler, []Config{{Type: "Unknown"}})
 	assert.Error(t, err)
 }
 
@@ -89,7 +90,7 @@ func TestApplyMiddlewares_EmptyChain(t *testing.T) {
 		called = true
 	})
 
-	result, err := ApplyMiddlewares(handler, []Config{}, nil)
+	result, err := ApplyMiddlewares(context.Background(), handler, []Config{})
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 
@@ -105,7 +106,7 @@ func TestApplyMiddlewares_SingleMiddleware(t *testing.T) {
 		called = true
 	})
 
-	result, err := ApplyMiddlewares(handler, []Config{{Type: "RequestId"}}, nil)
+	result, err := ApplyMiddlewares(context.Background(), handler, []Config{{Type: "RequestId"}})
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 
@@ -127,7 +128,7 @@ func TestApplyMiddlewares_MultipleMiddlewares(t *testing.T) {
 		{Type: "RequestLog"},
 	}
 
-	result, err := ApplyMiddlewares(handler, chain, nil)
+	result, err := ApplyMiddlewares(context.Background(), handler, chain)
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
