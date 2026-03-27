@@ -15,13 +15,15 @@ type MicroProxyAcmeManager struct {
 	acmeManager    *autocert.Manager
 	allowedDomains map[string]bool
 	mutex          sync.Mutex
+	usePort80      bool
 }
 
-func newMicroProxyAcmeManager(allowedDomains []string, email, cacheDir string) *MicroProxyAcmeManager {
+func newMicroProxyAcmeManager(allowedDomains []string, email, cacheDir string, usePort80 bool) *MicroProxyAcmeManager {
 	zap.S().Infof("Initializing ACME manager with email %s and cache directory %s", email, cacheDir)
 	acme := &MicroProxyAcmeManager{
 		allowedDomains: make(map[string]bool),
 		mutex:          sync.Mutex{},
+		usePort80:      usePort80,
 	}
 	acme.addDomain(allowedDomains)
 	acme.acmeManager = &autocert.Manager{

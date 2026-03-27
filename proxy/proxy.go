@@ -91,7 +91,7 @@ func (m *MicroProxy) StartProxy(port int) error {
 	if !ok {
 		return fmt.Errorf("no stopped HTTP server found for port %d", port)
 	}
-	if port == 80 && m.acmeManager != nil { //handle por 80 attach
+	if port == 80 && m.acmeManager != nil && m.acmeManager.usePort80 { //handle por 80 attach
 		zap.S().Infof("Attaching ACME manager to port 80")
 		serverHandler := server.getHandler()
 		if serverHandler != nil {
@@ -155,7 +155,7 @@ func (m *MicroProxy) StartAcmeManager(conf *config.ACMEConfig) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	domains := m.collectWorkingDomains()
-	m.acmeManager = newMicroProxyAcmeManager(domains, conf.Email, conf.Cache)
+	m.acmeManager = newMicroProxyAcmeManager(domains, conf.Email, conf.Cache, conf.OpenPort80)
 	return nil
 }
 

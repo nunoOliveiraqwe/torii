@@ -165,14 +165,24 @@
                 </div>
             </div>
             <!-- Request Log -->
-            <h4>Request Log</h4>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                <h4 style="margin:0;">Request Log</h4>
+                <select id="request-log-filter" aria-label="Filter requests" style="width:auto;min-width:180px;margin:0;padding:0.3rem 0.5rem;font-size:0.8rem;">
+                    <option value="">All connections</option>
+                </select>
+            </div>
             <div class="stat-card" style="text-align:left;padding:0;">
                 <div class="request-feed" id="request-feed">
                     <div class="error-empty">No requests recorded</div>
                 </div>
             </div>
             <!-- Recent Errors -->
-            <h4 style="margin-top:1.5rem;">Recent Errors</h4>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-top:1.5rem;">
+                <h4 style="margin:0;">Recent Errors</h4>
+                <select id="error-log-filter" aria-label="Filter errors" style="width:auto;min-width:180px;margin:0;padding:0.3rem 0.5rem;font-size:0.8rem;">
+                    <option value="">All connections</option>
+                </select>
+            </div>
             <div class="stat-card" style="text-align:left;padding:0;">
                 <div class="error-feed" id="error-feed">
                     <div class="error-empty">No errors recorded</div>
@@ -384,16 +394,23 @@
             var connName = snap.connection_name || '';
             // Store every per-connection snapshot
             perConnectionSnapshots[connName] = snap;
-            // Rebuild dropdown when a previously-unseen connection name arrives
+            // Rebuild dropdowns when a previously-unseen connection name arrives
             if (!knownConnectionNames[connName]) {
                 knownConnectionNames[connName] = true;
                 updateConnectionSelector();
+                updateLogFilterDropdowns();
             }
             // Update dashboard cards only for the selected connection
             if (selectedConnection === 'global' && connName === 'global') {
                 applySnapshot(snap);
             } else if (connName === selectedConnection) {
                 applySnapshot(snap);
+            }
+            // Live-update proxy routes metrics cells for port-level metrics
+            var portMatch = connName.match(/^metric-port-(\d+)$/);
+            if (portMatch) {
+                var metricsCell = document.querySelector('[data-metrics-port="' + portMatch[1] + '"]');
+                if (metricsCell) metricsCell.innerHTML = metricsHtmlFor(snap);
             }
         });
         metricsEventSource.addEventListener('proxy_error', function (e) {
@@ -406,6 +423,14 @@
             var connKey = entry.connection_name || '';
             if (sparklineBuffers[connKey]) {
                 sparklineBuffers[connKey].count++;
+            }
+            // Also feed the port-level sparkline buffer for path-level requests
+            var pathIdx = connKey.indexOf('-path-');
+            if (pathIdx !== -1) {
+                var parentKey = connKey.substring(0, pathIdx);
+                if (sparklineBuffers[parentKey]) {
+                    sparklineBuffers[parentKey].count++;
+                }
             }
         });
         metricsEventSource.onopen = function () { setSseStatus('connected'); };
@@ -472,7 +497,23 @@
             '<span class="dot"></span>' + (latestSnapshot ? 'Last updated at ' : 'Waiting for data… ') + timeLabel();
     }
 
-    function connectionKey(proxy) { return proxy.metrics_name; }
+    function connectionKey(proxy) { return 'metric-port-' + proxy.port; }
+
+    // Find the port-level aggregate metric from a proxy snapshot's metrics array.
+    function findPortMetric(proxy) {
+        var key = connectionKey(proxy);
+        if (!proxy.metrics) return null;
+        for (var i = 0; i < proxy.metrics.length; i++) {
+            if (proxy.metrics[i].connection_name === key) return proxy.metrics[i];
+        }
+        // Fallback: return the first metric if available
+        return proxy.metrics.length > 0 ? proxy.metrics[0] : null;
+    }
+
+    // Get the live metric snapshot for a proxy from SSE data (real-time).
+    function livePortMetric(proxy) {
+        return perConnectionSnapshots[connectionKey(proxy)] || findPortMetric(proxy);
+    }
 
     function resetStatCards() {
         currentRps = 0;
@@ -576,6 +617,7 @@
     // ---------- Error Log Feed ----------
     var MAX_ERROR_ENTRIES = 20;
     var errorEntries = [];
+    var errorLogFilter = '';  // '' = all connections
 
     function buildErrorRow(e) {
         var ts = new Date(e.timestamp);
@@ -612,6 +654,8 @@
     function addErrorToFeed(entry) {
         errorEntries.unshift(entry);
         if (errorEntries.length > MAX_ERROR_ENTRIES) errorEntries.pop();
+        // Only render to DOM if the entry matches the current filter
+        if (!matchesConnectionFilter(entry.connection_name, errorLogFilter)) return;
         var el = document.getElementById('error-feed');
         // Remove the empty-state placeholder if present
         var empty = el.querySelector('.error-empty');
@@ -628,12 +672,15 @@
 
     function renderErrorFeed() {
         var el = document.getElementById('error-feed');
-        if (errorEntries.length === 0) {
+        var filtered = errorEntries.filter(function (e) {
+            return matchesConnectionFilter(e.connection_name, errorLogFilter);
+        });
+        if (filtered.length === 0) {
             el.innerHTML = '<div class="error-empty">No errors recorded</div>';
             return;
         }
         var html = errorFeedHeader;
-        errorEntries.forEach(function (e) { html += buildErrorRow(e).outerHTML; });
+        filtered.forEach(function (e) { html += buildErrorRow(e).outerHTML; });
         el.innerHTML = html;
     }
 
@@ -652,6 +699,7 @@
     // ---------- Request Log Feed ----------
     var MAX_REQUEST_ENTRIES = 100;
     var requestEntries = [];
+    var requestLogFilter = '';  // '' = all connections
 
     function statusClass(code) {
         if (code >= 500) return 's5xx';
@@ -664,6 +712,15 @@
         if (!connectionName) return '–';
         var m = connectionName.match(/port-(\d+)/);
         return m ? m[1] : connectionName;
+    }
+
+    // Check if an entry's connection_name matches the given filter.
+    // A port-level filter (e.g. "metric-port-8081") also matches its
+    // path-level children ("metric-port-8081-path-…").
+    function matchesConnectionFilter(connName, filter) {
+        if (!filter) return true;
+        if (!connName) return false;
+        return connName === filter || connName.indexOf(filter + '-path-') === 0;
     }
 
     function buildRequestRow(e) {
@@ -704,6 +761,8 @@
     function addRequestToFeed(entry) {
         requestEntries.unshift(entry);
         if (requestEntries.length > MAX_REQUEST_ENTRIES) requestEntries.pop();
+        // Only render to DOM if the entry matches the current filter
+        if (!matchesConnectionFilter(entry.connection_name, requestLogFilter)) return;
         var el = document.getElementById('request-feed');
         // Remove the empty-state placeholder if present
         var empty = el.querySelector('.error-empty');
@@ -720,12 +779,15 @@
 
     function renderRequestFeed() {
         var el = document.getElementById('request-feed');
-        if (requestEntries.length === 0) {
+        var filtered = requestEntries.filter(function (e) {
+            return matchesConnectionFilter(e.connection_name, requestLogFilter);
+        });
+        if (filtered.length === 0) {
             el.innerHTML = '<div class="error-empty">No requests recorded</div>';
             return;
         }
         var html = requestFeedHeader;
-        requestEntries.forEach(function (e) { html += buildRequestRow(e).outerHTML; });
+        filtered.forEach(function (e) { html += buildRequestRow(e).outerHTML; });
         el.innerHTML = html;
     }
 
@@ -740,6 +802,60 @@
             })
             .catch(function () {});
     }
+
+    // ---------- Log Filter Dropdowns ----------
+    function buildLogFilterOptions() {
+        var names = Object.keys(perConnectionSnapshots).sort();
+        var html = '<option value="">All connections</option>';
+        // Reuse the same grouping logic as the dashboard selector
+        var ports = {};
+        names.forEach(function (name) {
+            if (name === 'global') return;
+            var pathIdx = name.indexOf('-path-');
+            if (pathIdx !== -1) {
+                var parent = name.substring(0, pathIdx);
+                if (!ports[parent]) ports[parent] = [];
+                ports[parent].push(name);
+            } else {
+                if (!ports[name]) ports[name] = [];
+            }
+        });
+        Object.keys(ports).sort().forEach(function (portKey) {
+            var portLabel = portKey.replace(/^metric-port-/, ':');
+            var children = ports[portKey];
+            if (children.length > 0) {
+                html += '<option value="' + portKey + '">' + portLabel + ' (all paths)</option>';
+                children.sort().forEach(function (childKey) {
+                    var path = childKey.substring(childKey.indexOf('-path-') + 6);
+                    html += '<option value="' + childKey + '">\u00A0\u00A0\u2514 ' + portLabel + ' ' + path + '</option>';
+                });
+            } else {
+                html += '<option value="' + portKey + '">' + portLabel + '</option>';
+            }
+        });
+        return html;
+    }
+
+    function updateLogFilterDropdowns() {
+        var html = buildLogFilterOptions();
+        var reqSel = document.getElementById('request-log-filter');
+        var errSel = document.getElementById('error-log-filter');
+        var reqCur = reqSel.value;
+        var errCur = errSel.value;
+        reqSel.innerHTML = html;
+        errSel.innerHTML = html;
+        if (reqCur && reqSel.querySelector('option[value="' + reqCur + '"]')) reqSel.value = reqCur;
+        if (errCur && errSel.querySelector('option[value="' + errCur + '"]')) errSel.value = errCur;
+    }
+
+    document.getElementById('request-log-filter').addEventListener('change', function () {
+        requestLogFilter = this.value;
+        renderRequestFeed();
+    });
+    document.getElementById('error-log-filter').addEventListener('change', function () {
+        errorLogFilter = this.value;
+        renderErrorFeed();
+    });
 
     // ---------- Sparklines ----------
     var sparklineBuffers = {};  // key → { history: [], count: 0 }
@@ -919,7 +1035,7 @@
         if (fp === lastRouteFingerprint) {
             proxies.forEach(function (p) {
                 var metricsCell = el.querySelector('[data-metrics-port="' + p.port + '"]');
-                if (metricsCell) metricsCell.innerHTML = metricsHtmlFor(p.metric);
+                if (metricsCell) metricsCell.innerHTML = metricsHtmlFor(livePortMetric(p));
             });
             return;
         }
@@ -954,7 +1070,7 @@
                     ? '<span class="badge badge-success">Running</span>'
                     : '<span class="badge badge-danger">Stopped</span>') + '</td>' +
                 '<td>' + sparkHtml + '</td>' +
-                '<td data-metrics-port="' + p.port + '">' + metricsHtmlFor(p.metric) + '</td>' +
+                '<td data-metrics-port="' + p.port + '">' + metricsHtmlFor(livePortMetric(p)) + '</td>' +
                 '<td>' + actionBtn + '</td>' +
                 '</tr>';
             // Expandable detail row for routes
