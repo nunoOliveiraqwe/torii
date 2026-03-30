@@ -14,15 +14,8 @@ const (
 	BothFlag IpFlag = Ipv4Flag | Ipv6Flag
 )
 
-type ACMEConfig struct {
-	Email      string `yaml:"email"`
-	Cache      string `yaml:"cache"`
-	OpenPort80 bool   `yaml:"open-port-80"`
-}
-
 type NetworkConfig struct {
 	HTTPListeners []HTTPListener `yaml:"http"`
-	ACMEConfig    *ACMEConfig    `yaml:"acme"`
 	TCPListeners  []TCPListener  `yaml:"tcp"`
 	Global        *GlobalConfig  `yaml:"global"`
 }

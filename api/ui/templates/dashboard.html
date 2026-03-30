@@ -22,6 +22,9 @@
             <li><a href="#" class="nav-link" data-page="system">
                 <span class="nav-icon">🖥️</span><span class="nav-label">System</span>
             </a></li>
+            <li><a href="#" class="nav-link" data-page="acme">
+                <span class="nav-icon">🔒</span><span class="nav-label">ACME / TLS</span>
+            </a></li>
             <li class="sidebar-section">Account</li>
             <li><a href="#" class="nav-link" data-page="account">
                 <span class="nav-icon">🔑</span><span class="nav-label">Account</span>
@@ -190,6 +193,64 @@
             </div>
         </section>
 
+        <!-- PAGE: ACME / TLS -->
+        <section class="page" data-page="acme" style="display:none;">
+            <hgroup>
+                <h2>ACME / TLS</h2>
+                <p>Manage automatic TLS certificates via DNS-01 challenges</p>
+            </hgroup>
+
+            <div class="stat-card" style="text-align:left;max-width:600px;margin-bottom:1.5rem;">
+                <p class="stat-label" style="margin-bottom:0.75rem;">Configuration</p>
+                <form id="acme-config-form" autocomplete="off">
+                    <label style="font-size:0.85rem;margin-bottom:0.25rem;">
+                        Enabled
+                        <fieldset style="margin:0.25rem 0 0.75rem;padding:0;border:none;">
+                            <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
+                                <input type="checkbox" id="acme-enabled" role="switch">
+                                <span id="acme-enabled-label">Disabled</span>
+                            </label>
+                        </fieldset>
+                    </label>
+                    <label for="acme-email" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                        Email
+                        <input type="email" id="acme-email" name="email" placeholder="admin@example.com" required style="margin-bottom:0.5rem;">
+                    </label>
+                    <label for="acme-dns-provider" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                        DNS Provider
+                        <select id="acme-dns-provider" required style="margin-bottom:0.5rem;">
+                            <option value="">Select a provider…</option>
+                        </select>
+                    </label>
+                    <div id="acme-credential-fields"></div>
+                    <label for="acme-ca-dir-url" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                        CA Directory URL <small>(leave empty for Let's Encrypt production)</small>
+                        <input type="text" id="acme-ca-dir-url" name="caDirUrl" placeholder="https://acme-v02.api.letsencrypt.org/directory" style="margin-bottom:0.5rem;">
+                    </label>
+                    <label for="acme-renewal-interval" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                        Renewal Check Interval <small>(Go duration, e.g. 12h, 6h30m)</small>
+                        <input type="text" id="acme-renewal-interval" name="renewalCheckInterval" placeholder="12h" style="margin-bottom:0.75rem;">
+                    </label>
+                    <button type="submit" style="width:100%;">Save Configuration</button>
+                </form>
+                <div id="acme-config-result"></div>
+            </div>
+
+            <h4>Managed Certificates</h4>
+            <div class="stat-card" style="text-align:left;padding:0;">
+                <div class="overflow-auto">
+                    <table id="acme-certs-table" style="margin:0;">
+                        <thead>
+                            <tr><th>Domain</th><th>Expires</th><th>Issued</th></tr>
+                        </thead>
+                        <tbody id="acme-certs-body">
+                            <tr><td colspan="3" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
         <!-- PAGE: Account -->
         <section class="page" data-page="account" style="display:none;">
             <hgroup>
@@ -269,6 +330,14 @@
             if (!healthInterval) healthInterval = setInterval(fetchSystemHealth, 5000);
         } else {
             if (healthInterval) { clearInterval(healthInterval); healthInterval = null; }
+        }
+
+        // Load ACME data when the page is shown
+        if (pageId === 'acme') {
+            loadAcmeProviders().then(function () {
+                loadAcmeConfig();
+                loadAcmeCertificates();
+            });
         }
     }
 
@@ -1194,6 +1263,149 @@
             resultEl.innerHTML = '<div class="success-alert">Password updated successfully.</div>';
             document.getElementById('old-password').value = '';
             document.getElementById('new-password').value = '';
+        })
+        .catch(function () { resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>'; });
+    });
+
+    // ---------- ACME / TLS ----------
+    var acmeProviders = [];   // [{name, fields:[{key,label,required,sensitive,placeholder}]}]
+
+    function loadAcmeProviders() {
+        return fetch('/api/v1/acme/providers', { credentials: 'same-origin' })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (list) {
+                acmeProviders = list || [];
+                var sel = document.getElementById('acme-dns-provider');
+                while (sel.options.length > 1) sel.remove(1);
+                acmeProviders.forEach(function (p) {
+                    var opt = document.createElement('option');
+                    opt.value = p.name;
+                    opt.textContent = p.name;
+                    sel.appendChild(opt);
+                });
+            });
+    }
+
+    function renderCredentialFields(providerName, values) {
+        var container = document.getElementById('acme-credential-fields');
+        container.innerHTML = '';
+        var provider = acmeProviders.find(function (p) { return p.name === providerName; });
+        if (!provider || !provider.fields) return;
+        provider.fields.forEach(function (f) {
+            var val = (values && values[f.key]) || '';
+            var inputType = f.sensitive ? 'password' : 'text';
+            var html = '<label for="acme-cred-' + f.key + '" style="font-size:0.85rem;margin-bottom:0.25rem;">' +
+                f.label + (f.required ? '' : ' <small>(optional)</small>') +
+                '<input type="' + inputType + '" id="acme-cred-' + f.key + '" ' +
+                'data-cred-key="' + f.key + '" ' +
+                'placeholder="' + (f.placeholder || '') + '" ' +
+                (f.required ? 'required ' : '') +
+                'value="' + val.replace(/"/g, '&quot;') + '" ' +
+                'style="margin-bottom:0.5rem;" autocomplete="off">' +
+                '</label>';
+            container.insertAdjacentHTML('beforeend', html);
+        });
+    }
+
+    document.getElementById('acme-dns-provider').addEventListener('change', function () {
+        renderCredentialFields(this.value, {});
+    });
+
+    function loadAcmeConfig() {
+        fetch('/api/v1/acme/config', { credentials: 'same-origin' })
+            .then(function (resp) {
+                if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+                if (!resp.ok) throw new Error(resp.statusText);
+                return resp.json();
+            })
+            .then(function (conf) {
+                if (!conf) return;
+                document.getElementById('acme-enabled').checked = conf.enabled;
+                document.getElementById('acme-enabled-label').textContent = conf.enabled ? 'Enabled' : 'Disabled';
+                document.getElementById('acme-email').value = conf.email || '';
+                document.getElementById('acme-dns-provider').value = conf.dnsProvider || '';
+                document.getElementById('acme-ca-dir-url').value = conf.caDirUrl || '';
+                document.getElementById('acme-renewal-interval').value = conf.renewalCheckInterval || '12h';
+                // Credentials are not returned by GET (they are serialized server-side).
+                // Render empty fields so the user can fill them in when changing provider.
+                renderCredentialFields(conf.dnsProvider, {});
+            })
+            .catch(function (err) { console.error('Failed to load ACME config', err); });
+    }
+
+    function loadAcmeCertificates() {
+        fetch('/api/v1/acme/certificates', { credentials: 'same-origin' })
+            .then(function (resp) {
+                if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+                if (!resp.ok) throw new Error(resp.statusText);
+                return resp.json();
+            })
+            .then(function (certs) {
+                if (!certs) return;
+                var tbody = document.getElementById('acme-certs-body');
+                if (!certs.length) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">No certificates yet.</td></tr>';
+                    return;
+                }
+                var html = '';
+                certs.forEach(function (c) {
+                    var expires = new Date(c.expiresAt);
+                    var created = new Date(c.createdAt);
+                    var now = new Date();
+                    var daysLeft = Math.ceil((expires - now) / (1000 * 60 * 60 * 24));
+                    var badgeClass = daysLeft <= 7 ? 'badge-danger' : daysLeft <= 30 ? 'badge-info' : 'badge-success';
+                    html += '<tr>' +
+                        '<td><code>' + c.domain + '</code></td>' +
+                        '<td><span class="badge ' + badgeClass + '">' + daysLeft + 'd</span> ' + expires.toLocaleDateString() + '</td>' +
+                        '<td>' + created.toLocaleDateString() + '</td>' +
+                        '</tr>';
+                });
+                tbody.innerHTML = html;
+            })
+            .catch(function (err) { console.error('Failed to load ACME certificates', err); });
+    }
+
+    document.getElementById('acme-enabled').addEventListener('change', function () {
+        document.getElementById('acme-enabled-label').textContent = this.checked ? 'Enabled' : 'Disabled';
+    });
+
+    document.getElementById('acme-config-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var resultEl = document.getElementById('acme-config-result');
+        resultEl.innerHTML = '';
+
+        var providerName = document.getElementById('acme-dns-provider').value;
+
+        // Collect dynamic credential fields into configurationMap.
+        var configMap = {};
+        document.querySelectorAll('#acme-credential-fields [data-cred-key]').forEach(function (inp) {
+            configMap[inp.getAttribute('data-cred-key')] = inp.value;
+        });
+
+        var body = {
+            email: document.getElementById('acme-email').value,
+            caDirUrl: document.getElementById('acme-ca-dir-url').value,
+            renewalCheckInterval: document.getElementById('acme-renewal-interval').value || '12h',
+            enabled: document.getElementById('acme-enabled').checked,
+            dns_provider_config_request: {
+                provider: providerName,
+                configurationMap: configMap
+            }
+        };
+        fetch('/api/v1/acme/config', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        })
+        .then(function (resp) {
+            if (resp.status === 401) { window.location.href = '/ui/login'; return; }
+            if (!resp.ok) return resp.text().then(function (t) {
+                resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to save configuration.') + '</div>';
+            });
+            showToast('ACME configuration saved and applied.', 'success');
+            resultEl.innerHTML = '<div class="success-alert" style="margin-top:0.75rem;">Configuration saved and applied.</div>';
+            loadAcmeConfig();
+            loadAcmeCertificates();
         })
         .catch(function () { resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>'; });
     });

@@ -12,6 +12,7 @@ import (
 
 	"github.com/nunoOliveiraqwe/micro-proxy/internal/fsutil"
 	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
+	"github.com/nunoOliveiraqwe/micro-proxy/proxy/acme"
 	"go.uber.org/zap"
 )
 
@@ -53,7 +54,7 @@ func (m *MicroProxyHttpsServer) GetServerId() string {
 	return m.serverId
 }
 
-func (m *MicroProxyHttpsServer) start(acmeManager *MicroProxyAcmeManager) error {
+func (m *MicroProxyHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
 	zap.S().Infof("Starting HTTPS server on %d, ipv4 = %s, ipv6 = %s", m.bindPort, m.iPV4BindInterface, m.iPV6BindInterface)
 	listeners := buildNetListeners(m.iPV4BindInterface, m.iPV6BindInterface, m.bindPort)
 	if len(listeners) == 0 {
@@ -72,7 +73,7 @@ func (m *MicroProxyHttpsServer) start(acmeManager *MicroProxyAcmeManager) error 
 		if acmeManager == nil {
 			return fmt.Errorf("ACME is enabled but no ACME manager is configured")
 		}
-		m.httpServer.TLSConfig = acmeManager.getTlsConfig()
+		m.httpServer.TLSConfig = acmeManager.GetTLSConfig()
 		for _, listener := range listeners {
 			tlsListener := tls.NewListener(listener, m.httpServer.TLSConfig)
 			go func(ln net.Listener) {

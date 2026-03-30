@@ -143,6 +143,7 @@ type testSystemService struct {
 
 func (t *testSystemService) Start() error                                      { return nil }
 func (t *testSystemService) Stop() error                                       { return nil }
+func (t *testSystemService) ReloadAcme() error                                 { return nil }
 func (t *testSystemService) SessionRegistry() *session.Registry                { return t.sessions }
 func (t *testSystemService) GetServiceStore() *app.ServiceStore                { return t.serviceStore }
 func (t *testSystemService) GetConfiguredProxyServers() []*proxy.ProxySnapshot { return t.proxies }
@@ -201,6 +202,7 @@ func newTestFixture(t *testing.T) *testFixture {
 		RoleStore:         store.RoleStore(mrs),
 		SystemConfigStore: store.SystemConfigStore(mscs),
 		ProxyMetricsStore: store.ProxyMetricsStore(mpms),
+		AcmeStore:         sqlite.NewAcmeStore(db),
 	}
 	serviceStore := app.NewServiceStore(dataStore)
 

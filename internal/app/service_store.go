@@ -1,14 +1,18 @@
 package app
 
+import "github.com/nunoOliveiraqwe/micro-proxy/internal/store"
+
 type ServiceStore struct {
 	userService                *UserService
 	systemConfigurationService *SystemConfigurationService
+	acmeStore                  store.AcmeStore
 }
 
-func NewServiceStore(store *DataStore) *ServiceStore {
+func NewServiceStore(ds *DataStore) *ServiceStore {
 	return &ServiceStore{
-		userService:                NewUserService(store),
-		systemConfigurationService: NewSystemConfigurationService(store),
+		userService:                NewUserService(ds),
+		systemConfigurationService: NewSystemConfigurationService(ds),
+		acmeStore:                  ds.AcmeStore,
 	}
 }
 
@@ -18,4 +22,8 @@ func (s *ServiceStore) GetUserService() *UserService {
 
 func (s *ServiceStore) GetSystemConfigurationService() *SystemConfigurationService {
 	return s.systemConfigurationService
+}
+
+func (s *ServiceStore) GetAcmeStore() store.AcmeStore {
+	return s.acmeStore
 }

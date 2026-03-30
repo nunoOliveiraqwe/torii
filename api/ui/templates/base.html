@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>microProxy{{block "title" .}}{{end}}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.7"></script>
     <script src="https://unpkg.com/htmx-ext-json-enc@2.0.1/json-enc.js"></script>
     <style>
         :root { --pico-font-size: 16px; }
@@ -97,6 +97,15 @@
             border: 1px solid #e74c3c;
             border-radius: 0.35rem;
             color: #e74c3c;
+            padding: 0.75rem 1rem;
+            margin-top: 0.75rem;
+            font-size: 0.9em;
+        }
+        .success-alert {
+            background-color: rgba(46, 204, 113, 0.15);
+            border: 1px solid #2ecc71;
+            border-radius: 0.35rem;
+            color: #2ecc71;
             padding: 0.75rem 1rem;
             margin-top: 0.75rem;
             font-size: 0.9em;

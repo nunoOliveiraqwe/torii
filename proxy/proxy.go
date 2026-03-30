@@ -8,13 +8,14 @@ import (
 
 	"github.com/nunoOliveiraqwe/micro-proxy/config"
 	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
+	"github.com/nunoOliveiraqwe/micro-proxy/proxy/acme"
 	"go.uber.org/zap"
 )
 
 type MicroHttpServer interface {
 	GetServerId() string
 	GetProxySnapshot(metric []*metrics.Metric) *ProxySnapshot
-	start(acmeManager *MicroProxyAcmeManager) error
+	start(acmeManager *acme.LegoAcmeManager) error
 	getHandler() http.Handler
 	updateHandler(handler http.Handler) error
 	stop() error
@@ -24,28 +25,28 @@ type MicroProxy struct {
 	stoppedHttpServers map[int]MicroHttpServer
 	startedHttpServers map[int]MicroHttpServer
 	lock               sync.Mutex
-	acmeManager        *MicroProxyAcmeManager
+	acmeManager        *acme.LegoAcmeManager
 	metricsManager     *metrics.ConnectionMetricsManager
 }
 
-func NewMicroProxy(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager) (*MicroProxy, error) {
+func NewMicroProxy(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager, acmeMgr *acme.LegoAcmeManager) (*MicroProxy, error) {
 	zap.S().Info("Initializing MicroProxy with configuration: ", conf)
 	m := MicroProxy{
 		stoppedHttpServers: make(map[int]MicroHttpServer),
 		startedHttpServers: make(map[int]MicroHttpServer),
 		lock:               sync.Mutex{},
 		metricsManager:     mgr,
+		acmeManager:        acmeMgr,
 	}
 	ctx := context.WithValue(context.Background(), "metricsManager", mgr)
 	err := m.initializeHttpNetworkStackFromConf(ctx, conf)
 	if err != nil {
 		return nil, err
 	}
-	if conf.ACMEConfig != nil {
-		err = m.StartAcmeManager(conf.ACMEConfig)
-		if err != nil {
-			return nil, err
-		}
+	if acmeMgr != nil {
+		domains := m.collectWorkingDomains()
+		acmeMgr.SetDomains(domains)
+		acmeMgr.StartRenewalLoop()
 	}
 	return &m, nil
 }
@@ -91,21 +92,6 @@ func (m *MicroProxy) StartProxy(port int) error {
 	if !ok {
 		return fmt.Errorf("no stopped HTTP server found for port %d", port)
 	}
-	if port == 80 && m.acmeManager != nil && m.acmeManager.usePort80 { //handle por 80 attach
-		zap.S().Infof("Attaching ACME manager to port 80")
-		serverHandler := server.getHandler()
-		if serverHandler != nil {
-			zap.S().Debugf("Original handler for port 80: %T", serverHandler)
-			nHandler := m.acmeManager.bindAcmeHandlerToPort80(serverHandler)
-			if nHandler != nil {
-				err := server.updateHandler(nHandler)
-				if err != nil {
-					zap.S().Errorf("Failed to update handler for port 80 with ACME manager: %v", err)
-					return err
-				}
-			}
-		}
-	}
 
 	err := server.start(m.acmeManager)
 	if err != nil {
@@ -144,19 +130,24 @@ func (m *MicroProxy) StopProxy(port int) error {
 	return nil
 }
 
-func (m *MicroProxy) StartAcmeManager(conf *config.ACMEConfig) error {
-	if conf == nil {
-		zap.S().Warnf("ACME configuration is nil, skipping ACME manager setup")
-		return fmt.Errorf("ACME configuration is nil")
-	} else if m.acmeManager != nil {
-		zap.S().Warnf("ACME manager already initialized")
-		return fmt.Errorf("ACME manager already initialized")
+func (m *MicroProxy) StopAcme() {
+	if m.acmeManager != nil {
+		m.acmeManager.Stop()
 	}
+}
+
+func (m *MicroProxy) SwapAcmeManager(newMgr *acme.LegoAcmeManager) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	domains := m.collectWorkingDomains()
-	m.acmeManager = newMicroProxyAcmeManager(domains, conf.Email, conf.Cache, conf.OpenPort80)
-	return nil
+	if m.acmeManager != nil {
+		m.acmeManager.Stop()
+	}
+	m.acmeManager = newMgr
+	if newMgr != nil {
+		domains := m.collectWorkingDomains()
+		newMgr.SetDomains(domains)
+		newMgr.StartRenewalLoop()
+	}
 }
 
 func (m *MicroProxy) AddHttpServer(ctx context.Context, conf config.HTTPListener, globalConf *config.GlobalConfig) error {

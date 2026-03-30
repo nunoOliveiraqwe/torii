@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nunoOliveiraqwe/micro-proxy/metrics"
+	"github.com/nunoOliveiraqwe/micro-proxy/proxy/acme"
 	"go.uber.org/zap"
 )
 
@@ -48,7 +49,7 @@ func (m *MicroProxyHttpServer) GetServerId() string {
 	return m.serverId
 }
 
-func (m *MicroProxyHttpServer) start(_ *MicroProxyAcmeManager) error {
+func (m *MicroProxyHttpServer) start(_ *acme.LegoAcmeManager) error {
 	zap.S().Infof("Starting HTTP server on %d, ipv4 = %s, ipv6 = %s", m.bindPort, m.iPV4BindInterface, m.iPV6BindInterface)
 	listeners := buildNetListeners(m.iPV4BindInterface, m.iPV6BindInterface, m.bindPort)
 	if len(listeners) == 0 {
