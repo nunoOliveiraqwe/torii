@@ -35,12 +35,6 @@ type HTTPListener struct {
 
 type GlobalConfig struct {
 	Middlewares []middleware.Config `yaml:"middlewares" json:"middlewares"`
-	Handlers    []HandlerConfig     `yaml:"handlers" json:"handlers"`
-}
-
-type HandlerConfig struct {
-	Path    string `yaml:"path" json:"path"`
-	Handler string `yaml:"handler" json:"handler"`
 }
 
 type TCPListener struct {

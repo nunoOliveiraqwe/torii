@@ -27,6 +27,7 @@ func init() {
 		"RequestId":  RequestIDMiddleware,
 		"RequestLog": RequestLoggerMiddleware,
 		"Headers":    HeadersMiddleware,
+		"RateLimit":  RateLimitMiddleware,
 	}
 }
 

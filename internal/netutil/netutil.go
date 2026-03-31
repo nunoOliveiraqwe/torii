@@ -3,6 +3,8 @@ package netutil
 import (
 	"fmt"
 	"net"
+	"net/http"
+	"strings"
 
 	"go.uber.org/zap"
 )
@@ -79,4 +81,30 @@ func GetNetworkBindAddressesFromInterface(ifName string) (ipv4, ipv6 string, err
 		zap.S().Warnf("interface %s is missing one address family (ipv4=%q, ipv6=%q)", ifName, ipv4, ipv6)
 	}
 	return ipv4, ipv6, nil
+}
+
+func GetIpFromRequest(r *http.Request) (string, error) {
+	zap.S().Debug("Fetching IP address from request")
+	ips := r.Header.Get("X-Forwarded-For")
+	splitIps := strings.Split(ips, ",")
+
+	if len(splitIps) > 0 {
+		zap.S().Debug("IP addresses found in X-Forwarded-For header: %v", splitIps)
+		netIP := net.ParseIP(splitIps[len(splitIps)-1])
+		if netIP != nil {
+			return netIP.String(), nil
+		}
+	}
+	zap.S().Debug("No valid IP found in X-Forwarded-For header, falling back to RemoteAddr: %s", r.RemoteAddr)
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return "", err
+	}
+
+	netIP := net.ParseIP(ip)
+	if netIP != nil {
+		return netIP.String(), nil
+	}
+
+	return "", fmt.Errorf("IP not found")
 }

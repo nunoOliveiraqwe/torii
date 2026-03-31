@@ -50,6 +50,10 @@ func (reg *Registry) GetValueFromSession(r *http.Request, key string) string {
 
 func (reg *Registry) NewSession(r *http.Request, w http.ResponseWriter, username string) error {
 	zap.S().Infof("Creating new session for user %s", username)
+	err := reg.RenewSession(r)
+	if err != nil {
+		return err
+	}
 	reg.manager.Put(r.Context(), "username", username)
 	return nil
 }
