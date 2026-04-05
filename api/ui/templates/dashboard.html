@@ -24,6 +24,9 @@
             <li><a href="#" class="nav-link" data-page="acme">
                 <span class="nav-icon">🔒</span><span class="nav-label">ACME / TLS</span>
             </a></li>
+            <li><a href="#" class="nav-link" data-page="api-keys">
+                <span class="nav-icon">🗝️</span><span class="nav-label">API Keys</span>
+            </a></li>
             <li class="sidebar-section">Account</li>
             <li><a href="#" class="nav-link" data-page="account">
                 <span class="nav-icon">🔑</span><span class="nav-label">Account</span>
@@ -199,38 +202,39 @@
                 <p>Manage automatic TLS certificates via DNS-01 challenges</p>
             </hgroup>
 
-            <div class="stat-card" style="text-align:left;max-width:600px;margin-bottom:1.5rem;">
+            <div class="stat-card" style="text-align:left;margin-bottom:1.5rem;">
                 <p class="stat-label" style="margin-bottom:0.75rem;">Configuration</p>
                 <form id="acme-config-form" autocomplete="off">
-                    <label style="font-size:0.85rem;margin-bottom:0.25rem;">
-                        Enabled
-                        <fieldset style="margin:0.25rem 0 0.75rem;padding:0;border:none;">
-                            <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
-                                <input type="checkbox" id="acme-enabled" role="switch">
-                                <span id="acme-enabled-label">Disabled</span>
-                            </label>
-                        </fieldset>
-                    </label>
-                    <label for="acme-email" style="font-size:0.85rem;margin-bottom:0.25rem;">
-                        Email
-                        <input type="email" id="acme-email" name="email" placeholder="admin@example.com" required style="margin-bottom:0.5rem;">
-                    </label>
-                    <label for="acme-dns-provider" style="font-size:0.85rem;margin-bottom:0.25rem;">
-                        DNS Provider
-                        <select id="acme-dns-provider" required style="margin-bottom:0.5rem;">
-                            <option value="">Select a provider…</option>
-                        </select>
-                    </label>
+                    <fieldset style="margin:0 0 0.75rem;padding:0;border:none;">
+                        <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
+                            <input type="checkbox" id="acme-enabled" role="switch">
+                            <span id="acme-enabled-label">Disabled</span>
+                        </label>
+                    </fieldset>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">
+                        <label for="acme-email" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                            Email
+                            <input type="email" id="acme-email" name="email" placeholder="admin@example.com" required style="margin-bottom:0.5rem;">
+                        </label>
+                        <label for="acme-dns-provider" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                            DNS Provider
+                            <select id="acme-dns-provider" required style="margin-bottom:0.5rem;">
+                                <option value="">Select a provider…</option>
+                            </select>
+                        </label>
+                    </div>
                     <div id="acme-credential-fields"></div>
-                    <label for="acme-ca-dir-url" style="font-size:0.85rem;margin-bottom:0.25rem;">
-                        CA Directory URL <small>(leave empty for Let's Encrypt production)</small>
-                        <input type="text" id="acme-ca-dir-url" name="caDirUrl" placeholder="https://acme-v02.api.letsencrypt.org/directory" style="margin-bottom:0.5rem;">
-                    </label>
-                    <label for="acme-renewal-interval" style="font-size:0.85rem;margin-bottom:0.25rem;">
-                        Renewal Check Interval <small>(Go duration, e.g. 12h, 6h30m)</small>
-                        <input type="text" id="acme-renewal-interval" name="renewalCheckInterval" placeholder="12h" style="margin-bottom:0.75rem;">
-                    </label>
-                    <button type="submit" style="width:100%;">Save Configuration</button>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">
+                        <label for="acme-ca-dir-url" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                            CA Directory URL <small>(leave empty for Let's Encrypt production)</small>
+                            <input type="text" id="acme-ca-dir-url" name="caDirUrl" placeholder="https://acme-v02.api.letsencrypt.org/directory" style="margin-bottom:0.5rem;">
+                        </label>
+                        <label for="acme-renewal-interval" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                            Renewal Check Interval <small>(Go duration, e.g. 12h, 6h30m)</small>
+                            <input type="text" id="acme-renewal-interval" name="renewalCheckInterval" placeholder="12h" style="margin-bottom:0.75rem;">
+                        </label>
+                    </div>
+                    <button type="submit">Save Configuration</button>
                 </form>
                 <div id="acme-config-result"></div>
             </div>
@@ -244,6 +248,71 @@
                         </thead>
                         <tbody id="acme-certs-body">
                             <tr><td colspan="3" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE: API Keys -->
+        <section class="page" data-page="api-keys" style="display:none;">
+            <hgroup>
+                <h2>API Keys</h2>
+                <p>Manage API keys for programmatic access</p>
+            </hgroup>
+
+            <!-- Created key banner (shown once after creation) -->
+            <div id="api-key-created-banner" style="display:none;margin-bottom:1.5rem;">
+                <div class="success-alert" style="margin:0;">
+                    <strong>API key created.</strong> Copy it now — it won't be shown again.
+                    <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;">
+                        <code id="api-key-created-value" style="flex:1;padding:0.4rem 0.6rem;background:rgba(0,0,0,0.3);border-radius:0.3rem;font-size:0.85rem;word-break:break-all;user-select:all;"></code>
+                        <button type="button" id="api-key-copy-btn" style="white-space:nowrap;padding:0.35rem 0.75rem;font-size:0.8rem;">Copy</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Create form -->
+            <div class="stat-card" style="text-align:left;margin-bottom:1.5rem;">
+                <p class="stat-label" style="margin-bottom:0.75rem;">Create New Key</p>
+                <form id="api-key-create-form" autocomplete="off">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">
+                        <label for="api-key-alias" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                            Alias
+                            <input type="text" id="api-key-alias" placeholder="e.g. monitoring-key" required style="margin-bottom:0.5rem;">
+                        </label>
+                        <label for="api-key-expiry" style="font-size:0.85rem;margin-bottom:0.25rem;">
+                            Expires <small>(optional)</small>
+                            <input type="datetime-local" id="api-key-expiry" style="margin-bottom:0.5rem;">
+                        </label>
+                    </div>
+                    <label style="font-size:0.85rem;margin-bottom:0.25rem;">Scopes</label>
+                    <fieldset style="margin:0 0 0.75rem;padding:0;border:none;display:flex;gap:1.5rem;flex-wrap:wrap;">
+                        <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
+                            <input type="checkbox" name="api-key-scope" value="read_stats"> Read Stats
+                        </label>
+                        <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
+                            <input type="checkbox" name="api-key-scope" value="read_config"> Read Config
+                        </label>
+                        <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
+                            <input type="checkbox" name="api-key-scope" value="write_config"> Write Config
+                        </label>
+                    </fieldset>
+                    <button type="submit">Create API Key</button>
+                </form>
+                <div id="api-key-create-result"></div>
+            </div>
+
+            <!-- Keys table -->
+            <h4>Existing Keys</h4>
+            <div class="stat-card" style="text-align:left;padding:0;">
+                <div class="overflow-auto">
+                    <table style="margin:0;">
+                        <thead>
+                            <tr><th>Alias</th><th>Scopes</th><th>Expires</th><th>Created</th><th></th></tr>
+                        </thead>
+                        <tbody id="api-keys-body">
+                            <tr><td colspan="5" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">Loading…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -337,6 +406,15 @@
                 loadAcmeConfig();
                 loadAcmeCertificates();
             });
+        }
+
+        // Load API keys when the page is shown
+        if (pageId === 'api-keys') {
+            loadApiKeys();
+        } else {
+            // Hide the created-key banner and clear the secret when navigating away
+            document.getElementById('api-key-created-banner').style.display = 'none';
+            document.getElementById('api-key-created-value').textContent = '';
         }
     }
 
@@ -1409,6 +1487,134 @@
             loadAcmeCertificates();
         })
         .catch(function () { resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>'; });
+    });
+
+    // ---------- API Keys ----------
+    function loadApiKeys() {
+        fetch('/api/v1/apiKeys', { credentials: 'same-origin' })
+            .then(function (resp) {
+                if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+                if (!resp.ok) throw new Error(resp.statusText);
+                return resp.json();
+            })
+            .then(function (keys) {
+                if (keys === null) return;
+                var tbody = document.getElementById('api-keys-body');
+                if (!keys || !keys.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">No API keys yet.</td></tr>';
+                    return;
+                }
+                var html = '';
+                keys.forEach(function (k) {
+                    var scopeList = k.scopes ? Object.keys(k.scopes) : [];
+                    var scopeBadges = scopeList.length
+                        ? scopeList.map(function (s) { return '<span class="badge badge-info" style="margin-right:0.25rem;">' + s + '</span>'; }).join('')
+                        : '<span style="color:var(--pico-muted-color);font-size:0.8rem;">none</span>';
+                    var expiresStr = '–';
+                    if (k.expires && k.expires !== '0001-01-01T00:00:00Z') {
+                        var exp = new Date(k.expires);
+                        var now = new Date();
+                        var daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+                        if (daysLeft < 0) {
+                            expiresStr = '<span class="badge badge-danger">Expired</span>';
+                        } else {
+                            var badgeCls = daysLeft <= 7 ? 'badge-danger' : daysLeft <= 30 ? 'badge-info' : 'badge-success';
+                            expiresStr = '<span class="badge ' + badgeCls + '">' + daysLeft + 'd</span> ' + exp.toLocaleDateString();
+                        }
+                    }
+                    var created = k.created_at ? new Date(k.created_at * 1000).toLocaleDateString() : '–';
+                    html += '<tr>' +
+                        '<td><code>' + k.alias + '</code></td>' +
+                        '<td>' + scopeBadges + '</td>' +
+                        '<td>' + expiresStr + '</td>' +
+                        '<td>' + created + '</td>' +
+                        '<td><button class="badge badge-danger proxy-action-btn api-key-delete-btn" data-alias="' + k.alias + '">Delete</button></td>' +
+                        '</tr>';
+                });
+                tbody.innerHTML = html;
+                tbody.querySelectorAll('.api-key-delete-btn').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        var alias = this.getAttribute('data-alias');
+                        if (!confirm('Delete API key "' + alias + '"?')) return;
+                        deleteApiKey(alias);
+                    });
+                });
+            })
+            .catch(function (err) {
+                console.error('Failed to load API keys', err);
+                document.getElementById('api-keys-body').innerHTML =
+                    '<tr><td colspan="5" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">Failed to load API keys.</td></tr>';
+            });
+    }
+
+    function deleteApiKey(alias) {
+        fetch('/api/v1/apiKeys/' + encodeURIComponent(alias), { method: 'DELETE', credentials: 'same-origin' })
+            .then(function (resp) {
+                if (resp.status === 401) { window.location.href = '/ui/login'; return; }
+                if (!resp.ok) return resp.text().then(function (t) { showToast(t || 'Failed to delete API key', 'error'); });
+                showToast('API key "' + alias + '" deleted.', 'success');
+                loadApiKeys();
+            })
+            .catch(function () { showToast('Failed to delete API key.', 'error'); });
+    }
+
+    document.getElementById('api-key-create-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var resultEl = document.getElementById('api-key-create-result');
+        resultEl.innerHTML = '';
+        document.getElementById('api-key-created-banner').style.display = 'none';
+
+        var alias = document.getElementById('api-key-alias').value.trim();
+        var scopes = [];
+        document.querySelectorAll('input[name="api-key-scope"]:checked').forEach(function (cb) {
+            scopes.push(cb.value);
+        });
+
+        if (!alias) { resultEl.innerHTML = '<div class="error-alert">Alias is required.</div>'; return; }
+        if (scopes.length === 0) { resultEl.innerHTML = '<div class="error-alert">Select at least one scope.</div>'; return; }
+
+        var body = { alias: alias, scopes: scopes };
+        var expiryVal = document.getElementById('api-key-expiry').value;
+        if (expiryVal) {
+            body.ExpiryDate = new Date(expiryVal).toISOString();
+        }
+
+        fetch('/api/v1/apiKeys', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        })
+        .then(function (resp) {
+            if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+            if (resp.status === 409) { resultEl.innerHTML = '<div class="error-alert">An API key with this alias already exists.</div>'; return null; }
+            if (!resp.ok) return resp.text().then(function (t) {
+                resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to create API key.') + '</div>';
+                return null;
+            });
+            return resp.json();
+        })
+        .then(function (created) {
+            if (!created) return;
+            // Show the raw key once
+            document.getElementById('api-key-created-value').textContent = created.key;
+            document.getElementById('api-key-created-banner').style.display = '';
+            // Reset form
+            document.getElementById('api-key-alias').value = '';
+            document.getElementById('api-key-expiry').value = '';
+            document.querySelectorAll('input[name="api-key-scope"]').forEach(function (cb) { cb.checked = false; });
+            showToast('API key "' + created.alias + '" created.', 'success');
+            loadApiKeys();
+        })
+        .catch(function () { resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>'; });
+    });
+
+    document.getElementById('api-key-copy-btn').addEventListener('click', function () {
+        var val = document.getElementById('api-key-created-value').textContent;
+        navigator.clipboard.writeText(val).then(function () {
+            showToast('Copied to clipboard.', 'success');
+        }).catch(function () {
+            showToast('Failed to copy. Select and copy manually.', 'error');
+        });
     });
 
     // ---------- Bootstrap ----------
