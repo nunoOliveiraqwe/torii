@@ -12,6 +12,7 @@ import (
 
 func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *config.GlobalConfig) (MicroHttpServer, error) {
 	zap.S().Infof("Building HTTP server on port %d", conf.Port)
+	zap.S().Info("Middleware order apply is global mw → route mw → path mw → proxy")
 	ifFace := "lo"
 	if conf.Interface == "" {
 		zap.S().Warn("No interface in configuration, defaulting to loopback")
@@ -40,6 +41,7 @@ func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *conf
 		return nil, fmt.Errorf("failed to build host dispatcher: %w", err)
 	}
 
+	//global mw → route mw → path mw → proxy
 	handler, err := buildGlobalDispatcher(ctx, global, hostHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build global dispatcher: %w", err)

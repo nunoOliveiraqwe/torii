@@ -88,7 +88,7 @@ func (h *headersConfig) compareHeadersInRequest(r *http.Request) bool {
 	for header, expectedVal := range h.cmpHeadersReq {
 		actualVal := r.Header.Get(header)
 		if actualVal != expectedVal {
-			zap.S().Debugf("Header %s value %s does not match expected value %s", header, actualVal, expectedVal)
+			zap.S().Debugf("Header %s value %s does not match expected value", header, actualVal) //don't leak the value
 			return false
 		}
 	}

@@ -2,6 +2,7 @@ package api
 
 import (
 	"html/template"
+	"io/fs"
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/api/ui"
@@ -112,6 +113,21 @@ func (h *uiHandler) handleLogout(w http.ResponseWriter, r *http.Request) {
 // registerUIRoutes adds all UI routes to the given ServeMux.
 func registerUIRoutes(mux *http.ServeMux, svc app.SystemService) {
 	h := newUIHandler(svc)
+
+	staticFS, _ := fs.Sub(ui.Static, "static")
+	staticHandler := http.StripPrefix("/static/", http.FileServer(http.FS(staticFS)))
+	mux.Handle("GET /static/", staticHandler)
+
+	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		data, err := ui.Static.ReadFile("static/favicon.svg")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Header().Set("Cache-Control", "public, max-age=604800")
+		w.Write(data)
+	})
 
 	mux.HandleFunc("GET /{$}", h.handleRoot)
 	mux.HandleFunc("GET /ui/login", h.handleLoginPage)

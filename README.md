@@ -39,7 +39,22 @@ It started as a small home-lab proxy, and it still works great for that. But it'
 - **Pluggable DNS providers** — Cloudflare supported out of the box, with an extensible provider registry.
 
 ### Middleware
-Middlewares are configured per-route, per-path, or globally. They run in the order you define them.
+Middlewares are configured per-route, per-path, or globally. Within each level they run in the order you define them.
+
+#### Execution Order
+
+The middleware execution order is **fixed** across layers:
+
+```
+Global middlewares → Route / Default middlewares → Path middlewares → Reverse Proxy
+```
+
+1. **Global** — middlewares defined in `netConfig.global.middlewares`. Applied to every request on every listener.
+2. **Route / Default** — middlewares defined on the matched `routes[].target.middlewares` (or `default.middlewares` when no host matches). Only one of these applies per request.
+3. **Path** — middlewares defined on a matching `paths[].middlewares` entry within the route or default target.
+4. **Reverse Proxy** — the request is forwarded to the backend.
+
+Each layer wraps the next, so a request always passes through Global first, then Route/Default, then Path, before reaching the upstream backend. You cannot reorder the layers — only the middlewares *within* each layer run in the sequence you list them.
 
 | Middleware | What it does |
 |---|---|

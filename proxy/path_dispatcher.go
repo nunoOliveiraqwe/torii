@@ -18,7 +18,7 @@ func (d *PathDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.mux.ServeHTTP(w, r)
 }
 
-func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, pathRules []config.PathRule, baseProxy http.HandlerFunc) (http.Handler, []string, error) {
+func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, pathRules []config.PathRule) (http.Handler, []string, error) {
 	mux := http.NewServeMux()
 
 	var mwNames []string
@@ -26,7 +26,7 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 	for _, rule := range pathRules {
 		pattern := normalizePattern(rule.Pattern)
 		ctx2 := context.WithValue(ctx, "path", rule.Pattern)
-		handler, err := buildMiddlewareChain(ctx2, baseProxy, rule.Middlewares)
+		handler, err := buildMiddlewareChain(ctx2, defaultHandler, rule.Middlewares)
 		if err != nil {
 			return nil, nil, err
 		}

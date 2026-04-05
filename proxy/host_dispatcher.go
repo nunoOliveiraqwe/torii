@@ -99,20 +99,19 @@ func buildRouteHandler(ctx context.Context, target config.RouteTarget) (http.Han
 	}
 	baseHandler := buildDefaultHttpHandler(proxy)
 
-	defaultHandler, err := buildMiddlewareChain(ctx, baseHandler, target.Middlewares)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to build middleware chain for backend %s: %w", target.Backend, err)
-	}
 	mwNames := middlewareNames(target.Middlewares)
-
 	if len(target.Paths) > 0 {
-		pathHandler, pathMwNames, err := buildPathDispatcher(ctx, defaultHandler, target.Paths, baseHandler)
+		pathHandler, pathMwNames, err := buildPathDispatcher(ctx, baseHandler, target.Paths)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to build path dispatcher for backend %s: %w", target.Backend, err)
 		}
 		mwNames = append(mwNames, pathMwNames...)
-		return pathHandler, mwNames, nil
+		baseHandler = pathHandler.ServeHTTP
 	}
-
+	//global mw → route mw → path mw → proxy
+	defaultHandler, err := buildMiddlewareChain(ctx, baseHandler, target.Middlewares)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to build middleware chain for backend %s: %w", target.Backend, err)
+	}
 	return defaultHandler, mwNames, nil
 }
