@@ -4,11 +4,16 @@ import (
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/internal/app"
+	"github.com/nunoOliveiraqwe/torii/internal/domain"
 )
 
 var APPLICATION_ROUTE_BASE_PATH = "/api/v1"
 
 type ApplicationHandlerFunc func(svc app.SystemService) http.HandlerFunc
+
+type KeyAuth struct {
+	Scopes []domain.Scope
+}
 
 type ApplicationRoute struct {
 	Name               string
@@ -18,6 +23,7 @@ type ApplicationRoute struct {
 	IsAllowedBeforeFts bool
 	IsAllowedAfterFts  bool
 	IsSecure           bool
+	KeyAuth            KeyAuth
 	HandlerFunc        ApplicationHandlerFunc
 }
 
@@ -131,6 +137,7 @@ var routes = []ApplicationRoute{
 		IsAllowedBeforeFts: false,
 		IsAllowedAfterFts:  true,
 		IsSecure:           true,
+		KeyAuth:            struct{ Scopes []domain.Scope }{Scopes: []domain.Scope{domain.READ_STATS_SCOPE}},
 		HandlerFunc:        handleGetGlobalMetrics,
 	},
 	{
@@ -222,5 +229,35 @@ var routes = []ApplicationRoute{
 		IsAllowedAfterFts:  true,
 		IsSecure:           true,
 		HandlerFunc:        handleGetAcmeProviders,
+	},
+	{
+		Name:               "List API Key",
+		Description:        "Returns a list of all API keys",
+		Method:             "GET",
+		Pattern:            "/apiKeys",
+		IsAllowedBeforeFts: false,
+		IsAllowedAfterFts:  true,
+		IsSecure:           true,
+		HandlerFunc:        handleGetAllApiKey,
+	},
+	{
+		Name:               "Create a API Key",
+		Description:        "Creates a new API key with the provided name and scopes",
+		Method:             "POST",
+		Pattern:            "/apiKeys",
+		IsAllowedBeforeFts: false,
+		IsAllowedAfterFts:  true,
+		IsSecure:           true,
+		HandlerFunc:        handleCreateNewApiKey,
+	},
+	{
+		Name:               "Deletes a API Key",
+		Description:        "Deletes a API key",
+		Method:             "DELETE",
+		Pattern:            "/apiKeys/{id}",
+		IsAllowedBeforeFts: false,
+		IsAllowedAfterFts:  true,
+		IsSecure:           true,
+		HandlerFunc:        handleDeleteApiKey,
 	},
 }

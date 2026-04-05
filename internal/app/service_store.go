@@ -3,6 +3,7 @@ package app
 import "github.com/nunoOliveiraqwe/torii/internal/store"
 
 type ServiceStore struct {
+	apiKeyService              *ApiKeyService
 	userService                *UserService
 	systemConfigurationService *SystemConfigurationService
 	acmeStore                  store.AcmeStore
@@ -10,6 +11,7 @@ type ServiceStore struct {
 
 func NewServiceStore(ds *DataStore) *ServiceStore {
 	return &ServiceStore{
+		apiKeyService:              NewApiKeyService(ds.ApiKeyStore),
 		userService:                NewUserService(ds),
 		systemConfigurationService: NewSystemConfigurationService(ds),
 		acmeStore:                  ds.AcmeStore,
@@ -26,4 +28,8 @@ func (s *ServiceStore) GetSystemConfigurationService() *SystemConfigurationServi
 
 func (s *ServiceStore) GetAcmeStore() store.AcmeStore {
 	return s.acmeStore
+}
+
+func (s *ServiceStore) GetApiKeyService() *ApiKeyService {
+	return s.apiKeyService
 }

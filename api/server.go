@@ -48,7 +48,11 @@ func buildMux(port int, svc app.SystemService) *http.ServeMux {
 		ctx = context.WithValue(ctx, middleware.MgrKey, svc.GetGlobalMetricsManager())
 		ctx = context.WithValue(ctx, "serverId", fmt.Sprintf("http-%d", port))
 		if route.IsSecure {
-			routeHandlerFunc = isAuthenticatedRequest(routeHandlerFunc, svc)
+			if len(route.KeyAuth.Scopes) > 0 {
+				routeHandlerFunc = isAuthenticatedBySessionOrApiKey(routeHandlerFunc, route.KeyAuth.Scopes, svc)
+			} else {
+				routeHandlerFunc = isAuthenticatedRequest(routeHandlerFunc, svc)
+			}
 		}
 		routeHandlerFunc = checkIfRouteIsAllowedIfFtsIsNotDone(routeHandlerFunc, route.IsAllowedBeforeFts, route.IsAllowedAfterFts, svc)
 		routeHandlerFunc = middleware.MetricsMiddleware(ctx, routeHandlerFunc, middleware.Config{})

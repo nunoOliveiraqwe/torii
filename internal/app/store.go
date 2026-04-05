@@ -11,6 +11,7 @@ type DataStore struct {
 	SystemConfigStore store.SystemConfigStore
 	ProxyMetricsStore store.ProxyMetricsStore
 	AcmeStore         store.AcmeStore
+	ApiKeyStore       store.ApiKeyStore
 }
 
 func NewDataStore(db *sqlite.DB) *DataStore {
@@ -20,5 +21,6 @@ func NewDataStore(db *sqlite.DB) *DataStore {
 		SystemConfigStore: sqlite.NewSystemConfigStore(db),
 		ProxyMetricsStore: sqlite.NewProxyMetricsStore(db),
 		AcmeStore:         sqlite.NewAcmeStore(db),
+		ApiKeyStore:       sqlite.NewApiKeyStore(db),
 	}
 }

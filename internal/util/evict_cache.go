@@ -118,6 +118,12 @@ func (c *Cache[T]) GetValue(ip string) (T, error) {
 	return entry, nil
 }
 
+func (c *Cache[T]) Evict(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.cache, key)
+}
+
 // only supposed to be called after a lock is held
 func (c *Cache[T]) evictOldest() {
 	var oldestKey string

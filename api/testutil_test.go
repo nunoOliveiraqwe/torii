@@ -203,6 +203,7 @@ func newTestFixture(t *testing.T) *testFixture {
 		SystemConfigStore: store.SystemConfigStore(mscs),
 		ProxyMetricsStore: store.ProxyMetricsStore(mpms),
 		AcmeStore:         sqlite.NewAcmeStore(db),
+		ApiKeyStore:       sqlite.NewApiKeyStore(db),
 	}
 	serviceStore := app.NewServiceStore(dataStore)
 
