@@ -150,16 +150,16 @@ func parseConfiguration(conf Config) *headersConfig {
 	parseConfigMap(conf, cmpHeadersReqKey, func(key, val string) {
 		h.cmpHeadersReq[key] = val
 	})
-	parseConfigSlice(conf, stripHeadersResKey, func(val string) {
+	parseHeaderConfigSlice(conf, stripHeadersResKey, func(val string) {
 		h.stripHeadersRes[val] = true
 	})
-	parseConfigSlice(conf, stripHeadersReqKey, func(val string) {
+	parseHeaderConfigSlice(conf, stripHeadersReqKey, func(val string) {
 		h.stripHeadersReq[val] = true
 	})
 	return &h
 }
 
-func parseConfigSlice(conf Config, key string, setFunc func(val string)) {
+func parseHeaderConfigSlice(conf Config, key string, setFunc func(val string)) {
 	zap.S().Debugf("Parsing config slice for key: %s", key)
 	headerSlice, exists := conf.Options[key]
 	zap.S().Debugf("Headers configuration for key %s, exists: %v", key, exists)

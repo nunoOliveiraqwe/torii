@@ -30,6 +30,7 @@ func init() {
 		"RateLimiter":  RateLimitMiddleware,
 		"CountryBlock": CountryBlockMiddleware,
 		"IpBlock":      IpBlockMiddleware,
+		"Redirect":     RedirectMiddleware,
 	}
 }
 
