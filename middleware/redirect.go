@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/nunoOliveiraqwe/torii/internal/proxyutil"
 	"go.uber.org/zap"
 )
 
@@ -67,27 +68,15 @@ func (e *externalRedirecter) buildRedirectURL(r *http.Request) string {
 	return u.String()
 }
 
-func newInternalRedirecter(opts *redirectOptions) *internalRedirecter {
-	ir := &internalRedirecter{opts: opts}
-	ir.proxy = &httputil.ReverseProxy{
-		Rewrite: func(pr *httputil.ProxyRequest) {
-			pr.SetURL(opts.targetUrl)
-			pr.Out.Host = pr.In.Host
-
-			if opts.dropPath {
-				// Use only the target's path, ignore the original request path
-				pr.Out.URL.Path = opts.targetUrl.Path
-				pr.Out.URL.RawPath = ""
-			}
-			// When dropPath is false, SetURL already joins target path + request path
-
-			if opts.dropQuery {
-				pr.Out.URL.RawQuery = opts.targetUrl.RawQuery
-			}
-			// When dropQuery is false, SetURL already merges query params
-		},
+func newInternalRedirecter(opts *redirectOptions) (*internalRedirecter, error) {
+	proxy, err := proxyutil.NewReverseProxy(opts.targetUrl.String(), proxyutil.ProxyOptions{
+		DropPath:  opts.dropPath,
+		DropQuery: opts.dropQuery,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to build internal redirect proxy: %w", err)
 	}
-	return ir
+	return &internalRedirecter{opts: opts, proxy: proxy}, nil
 }
 
 func (e *internalRedirecter) redirect(w http.ResponseWriter, r *http.Request) {
@@ -108,7 +97,14 @@ func RedirectMiddleware(_ context.Context, _ http.HandlerFunc, conf Config) http
 	if opts.mode == "external" {
 		r = &externalRedirecter{opts: opts}
 	} else {
-		r = newInternalRedirecter(opts)
+		ir, irErr := newInternalRedirecter(opts)
+		if irErr != nil {
+			zap.S().Errorf("RedirectMiddleware: failed to build internal redirecter: %v. Failing closed.", irErr)
+			return func(writer http.ResponseWriter, request *http.Request) {
+				http.Error(writer, "RedirectMiddleware misconfigured", http.StatusServiceUnavailable)
+			}
+		}
+		r = ir
 	}
 	return func(writer http.ResponseWriter, request *http.Request) {
 		r.redirect(writer, request)
@@ -148,14 +144,11 @@ func parseRedirectConf(conf Config) (*redirectOptions, error) {
 
 	zap.S().Debugf("RedirectMiddleware: successfully parsed configuration with mode %q, status code %d and target %q", mode, statusCode, target)
 
-	parsed, err := url.Parse(target)
-	if err != nil {
-		return nil, fmt.Errorf("'target' option is not a valid URL: %v", err)
-	}
+	parsed, parseErr := url.Parse(target)
 
-	// If url.Parse didn't find a scheme+host, try treating the raw value as host:port
+	// If url.Parse failed or didn't find a scheme+host, try treating the raw value as host:port
 	// and construct a proper URL from it
-	if parsed.Scheme == "" || parsed.Host == "" {
+	if parseErr != nil || parsed.Scheme == "" || parsed.Host == "" {
 		zap.S().Debug("RedirectMiddleware: 'target' has no scheme, trying as host:port")
 		host, port, splitErr := net.SplitHostPort(target)
 		if splitErr != nil {

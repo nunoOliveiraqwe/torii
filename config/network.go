@@ -52,6 +52,9 @@ type Route struct {
 
 type PathRule struct {
 	Pattern     string              `yaml:"pattern"`
+	Backend     string              `yaml:"backend"`
+	DropPath    *bool               `yaml:"drop-path"`
+	DropQuery   *bool               `yaml:"drop-query"`
 	Middlewares []middleware.Config `yaml:"middlewares"`
 }
 

@@ -1,8 +1,8 @@
-{{define "title"}} – Dashboard{{end}}
-{{define "head"}}
+{{ define "title"}} – Dashboard{{ end }}
+{{ define "head"}}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-{{end}}
-{{define "body"}}
+{{ end }}
+{{ define "body"}}
 <div id="toast-container" class="toast-container"></div>
 <div class="app-layout">
     <!-- Sidebar -->
@@ -34,7 +34,7 @@
         </ul>
         <div class="sidebar-footer">
             <div class="sidebar-user">
-                <div class="sidebar-user-avatar" id="sidebar-avatar">{{slice .Username 0 1}}</div>
+                <div class="sidebar-user-avatar" id="sidebar-avatar">{{ slice .Username 0 1}}</div>
                 <span class="sidebar-user-name" id="sidebar-username">{{.Username}}</span>
             </div>
             <a href="#" id="btn-logout">⎋ Sign out</a>
@@ -48,10 +48,12 @@
         <section class="page" data-page="dashboard">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
                 <hgroup style="margin:0;">
-                    <h2><span class="sse-indicator connecting" id="sse-dot" title="SSE disconnected"></span>Dashboard</h2>
+                    <h2><span class="sse-indicator connecting" id="sse-dot" title="SSE disconnected"></span>Dashboard
+                    </h2>
                     <p>Proxy server overview and management</p>
                 </hgroup>
-                <select id="connection-selector" aria-label="Select connection" style="width:auto;min-width:200px;margin:0;">
+                <select id="connection-selector" aria-label="Select connection"
+                        style="width:auto;min-width:200px;margin:0;">
                     <option value="global">Global (all proxies)</option>
                 </select>
             </div>
@@ -70,9 +72,15 @@
                 <!-- Feature 1: latency percentile card -->
                 <div class="stat-card">
                     <div class="latency-percentiles">
-                        <div class="latency-row"><span class="latency-label">P50</span><span class="latency-value" id="stat-p50">–</span></div>
-                        <div class="latency-row"><span class="latency-label">P95</span><span class="latency-value" id="stat-p95">–</span></div>
-                        <div class="latency-row"><span class="latency-label">P99</span><span class="latency-value" id="stat-p99">–</span></div>
+                        <div class="latency-row"><span class="latency-label">P50</span><span class="latency-value"
+                                                                                             id="stat-p50">–</span>
+                        </div>
+                        <div class="latency-row"><span class="latency-label">P95</span><span class="latency-value"
+                                                                                             id="stat-p95">–</span>
+                        </div>
+                        <div class="latency-row"><span class="latency-label">P99</span><span class="latency-value"
+                                                                                             id="stat-p99">–</span>
+                        </div>
                     </div>
                     <p class="stat-label">Latency (ms)</p>
                 </div>
@@ -190,17 +198,23 @@
                     <div class="health-gauges" style="max-width:100%;">
                         <div class="gauge-row">
                             <span class="gauge-label">Heap</span>
-                            <div class="gauge-bar"><div class="gauge-fill" id="gauge-memory-fill" style="width:0%"></div></div>
+                            <div class="gauge-bar">
+                                <div class="gauge-fill" id="gauge-memory-fill" style="width:0%"></div>
+                            </div>
                             <span class="gauge-value" id="gauge-memory-text">–</span>
                         </div>
                         <div class="gauge-row">
                             <span class="gauge-label">Goroutines</span>
-                            <div class="gauge-bar"><div class="gauge-fill" id="gauge-goroutine-fill" style="width:0%"></div></div>
+                            <div class="gauge-bar">
+                                <div class="gauge-fill" id="gauge-goroutine-fill" style="width:0%"></div>
+                            </div>
                             <span class="gauge-value" id="gauge-goroutine-text">–</span>
                         </div>
                         <div class="gauge-row">
                             <span class="gauge-label">GC Pause</span>
-                            <div class="gauge-bar"><div class="gauge-fill" id="gauge-gc-fill" style="width:0%"></div></div>
+                            <div class="gauge-bar">
+                                <div class="gauge-fill" id="gauge-gc-fill" style="width:0%"></div>
+                            </div>
                             <span class="gauge-value" id="gauge-gc-text">–</span>
                         </div>
                     </div>
@@ -210,7 +224,8 @@
             <!-- Tab: Requests -->
             <div class="inner-tab-panel" id="system-tab-requests" style="display:none;">
                 <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem;">
-                    <select id="request-log-filter" aria-label="Filter requests" style="width:auto;min-width:180px;margin:0;padding:0.3rem 0.5rem;font-size:0.8rem;">
+                    <select id="request-log-filter" aria-label="Filter requests"
+                            style="width:auto;min-width:180px;margin:0;padding:0.3rem 0.5rem;font-size:0.8rem;">
                         <option value="">All connections</option>
                     </select>
                 </div>
@@ -224,7 +239,8 @@
             <!-- Tab: Errors -->
             <div class="inner-tab-panel" id="system-tab-errors" style="display:none;">
                 <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem;">
-                    <select id="error-log-filter" aria-label="Filter errors" style="width:auto;min-width:180px;margin:0;padding:0.3rem 0.5rem;font-size:0.8rem;">
+                    <select id="error-log-filter" aria-label="Filter errors"
+                            style="width:auto;min-width:180px;margin:0;padding:0.3rem 0.5rem;font-size:0.8rem;">
                         <option value="">All connections</option>
                     </select>
                 </div>
@@ -243,9 +259,10 @@
                     <h2>ACME / TLS</h2>
                     <p>Manage automatic TLS certificates via DNS-01 challenges</p>
                 </hgroup>
-                <button type="button" id="acme-reset-btn" style="display:none;background:none;border:1px solid #e74c3c;color:#e74c3c;padding:0.4rem 1rem;font-size:0.8rem;border-radius:0.35rem;cursor:pointer;white-space:nowrap;transition:background 0.15s,color 0.15s;"
-                    onmouseover="this.style.background='#e74c3c';this.style.color='#fff';"
-                    onmouseout="this.style.background='none';this.style.color='#e74c3c';">
+                <button type="button" id="acme-reset-btn"
+                        style="display:none;background:none;border:1px solid #e74c3c;color:#e74c3c;padding:0.4rem 1rem;font-size:0.8rem;border-radius:0.35rem;cursor:pointer;white-space:nowrap;transition:background 0.15s,color 0.15s;"
+                        onmouseover="this.style.background='#e74c3c';this.style.color='#fff';"
+                        onmouseout="this.style.background='none';this.style.color='#e74c3c';">
                     Reset ACME
                 </button>
             </div>
@@ -275,7 +292,8 @@
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">
                             <label for="acme-email" style="font-size:0.85rem;margin-bottom:0.25rem;">
                                 Email
-                                <input type="email" id="acme-email" name="email" placeholder="admin@example.com" required style="margin-bottom:0.5rem;">
+                                <input type="email" id="acme-email" name="email" placeholder="admin@example.com"
+                                       required style="margin-bottom:0.5rem;">
                             </label>
                             <label for="acme-dns-provider" style="font-size:0.85rem;margin-bottom:0.25rem;">
                                 DNS Provider
@@ -288,11 +306,14 @@
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">
                             <label for="acme-ca-dir-url" style="font-size:0.85rem;margin-bottom:0.25rem;">
                                 CA Directory URL <small>(leave empty for Let's Encrypt production)</small>
-                                <input type="text" id="acme-ca-dir-url" name="caDirUrl" placeholder="https://acme-v02.api.letsencrypt.org/directory" style="margin-bottom:0.5rem;">
+                                <input type="text" id="acme-ca-dir-url" name="caDirUrl"
+                                       placeholder="https://acme-v02.api.letsencrypt.org/directory"
+                                       style="margin-bottom:0.5rem;">
                             </label>
                             <label for="acme-renewal-interval" style="font-size:0.85rem;margin-bottom:0.25rem;">
                                 Renewal Check Interval <small>(Go duration, e.g. 12h, 6h30m)</small>
-                                <input type="text" id="acme-renewal-interval" name="renewalCheckInterval" placeholder="12h" style="margin-bottom:0.75rem;">
+                                <input type="text" id="acme-renewal-interval" name="renewalCheckInterval"
+                                       placeholder="12h" style="margin-bottom:0.75rem;">
                             </label>
                         </div>
                         <button type="submit" id="acme-save-btn">Save Configuration</button>
@@ -307,10 +328,19 @@
                     <div class="overflow-auto">
                         <table id="acme-certs-table" style="margin:0;">
                             <thead>
-                                <tr><th>Domain</th><th>Status</th><th>Expires</th><th>Issued</th></tr>
+                            <tr>
+                                <th>Domain</th>
+                                <th>Status</th>
+                                <th>Expires</th>
+                                <th>Issued</th>
+                            </tr>
                             </thead>
                             <tbody id="acme-certs-body">
-                                <tr><td colspan="4" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">Loading…</td></tr>
+                            <tr>
+                                <td colspan="4" class="text-center"
+                                    style="padding:1.5rem;color:var(--pico-muted-color);">Loading…
+                                </td>
+                            </tr>
                             </tbody>
                         </table>
                     </div>
@@ -330,8 +360,11 @@
                 <div class="success-alert" style="margin:0;">
                     <strong>API key created.</strong> Copy it now — it won't be shown again.
                     <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;">
-                        <code id="api-key-created-value" style="flex:1;padding:0.4rem 0.6rem;background:rgba(0,0,0,0.3);border-radius:0.3rem;font-size:0.85rem;word-break:break-all;user-select:all;"></code>
-                        <button type="button" id="api-key-copy-btn" style="white-space:nowrap;padding:0.35rem 0.75rem;font-size:0.8rem;">Copy</button>
+                        <code id="api-key-created-value"
+                              style="flex:1;padding:0.4rem 0.6rem;background:rgba(0,0,0,0.3);border-radius:0.3rem;font-size:0.85rem;word-break:break-all;user-select:all;"></code>
+                        <button type="button" id="api-key-copy-btn"
+                                style="white-space:nowrap;padding:0.35rem 0.75rem;font-size:0.8rem;">Copy
+                        </button>
                     </div>
                 </div>
             </div>
@@ -349,7 +382,8 @@
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">
                             <label for="api-key-alias" style="font-size:0.85rem;margin-bottom:0.25rem;">
                                 Alias
-                                <input type="text" id="api-key-alias" placeholder="e.g. monitoring-key" required style="margin-bottom:0.5rem;">
+                                <input type="text" id="api-key-alias" placeholder="e.g. monitoring-key" required
+                                       style="margin-bottom:0.5rem;">
                             </label>
                             <label for="api-key-expiry" style="font-size:0.85rem;margin-bottom:0.25rem;">
                                 Expires <small>(optional)</small>
@@ -357,7 +391,8 @@
                             </label>
                         </div>
                         <label style="font-size:0.85rem;margin-bottom:0.25rem;">Scopes</label>
-                        <fieldset style="margin:0 0 0.75rem;padding:0;border:none;display:flex;gap:1.5rem;flex-wrap:wrap;">
+                        <fieldset
+                                style="margin:0 0 0.75rem;padding:0;border:none;display:flex;gap:1.5rem;flex-wrap:wrap;">
                             <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;">
                                 <input type="checkbox" name="api-key-scope" value="read_stats"> Read Stats
                             </label>
@@ -380,10 +415,20 @@
                     <div class="overflow-auto">
                         <table style="margin:0;">
                             <thead>
-                                <tr><th>Alias</th><th>Scopes</th><th>Expires</th><th>Created</th><th></th></tr>
+                            <tr>
+                                <th>Alias</th>
+                                <th>Scopes</th>
+                                <th>Expires</th>
+                                <th>Created</th>
+                                <th></th>
+                            </tr>
                             </thead>
                             <tbody id="api-keys-body">
-                                <tr><td colspan="5" class="text-center" style="padding:1.5rem;color:var(--pico-muted-color);">Loading…</td></tr>
+                            <tr>
+                                <td colspan="5" class="text-center"
+                                    style="padding:1.5rem;color:var(--pico-muted-color);">Loading…
+                                </td>
+                            </tr>
                             </tbody>
                         </table>
                     </div>
@@ -402,11 +447,13 @@
                 <form id="change-password-form" autocomplete="off">
                     <label for="old-password" style="font-size:0.85rem;margin-bottom:0.25rem;">
                         Current Password
-                        <input type="password" id="old-password" name="oldPassword" placeholder="Current password" required style="margin-bottom:0.5rem;">
+                        <input type="password" id="old-password" name="oldPassword" placeholder="Current password"
+                               required style="margin-bottom:0.5rem;">
                     </label>
                     <label for="new-password" style="font-size:0.85rem;margin-bottom:0.25rem;">
                         New Password
-                        <input type="password" id="new-password" name="newPassword" placeholder="New password" required style="margin-bottom:0.75rem;">
+                        <input type="password" id="new-password" name="newPassword" placeholder="New password" required
+                               style="margin-bottom:0.75rem;">
                     </label>
                     <button type="submit" style="width:100%;">Update Password</button>
                 </form>
@@ -427,12 +474,15 @@
         container.appendChild(toast);
         setTimeout(function () {
             toast.classList.add('toast-fade-out');
-            toast.addEventListener('animationend', function () { toast.remove(); });
+            toast.addEventListener('animationend', function () {
+                toast.remove();
+            });
         }, 3000);
     }
 
     // ---------- SSE indicator ----------
     var sseDot = document.getElementById('sse-dot');
+
     function setSseStatus(status) {
         sseDot.className = 'sse-indicator ' + status;
         sseDot.title = 'SSE ' + status;
@@ -440,7 +490,7 @@
 
     // ---------- Page navigation ----------
     var navLinks = document.querySelectorAll('.nav-link');
-    var pages    = document.querySelectorAll('.page');
+    var pages = document.querySelectorAll('.page');
     var currentPage = 'dashboard';
     var healthInterval = null;
 
@@ -521,7 +571,10 @@
             fetchSystemHealth();
             if (!healthInterval) healthInterval = setInterval(fetchSystemHealth, 5000);
         } else {
-            if (healthInterval) { clearInterval(healthInterval); healthInterval = null; }
+            if (healthInterval) {
+                clearInterval(healthInterval);
+                healthInterval = null;
+            }
         }
 
         // Load ACME config when the page is shown (certs load on tab click)
@@ -561,15 +614,20 @@
     var prevSnapshot = null;
 
     var metricMeta = {
-        reqPerSec:     { label: 'Req/s',            color: 'rgba(124,110,240,1)', bg: 'rgba(124,110,240,0.15)' },
-        latencyP99:    { label: 'Latency P99 (ms)', color: 'rgba(231,76,60,1)',   bg: 'rgba(231,76,60,0.15)',  isMs: true },
-        bytesSent:     { label: 'Bytes Sent',       color: 'rgba(124,110,240,1)', bg: 'rgba(124,110,240,0.15)', isBytes: true },
-        bytesReceived: { label: 'Bytes Received',   color: 'rgba(52,152,219,1)',  bg: 'rgba(52,152,219,0.15)',  isBytes: true },
-        requestCount:  { label: 'Requests',         color: 'rgba(46,204,113,1)',  bg: 'rgba(46,204,113,0.15)' },
-        errorCount:    { label: 'Errors',            color: 'rgba(231,76,60,1)',   bg: 'rgba(231,76,60,0.15)' },
-        request2xx:    { label: '2xx',              color: 'rgba(46,204,113,1)',  bg: 'rgba(46,204,113,0.15)' },
-        request4xx:    { label: '4xx',              color: 'rgba(243,156,18,1)',  bg: 'rgba(243,156,18,0.15)' },
-        request5xx:    { label: '5xx',              color: 'rgba(231,76,60,1)',   bg: 'rgba(231,76,60,0.15)' }
+        reqPerSec: {label: 'Req/s', color: 'rgba(124,110,240,1)', bg: 'rgba(124,110,240,0.15)'},
+        latencyP99: {label: 'Latency P99 (ms)', color: 'rgba(231,76,60,1)', bg: 'rgba(231,76,60,0.15)', isMs: true},
+        bytesSent: {label: 'Bytes Sent', color: 'rgba(124,110,240,1)', bg: 'rgba(124,110,240,0.15)', isBytes: true},
+        bytesReceived: {
+            label: 'Bytes Received',
+            color: 'rgba(52,152,219,1)',
+            bg: 'rgba(52,152,219,0.15)',
+            isBytes: true
+        },
+        requestCount: {label: 'Requests', color: 'rgba(46,204,113,1)', bg: 'rgba(46,204,113,0.15)'},
+        errorCount: {label: 'Errors', color: 'rgba(231,76,60,1)', bg: 'rgba(231,76,60,0.15)'},
+        request2xx: {label: '2xx', color: 'rgba(46,204,113,1)', bg: 'rgba(46,204,113,0.15)'},
+        request4xx: {label: '4xx', color: 'rgba(243,156,18,1)', bg: 'rgba(243,156,18,0.15)'},
+        request5xx: {label: '5xx', color: 'rgba(231,76,60,1)', bg: 'rgba(231,76,60,0.15)'}
     };
 
     function fmtBytes(b) {
@@ -579,12 +637,16 @@
         if (i < 0) return '0 B';
         return (b / Math.pow(1024, i)).toFixed(i ? 1 : 0) + ' ' + units[i];
     }
-    function fmtNum(n) { return (n || 0).toLocaleString(); }
+
+    function fmtNum(n) {
+        return (n || 0).toLocaleString();
+    }
+
     function timeLabel() {
         var d = new Date();
         return d.getHours().toString().padStart(2, '0') + ':' +
-               d.getMinutes().toString().padStart(2, '0') + ':' +
-               d.getSeconds().toString().padStart(2, '0');
+            d.getMinutes().toString().padStart(2, '0') + ':' +
+            d.getSeconds().toString().padStart(2, '0');
     }
 
     function initChart() {
@@ -604,17 +666,17 @@
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                animation: { duration: 200 },
-                interaction: { mode: 'index', intersect: false },
-                plugins: { legend: { display: false } },
+                animation: {duration: 200},
+                interaction: {mode: 'index', intersect: false},
+                plugins: {legend: {display: false}},
                 scales: {
                     x: {
-                        grid: { color: 'rgba(255,255,255,0.06)' },
-                        ticks: { color: 'rgba(255,255,255,0.5)', maxRotation: 0, maxTicksLimit: 10 }
+                        grid: {color: 'rgba(255,255,255,0.06)'},
+                        ticks: {color: 'rgba(255,255,255,0.5)', maxRotation: 0, maxTicksLimit: 10}
                     },
                     y: {
                         beginAtZero: true,
-                        grid: { color: 'rgba(255,255,255,0.06)' },
+                        grid: {color: 'rgba(255,255,255,0.06)'},
                         ticks: {
                             color: 'rgba(255,255,255,0.5)',
                             callback: function (value) {
@@ -639,6 +701,7 @@
         chart.data.datasets[0].backgroundColor = meta.bg;
         chart.update();
     }
+
     document.getElementById('metric-selector').addEventListener('change', function () {
         switchMetric(this.value);
     });
@@ -702,8 +765,12 @@
                 }
             }
         });
-        metricsEventSource.onopen = function () { setSseStatus('connected'); };
-        metricsEventSource.onerror = function () { setSseStatus('disconnected'); };
+        metricsEventSource.onopen = function () {
+            setSseStatus('connected');
+        };
+        metricsEventSource.onerror = function () {
+            setSseStatus('disconnected');
+        };
     }
 
     function applySnapshot(snap) {
@@ -711,7 +778,10 @@
         latestSnapshot = snap;
         latestSnapshot._ts = now;
         updateStatCards(latestSnapshot);
-        if (!prevSnapshot) { prevSnapshot = latestSnapshot; lastSnapshotTime = now; }
+        if (!prevSnapshot) {
+            prevSnapshot = latestSnapshot;
+            lastSnapshotTime = now;
+        }
     }
 
     var currentRps = 0;
@@ -755,7 +825,9 @@
         }
 
         if (metricsHistory.labels.length > MAX_POINTS) {
-            Object.keys(metricsHistory).forEach(function (k) { metricsHistory[k].shift(); });
+            Object.keys(metricsHistory).forEach(function (k) {
+                metricsHistory[k].shift();
+            });
         }
         if (chart) chart.update();
 
@@ -766,7 +838,9 @@
             '<span class="dot"></span>' + (latestSnapshot ? 'Last updated at ' : 'Waiting for data… ') + timeLabel();
     }
 
-    function connectionKey(proxy) { return 'metric-port-' + proxy.port; }
+    function connectionKey(proxy) {
+        return 'metric-port-' + proxy.port;
+    }
 
     // Find the port-level aggregate metric from a proxy snapshot's metrics array.
     function findPortMetric(proxy) {
@@ -809,9 +883,9 @@
         document.getElementById('stat-rps').textContent = currentRps.toFixed(1);
         document.getElementById('stat-total-requests').textContent = fmtNum(m.request_count) + ' total';
 
-        document.getElementById('stat-errors').textContent      = fmtNum(m.error_count);
-        document.getElementById('stat-bytes-sent').textContent   = fmtBytes(m.bytes_sent);
-        document.getElementById('stat-bytes-recv').textContent   = fmtBytes(m.bytes_received);
+        document.getElementById('stat-errors').textContent = fmtNum(m.error_count);
+        document.getElementById('stat-bytes-sent').textContent = fmtBytes(m.bytes_sent);
+        document.getElementById('stat-bytes-recv').textContent = fmtBytes(m.bytes_received);
 
         var rate = m.request_count > 0 ? ((m.error_count / m.request_count) * 100).toFixed(1) + '%' : '0%';
         document.getElementById('stat-error-rate').textContent = rate + ' error rate';
@@ -827,7 +901,9 @@
     }
 
     function resetChartHistory() {
-        Object.keys(metricsHistory).forEach(function (k) { metricsHistory[k].length = 0; });
+        Object.keys(metricsHistory).forEach(function (k) {
+            metricsHistory[k].length = 0;
+        });
         prevSnapshot = null;
         latestSnapshot = null;
         lastSnapshotTime = null;
@@ -842,7 +918,7 @@
 
     // ---------- System Health ----------
     function fetchSystemHealth() {
-        fetch('/api/v1/system/health', { credentials: 'same-origin' })
+        fetch('/api/v1/system/health', {credentials: 'same-origin'})
             .then(function (resp) {
                 if (!resp.ok) return null;
                 return resp.json();
@@ -853,12 +929,15 @@
                 // --- Stat cards ---
                 // Uptime
                 var secs = Math.floor(h.uptime_seconds);
-                var days = Math.floor(secs / 86400); secs %= 86400;
-                var hrs  = Math.floor(secs / 3600);  secs %= 3600;
-                var mins = Math.floor(secs / 60);    secs %= 60;
+                var days = Math.floor(secs / 86400);
+                secs %= 86400;
+                var hrs = Math.floor(secs / 3600);
+                secs %= 3600;
+                var mins = Math.floor(secs / 60);
+                secs %= 60;
                 var parts = [];
                 if (days) parts.push(days + 'd');
-                if (hrs)  parts.push(hrs + 'h');
+                if (hrs) parts.push(hrs + 'h');
                 if (mins) parts.push(mins + 'm');
                 parts.push(secs + 's');
                 document.getElementById('health-uptime-val').textContent = parts.join(' ');
@@ -903,7 +982,8 @@
                 gcFill.className = 'gauge-fill' + (gcMs > 80 ? ' danger' : gcMs > 30 ? ' warn' : '');
                 document.getElementById('gauge-gc-text').textContent = gcMs.toFixed(1) + ' ms (' + h.num_gc + ' cycles)';
             })
-            .catch(function () {});
+            .catch(function () {
+            });
     }
 
     // ---------- Error Log Feed ----------
@@ -913,9 +993,9 @@
 
     function buildErrorRow(e) {
         var ts = new Date(e.timestamp);
-        var time = ts.getHours().toString().padStart(2,'0') + ':' +
-                   ts.getMinutes().toString().padStart(2,'0') + ':' +
-                   ts.getSeconds().toString().padStart(2,'0');
+        var time = ts.getHours().toString().padStart(2, '0') + ':' +
+            ts.getMinutes().toString().padStart(2, '0') + ':' +
+            ts.getSeconds().toString().padStart(2, '0');
         var row = document.createElement('div');
         row.className = 'error-entry';
         row.innerHTML =
@@ -923,7 +1003,7 @@
             '<span class="error-remote">' + (e.remote_address || '–') + '</span>' +
             '<span class="error-status">' + (e.status_code || '5xx') + '</span>' +
             '<span class="error-method">' + (e.method || '?') + '</span>' +
-            '<span class="error-path" title="' + (e.path || '').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
+            '<span class="error-path" title="' + (e.path || '').replace(/"/g, '&quot;') + '">' + (e.path || '/') + '</span>' +
             '<span class="error-latency">' + (e.latency_ms || 0) + ' ms</span>';
         return row;
     }
@@ -972,20 +1052,25 @@
             return;
         }
         var html = errorFeedHeader;
-        filtered.forEach(function (e) { html += buildErrorRow(e).outerHTML; });
+        filtered.forEach(function (e) {
+            html += buildErrorRow(e).outerHTML;
+        });
         el.innerHTML = html;
     }
 
     function loadRecentErrors() {
-        fetch('/api/v1/proxy/errors', { credentials: 'same-origin' })
-            .then(function (resp) { return resp.ok ? resp.json() : []; })
+        fetch('/api/v1/proxy/errors', {credentials: 'same-origin'})
+            .then(function (resp) {
+                return resp.ok ? resp.json() : [];
+            })
             .then(function (entries) {
                 if (entries && entries.length) {
                     errorEntries = entries.slice(0, MAX_ERROR_ENTRIES);
                     renderErrorFeed();
                 }
             })
-            .catch(function () {});
+            .catch(function () {
+            });
     }
 
     // ---------- Request Log Feed ----------
@@ -1017,9 +1102,9 @@
 
     function buildRequestRow(e) {
         var ts = new Date(e.timestamp);
-        var time = ts.getHours().toString().padStart(2,'0') + ':' +
-                   ts.getMinutes().toString().padStart(2,'0') + ':' +
-                   ts.getSeconds().toString().padStart(2,'0');
+        var time = ts.getHours().toString().padStart(2, '0') + ':' +
+            ts.getMinutes().toString().padStart(2, '0') + ':' +
+            ts.getSeconds().toString().padStart(2, '0');
         var sc = e.status_code || 0;
         var row = document.createElement('div');
         row.className = 'req-entry';
@@ -1028,7 +1113,7 @@
             '<span class="req-remote">' + (e.remote_address || '–') + '</span>' +
             '<span class="req-country">' + (e.country || '–') + '</span>' +
             '<span class="req-route">:' + parsePort(e.connection_name) + '</span>' +
-            '<span class="req-path" title="' + (e.path || '').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
+            '<span class="req-path" title="' + (e.path || '').replace(/"/g, '&quot;') + '">' + (e.path || '/') + '</span>' +
             '<span class="req-method">' + (e.method || '?') + '</span>' +
             '<span class="req-status ' + statusClass(sc) + '">' + (sc || '–') + '</span>' +
             '<span class="req-latency">' + (e.latency_ms || 0) + ' ms</span>';
@@ -1081,20 +1166,25 @@
             return;
         }
         var html = requestFeedHeader;
-        filtered.forEach(function (e) { html += buildRequestRow(e).outerHTML; });
+        filtered.forEach(function (e) {
+            html += buildRequestRow(e).outerHTML;
+        });
         el.innerHTML = html;
     }
 
     function loadRecentRequests() {
-        fetch('/api/v1/proxy/requests', { credentials: 'same-origin' })
-            .then(function (resp) { return resp.ok ? resp.json() : []; })
+        fetch('/api/v1/proxy/requests', {credentials: 'same-origin'})
+            .then(function (resp) {
+                return resp.ok ? resp.json() : [];
+            })
             .then(function (entries) {
                 if (entries && entries.length) {
                     requestEntries = entries.slice(0, MAX_REQUEST_ENTRIES);
                     renderRequestFeed();
                 }
             })
-            .catch(function () {});
+            .catch(function () {
+            });
     }
 
     // ---------- Log Filter Dropdowns ----------
@@ -1179,7 +1269,7 @@
             if (!p.is_started) return;
             var key = connectionKey(p);
             if (!sparklineBuffers[key]) {
-                sparklineBuffers[key] = { history: [], count: 0 };
+                sparklineBuffers[key] = {history: [], count: 0};
             }
         });
         // Remove buffers for stopped/removed routes
@@ -1205,9 +1295,12 @@
 
     // ---------- Proxy routes ----------
     function loadProxyRoutes() {
-        fetch('/api/v1/proxy/routes', { credentials: 'same-origin' })
+        fetch('/api/v1/proxy/routes', {credentials: 'same-origin'})
             .then(function (resp) {
-                if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+                if (resp.status === 401) {
+                    window.location.href = '/ui/login';
+                    return null;
+                }
                 if (!resp.ok) throw new Error(resp.statusText);
                 return resp.json();
             })
@@ -1282,7 +1375,9 @@
     var lastRouteFingerprint = '';
 
     function routeFingerprint(proxies) {
-        return proxies.slice().sort(function (a, b) { return a.port - b.port; }).map(function (p) {
+        return proxies.slice().sort(function (a, b) {
+            return a.port - b.port;
+        }).map(function (p) {
             return p.port + ':' + (p.is_started ? '1' : '0');
         }).join('|');
     }
@@ -1308,7 +1403,9 @@
     }
 
     function sortProxiesByPort(proxies) {
-        return proxies.slice().sort(function (a, b) { return a.port - b.port; });
+        return proxies.slice().sort(function (a, b) {
+            return a.port - b.port;
+        });
     }
 
     function renderProxyRoutes(proxies) {
@@ -1349,14 +1446,18 @@
                 : '<span style="color:var(--pico-muted-color);font-size:0.75rem">–</span>';
             var routeCount = (p.routes && p.routes.length) || 0;
             var pathCount = 0;
-            if (p.routes) p.routes.forEach(function (r) { pathCount += (r.paths && r.paths.length) || 0; });
+            if (p.routes) p.routes.forEach(function (r) {
+                pathCount += (r.paths && r.paths.length) || 0;
+            });
             var toggleLabel = routeCount + ' route' + (routeCount !== 1 ? 's' : '');
             if (pathCount > 0) toggleLabel += ', ' + pathCount + ' path' + (pathCount !== 1 ? 's' : '');
             h += '<tr>' +
                 '<td><code>' + p.port + '</code></td>' +
                 '<td>' + (p.interface || '<em>all</em>') + '</td>' +
                 '<td>' + (p.backend && p.backend.length
-                    ? p.backend.map(function (b) { return '<code>' + b + '</code>'; }).join('<br>')
+                    ? p.backend.map(function (b) {
+                        return '<code>' + b + '</code>';
+                    }).join('<br>')
                     : '<em>none</em>') + '</td>' +
                 '<td>' + badge(p.is_using_https) + '</td>' +
                 '<td>' + badge(p.is_using_acme) + '</td>' +
@@ -1415,9 +1516,10 @@
             if (r.paths && r.paths.length > 0) {
                 r.paths.forEach(function (p) {
                     var pmw = (p.middlewares && p.middlewares.length) ? p.middlewares.join(', ') : '<em>none</em>';
+                    var pbackend = p.backend ? '<code>' + p.backend + '</code>' : 'Defined by parent';
                     h += '<tr style="color:var(--pico-muted-color);">' +
                         '<td style="padding-left:1.5rem;">↳ <code>' + p.pattern + '</code></td>' +
-                        '<td></td>' +
+                        '<td>' + pbackend + '</td>' +
                         '<td>' + pmw + '</td></tr>';
                 });
             }
@@ -1429,14 +1531,21 @@
     function toggleProxy(port, action) {
         if (!confirm('Are you sure you want to ' + action + ' the proxy on port ' + port + '?')) return;
         lastRouteFingerprint = '';  // force full rebuild on next load
-        fetch('/api/v1/proxy/routes/' + port + '/' + action, { method: 'POST', credentials: 'same-origin' })
-        .then(function (resp) {
-            if (resp.status === 401) { window.location.href = '/ui/login'; return; }
-            if (!resp.ok) return resp.text().then(function (t) { showToast(t || 'Failed to ' + action + ' proxy', 'error'); });
-            showToast('Proxy on port ' + port + ' ' + (action === 'stop' ? 'stopped' : 'started'), 'success');
-            loadProxyRoutes();
-        })
-        .catch(function () { showToast('Failed to ' + action + ' proxy on port ' + port, 'error'); });
+        fetch('/api/v1/proxy/routes/' + port + '/' + action, {method: 'POST', credentials: 'same-origin'})
+            .then(function (resp) {
+                if (resp.status === 401) {
+                    window.location.href = '/ui/login';
+                    return;
+                }
+                if (!resp.ok) return resp.text().then(function (t) {
+                    showToast(t || 'Failed to ' + action + ' proxy', 'error');
+                });
+                showToast('Proxy on port ' + port + ' ' + (action === 'stop' ? 'stopped' : 'started'), 'success');
+                loadProxyRoutes();
+            })
+            .catch(function () {
+                showToast('Failed to ' + action + ' proxy on port ' + port, 'error');
+            });
     }
 
     function badge(val) {
@@ -1445,9 +1554,12 @@
 
     // ---------- Identity ----------
     function loadIdentity() {
-        fetch('/api/v1/auth/user', { credentials: 'same-origin' })
+        fetch('/api/v1/auth/user', {credentials: 'same-origin'})
             .then(function (resp) {
-                if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+                if (resp.status === 401) {
+                    window.location.href = '/ui/login';
+                    return null;
+                }
                 if (!resp.ok) throw new Error(resp.statusText);
                 return resp.json();
             })
@@ -1457,15 +1569,21 @@
                 document.getElementById('sidebar-username').textContent = name;
                 document.getElementById('sidebar-avatar').textContent = name.charAt(0).toUpperCase();
             })
-            .catch(function (err) { console.error('Failed to load identity', err); });
+            .catch(function (err) {
+                console.error('Failed to load identity', err);
+            });
     }
 
     // ---------- Logout via API ----------
     document.getElementById('btn-logout').addEventListener('click', function (e) {
         e.preventDefault();
-        fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'same-origin' })
-            .then(function () { window.location.href = '/ui/login'; })
-            .catch(function () { window.location.href = '/ui/login'; });
+        fetch('/api/v1/auth/logout', {method: 'POST', credentials: 'same-origin'})
+            .then(function () {
+                window.location.href = '/ui/login';
+            })
+            .catch(function () {
+                window.location.href = '/ui/login';
+            });
     });
 
     // ---------- Change Password ----------
@@ -1477,19 +1595,24 @@
         resultEl.innerHTML = '';
         fetch('/api/v1/auth/user', {
             method: 'POST', credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ oldPassword: oldPwd, newPassword: newPwd })
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({oldPassword: oldPwd, newPassword: newPwd})
         })
-        .then(function (resp) {
-            if (resp.status === 401) { resultEl.innerHTML = '<div class="error-alert">Current password is incorrect.</div>'; return; }
-            if (!resp.ok) return resp.text().then(function (t) {
-                resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to change password.') + '</div>';
+            .then(function (resp) {
+                if (resp.status === 401) {
+                    resultEl.innerHTML = '<div class="error-alert">Current password is incorrect.</div>';
+                    return;
+                }
+                if (!resp.ok) return resp.text().then(function (t) {
+                    resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to change password.') + '</div>';
+                });
+                resultEl.innerHTML = '<div class="success-alert">Password updated successfully.</div>';
+                document.getElementById('old-password').value = '';
+                document.getElementById('new-password').value = '';
+            })
+            .catch(function () {
+                resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>';
             });
-            resultEl.innerHTML = '<div class="success-alert">Password updated successfully.</div>';
-            document.getElementById('old-password').value = '';
-            document.getElementById('new-password').value = '';
-        })
-        .catch(function () { resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>'; });
     });
 
     // ---------- ACME / TLS ----------
@@ -1498,16 +1621,22 @@
 
     function lockAcmeForm(locked) {
         var fields = ['acme-email', 'acme-dns-provider', 'acme-ca-dir-url', 'acme-renewal-interval'];
-        fields.forEach(function (id) { document.getElementById(id).disabled = locked; });
-        document.querySelectorAll('#acme-credential-fields input').forEach(function (inp) { inp.disabled = locked; });
+        fields.forEach(function (id) {
+            document.getElementById(id).disabled = locked;
+        });
+        document.querySelectorAll('#acme-credential-fields input').forEach(function (inp) {
+            inp.disabled = locked;
+        });
         document.getElementById('acme-save-btn').style.display = locked ? 'none' : '';
         document.getElementById('acme-locked-notice').style.display = locked ? '' : 'none';
         document.getElementById('acme-reset-btn').style.display = locked ? '' : 'none';
     }
 
     function loadAcmeProviders() {
-        return fetch('/api/v1/acme/providers', { credentials: 'same-origin' })
-            .then(function (r) { return r.ok ? r.json() : []; })
+        return fetch('/api/v1/acme/providers', {credentials: 'same-origin'})
+            .then(function (r) {
+                return r.ok ? r.json() : [];
+            })
             .then(function (list) {
                 acmeProviders = list || [];
                 var sel = document.getElementById('acme-dns-provider');
@@ -1524,7 +1653,9 @@
     function renderCredentialFields(providerName, values) {
         var container = document.getElementById('acme-credential-fields');
         container.innerHTML = '';
-        var provider = acmeProviders.find(function (p) { return p.name === providerName; });
+        var provider = acmeProviders.find(function (p) {
+            return p.name === providerName;
+        });
         if (!provider || !provider.fields) return;
         provider.fields.forEach(function (f) {
             var val = (values && values[f.key]) || '';
@@ -1549,9 +1680,12 @@
     });
 
     function loadAcmeConfig() {
-        fetch('/api/v1/acme/config', { credentials: 'same-origin' })
+        fetch('/api/v1/acme/config', {credentials: 'same-origin'})
             .then(function (resp) {
-                if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+                if (resp.status === 401) {
+                    window.location.href = '/ui/login';
+                    return null;
+                }
                 if (!resp.ok) throw new Error(resp.statusText);
                 return resp.json();
             })
@@ -1567,13 +1701,18 @@
                 renderCredentialFields(conf.dnsProvider, {});
                 lockAcmeForm(acmeConfigExists);
             })
-            .catch(function (err) { console.error('Failed to load ACME config', err); });
+            .catch(function (err) {
+                console.error('Failed to load ACME config', err);
+            });
     }
 
     function loadAcmeCertificates() {
-        fetch('/api/v1/acme/certificates', { credentials: 'same-origin' })
+        fetch('/api/v1/acme/certificates', {credentials: 'same-origin'})
             .then(function (resp) {
-                if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+                if (resp.status === 401) {
+                    window.location.href = '/ui/login';
+                    return null;
+                }
                 if (!resp.ok) throw new Error(resp.statusText);
                 return resp.json();
             })
@@ -1603,7 +1742,9 @@
                 });
                 tbody.innerHTML = html;
             })
-            .catch(function (err) { console.error('Failed to load ACME certificates', err); });
+            .catch(function (err) {
+                console.error('Failed to load ACME certificates', err);
+            });
     }
 
     // Enabled toggle — uses PATCH endpoint (only mutation allowed post-setup)
@@ -1613,14 +1754,18 @@
         if (!acmeConfigExists) return; // toggle is part of the form for first-time setup
         fetch('/api/v1/acme/config', {
             method: 'PATCH', credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ enabled: enabled })
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({enabled: enabled})
         })
-        .then(function (resp) {
-            if (!resp.ok) return resp.text().then(function (t) { showToast(t || 'Failed to toggle ACME.', 'error'); });
-            showToast('ACME ' + (enabled ? 'enabled' : 'disabled') + '.', 'success');
-        })
-        .catch(function () { showToast('Failed to toggle ACME state.', 'error'); });
+            .then(function (resp) {
+                if (!resp.ok) return resp.text().then(function (t) {
+                    showToast(t || 'Failed to toggle ACME.', 'error');
+                });
+                showToast('ACME ' + (enabled ? 'enabled' : 'disabled') + '.', 'success');
+            })
+            .catch(function () {
+                showToast('Failed to toggle ACME state.', 'error');
+            });
     });
 
     document.getElementById('acme-config-form').addEventListener('submit', function (e) {
@@ -1648,26 +1793,36 @@
         };
         fetch('/api/v1/acme/config', {
             method: 'POST', credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(body)
         })
-        .then(function (resp) {
-            if (resp.status === 401) { window.location.href = '/ui/login'; return; }
-            if (!resp.ok) return resp.text().then(function (t) {
-                resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to save configuration.') + '</div>';
+            .then(function (resp) {
+                if (resp.status === 401) {
+                    window.location.href = '/ui/login';
+                    return;
+                }
+                if (!resp.ok) return resp.text().then(function (t) {
+                    resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to save configuration.') + '</div>';
+                });
+                showToast('ACME configuration saved and applied.', 'success');
+                loadAcmeConfig();
+            })
+            .catch(function () {
+                resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>';
             });
-            showToast('ACME configuration saved and applied.', 'success');
-            loadAcmeConfig();
-        })
-        .catch(function () { resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>'; });
     });
 
     document.getElementById('acme-reset-btn').addEventListener('click', function () {
         if (!confirm('This will permanently delete ALL ACME data:\n\n• Configuration\n• Account keys\n• Certificates\n\nThis cannot be undone. Continue?')) return;
-        fetch('/api/v1/acme', { method: 'DELETE', credentials: 'same-origin' })
+        fetch('/api/v1/acme', {method: 'DELETE', credentials: 'same-origin'})
             .then(function (resp) {
-                if (resp.status === 401) { window.location.href = '/ui/login'; return; }
-                if (!resp.ok) return resp.text().then(function (t) { showToast(t || 'Failed to reset ACME data.', 'error'); });
+                if (resp.status === 401) {
+                    window.location.href = '/ui/login';
+                    return;
+                }
+                if (!resp.ok) return resp.text().then(function (t) {
+                    showToast(t || 'Failed to reset ACME data.', 'error');
+                });
                 showToast('All ACME data has been reset.', 'success');
                 acmeConfigExists = false;
                 document.getElementById('acme-enabled').checked = false;
@@ -1680,14 +1835,19 @@
                 document.getElementById('acme-config-result').innerHTML = '';
                 lockAcmeForm(false);
             })
-            .catch(function () { showToast('An error occurred while resetting ACME data.', 'error'); });
+            .catch(function () {
+                showToast('An error occurred while resetting ACME data.', 'error');
+            });
     });
 
     // ---------- API Keys ----------
     function loadApiKeys() {
-        fetch('/api/v1/apiKeys', { credentials: 'same-origin' })
+        fetch('/api/v1/apiKeys', {credentials: 'same-origin'})
             .then(function (resp) {
-                if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
+                if (resp.status === 401) {
+                    window.location.href = '/ui/login';
+                    return null;
+                }
                 if (!resp.ok) throw new Error(resp.statusText);
                 return resp.json();
             })
@@ -1702,7 +1862,9 @@
                 keys.forEach(function (k) {
                     var scopeList = k.scopes ? Object.keys(k.scopes) : [];
                     var scopeBadges = scopeList.length
-                        ? scopeList.map(function (s) { return '<span class="badge badge-info" style="margin-right:0.25rem;">' + s + '</span>'; }).join('')
+                        ? scopeList.map(function (s) {
+                            return '<span class="badge badge-info" style="margin-right:0.25rem;">' + s + '</span>';
+                        }).join('')
                         : '<span style="color:var(--pico-muted-color);font-size:0.8rem;">none</span>';
                     var expiresStr = '–';
                     if (k.expires && k.expires !== '0001-01-01T00:00:00Z') {
@@ -1742,14 +1904,21 @@
     }
 
     function deleteApiKey(alias) {
-        fetch('/api/v1/apiKeys/' + encodeURIComponent(alias), { method: 'DELETE', credentials: 'same-origin' })
+        fetch('/api/v1/apiKeys/' + encodeURIComponent(alias), {method: 'DELETE', credentials: 'same-origin'})
             .then(function (resp) {
-                if (resp.status === 401) { window.location.href = '/ui/login'; return; }
-                if (!resp.ok) return resp.text().then(function (t) { showToast(t || 'Failed to delete API key', 'error'); });
+                if (resp.status === 401) {
+                    window.location.href = '/ui/login';
+                    return;
+                }
+                if (!resp.ok) return resp.text().then(function (t) {
+                    showToast(t || 'Failed to delete API key', 'error');
+                });
                 showToast('API key "' + alias + '" deleted.', 'success');
                 loadApiKeys();
             })
-            .catch(function () { showToast('Failed to delete API key.', 'error'); });
+            .catch(function () {
+                showToast('Failed to delete API key.', 'error');
+            });
     }
 
     document.getElementById('api-key-create-form').addEventListener('submit', function (e) {
@@ -1764,10 +1933,16 @@
             scopes.push(cb.value);
         });
 
-        if (!alias) { resultEl.innerHTML = '<div class="error-alert">Alias is required.</div>'; return; }
-        if (scopes.length === 0) { resultEl.innerHTML = '<div class="error-alert">Select at least one scope.</div>'; return; }
+        if (!alias) {
+            resultEl.innerHTML = '<div class="error-alert">Alias is required.</div>';
+            return;
+        }
+        if (scopes.length === 0) {
+            resultEl.innerHTML = '<div class="error-alert">Select at least one scope.</div>';
+            return;
+        }
 
-        var body = { alias: alias, scopes: scopes };
+        var body = {alias: alias, scopes: scopes};
         var expiryVal = document.getElementById('api-key-expiry').value;
         if (expiryVal) {
             var d = new Date(expiryVal + 'T23:59:59');
@@ -1776,31 +1951,41 @@
 
         fetch('/api/v1/apiKeys', {
             method: 'POST', credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(body)
         })
-        .then(function (resp) {
-            if (resp.status === 401) { window.location.href = '/ui/login'; return null; }
-            if (resp.status === 409) { resultEl.innerHTML = '<div class="error-alert">An API key with this alias already exists.</div>'; return null; }
-            if (!resp.ok) return resp.text().then(function (t) {
-                resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to create API key.') + '</div>';
-                return null;
+            .then(function (resp) {
+                if (resp.status === 401) {
+                    window.location.href = '/ui/login';
+                    return null;
+                }
+                if (resp.status === 409) {
+                    resultEl.innerHTML = '<div class="error-alert">An API key with this alias already exists.</div>';
+                    return null;
+                }
+                if (!resp.ok) return resp.text().then(function (t) {
+                    resultEl.innerHTML = '<div class="error-alert">' + (t || 'Failed to create API key.') + '</div>';
+                    return null;
+                });
+                return resp.json();
+            })
+            .then(function (created) {
+                if (!created) return;
+                // Show the raw key once
+                document.getElementById('api-key-created-value').textContent = created.key;
+                document.getElementById('api-key-created-banner').style.display = '';
+                // Reset form
+                document.getElementById('api-key-alias').value = '';
+                document.getElementById('api-key-expiry').value = '';
+                document.querySelectorAll('input[name="api-key-scope"]').forEach(function (cb) {
+                    cb.checked = false;
+                });
+                showToast('API key "' + created.alias + '" created.', 'success');
+                loadApiKeys();
+            })
+            .catch(function () {
+                resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>';
             });
-            return resp.json();
-        })
-        .then(function (created) {
-            if (!created) return;
-            // Show the raw key once
-            document.getElementById('api-key-created-value').textContent = created.key;
-            document.getElementById('api-key-created-banner').style.display = '';
-            // Reset form
-            document.getElementById('api-key-alias').value = '';
-            document.getElementById('api-key-expiry').value = '';
-            document.querySelectorAll('input[name="api-key-scope"]').forEach(function (cb) { cb.checked = false; });
-            showToast('API key "' + created.alias + '" created.', 'success');
-            loadApiKeys();
-        })
-        .catch(function () { resultEl.innerHTML = '<div class="error-alert">An error occurred. Please try again.</div>'; });
     });
 
     document.getElementById('api-key-copy-btn').addEventListener('click', function () {
@@ -1821,5 +2006,5 @@
     setInterval(loadProxyRoutes, 10000);
     setInterval(tickSparklines, 1000);
 </script>
-{{end}}
+{{ end }}
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/proxyutil"
 	"go.uber.org/zap"
 )
 
@@ -18,18 +19,34 @@ func (d *PathDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.mux.ServeHTTP(w, r)
 }
 
-func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, pathRules []config.PathRule) (http.Handler, []string, error) {
+func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, pathRules []config.PathRule) (http.Handler, []string, []string, error) {
 	mux := http.NewServeMux()
 
-	var mwNames []string
-
+	mwNames := make([]string, 0)
+	backends := make([]string, 0)
 	for _, rule := range pathRules {
+		pathBaseHandler := defaultHandler
+		if rule.Backend != "" {
+			zap.S().Infof("Building backend handler for path rule %q with backend %q", rule.Pattern, rule.Backend)
+			opts := proxyutil.ProxyOptions{
+				DropPath:  rule.DropPath != nil && *rule.DropPath,
+				DropQuery: rule.DropQuery != nil && *rule.DropQuery,
+			}
+			proxy, err := buildHttpRevProxy(rule.Backend, opts)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to build reverse proxy for path rule %q: %w", rule.Pattern, err)
+			}
+			pathBaseHandler = buildDefaultHttpHandler(proxy)
+			backends = append(backends, rule.Backend)
+		}
+
 		pattern := normalizePattern(rule.Pattern)
 		ctx2 := context.WithValue(ctx, "path", rule.Pattern)
-		handler, err := buildMiddlewareChain(ctx2, defaultHandler, rule.Middlewares)
+		handler, err := buildMiddlewareChain(ctx2, pathBaseHandler, rule.Middlewares)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
+
 		mux.HandleFunc(pattern, handler)
 		mwNames = append(mwNames, middlewareNames(rule.Middlewares)...)
 		zap.S().Infof("Registered path rule %q with %d middlewares", pattern, len(rule.Middlewares))
@@ -38,7 +55,7 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 	// Default catch-all: the route-level middleware chain wrapping the backend.
 	mux.HandleFunc("/", defaultHandler)
 
-	return &PathDispatcher{mux: mux}, mwNames, nil
+	return &PathDispatcher{mux: mux}, mwNames, backends, nil
 }
 
 // normalizePattern converts user-friendly glob patterns into Go ServeMux

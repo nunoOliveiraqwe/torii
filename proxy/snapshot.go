@@ -4,6 +4,7 @@ import "github.com/nunoOliveiraqwe/torii/metrics"
 
 type PathSnapshot struct {
 	Pattern     string   `json:"pattern"`
+	Backend     string   `json:"backend,omitempty"`
 	Middlewares []string `json:"middlewares"`
 }
 

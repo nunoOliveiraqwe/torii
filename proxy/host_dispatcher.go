@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/proxyutil"
 	"go.uber.org/zap"
 )
 
@@ -46,7 +47,7 @@ func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget,
 			zap.S().Errorf("Route host cannot be empty, skipping")
 			continue
 		}
-		handler, names, err := buildRouteHandler(ctx, route.Target)
+		handler, names, pathBackends, err := buildRouteHandler(ctx, route.Target)
 		if err != nil {
 			zap.S().Errorf("Failed to build handler for host %s: %v", route.Host, err)
 			continue
@@ -54,18 +55,20 @@ func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget,
 		d.routes[route.Host] = handler
 		mwNames = append(mwNames, names...)
 		backends = append(backends, route.Target.Backend)
+		backends = append(backends, pathBackends...)
 		routeSnapshots = append(routeSnapshots, buildRouteSnapshot(route.Host, route.Target))
 		zap.S().Infof("Registered route for host %s with backend %s", route.Host, route.Target.Backend)
 	}
 
 	if defaultTarget != nil {
-		handler, names, err := buildRouteHandler(ctx, *defaultTarget)
+		handler, names, pathBackends, err := buildRouteHandler(ctx, *defaultTarget)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed to build default route handler: %w", err)
 		}
 		d.default_ = handler
 		mwNames = append(mwNames, names...)
 		backends = append(backends, defaultTarget.Backend)
+		backends = append(backends, pathBackends...)
 		routeSnapshots = append(routeSnapshots, buildRouteSnapshot("", *defaultTarget))
 		zap.S().Infof("Registered default route with backend %s", defaultTarget.Backend)
 	}
@@ -86,32 +89,35 @@ func buildRouteSnapshot(host string, target config.RouteTarget) RouteSnapshot {
 	for _, p := range target.Paths {
 		rs.Paths = append(rs.Paths, PathSnapshot{
 			Pattern:     p.Pattern,
+			Backend:     p.Backend,
 			Middlewares: middlewareNames(p.Middlewares),
 		})
 	}
 	return rs
 }
 
-func buildRouteHandler(ctx context.Context, target config.RouteTarget) (http.Handler, []string, error) {
-	proxy, err := buildHttpRevProxy(target.Backend)
+func buildRouteHandler(ctx context.Context, target config.RouteTarget) (http.Handler, []string, []string, error) {
+	proxy, err := buildHttpRevProxy(target.Backend, proxyutil.ProxyOptions{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to build reverse proxy for backend %s: %w", target.Backend, err)
+		return nil, nil, nil, fmt.Errorf("failed to build reverse proxy for backend %s: %w", target.Backend, err)
 	}
 	baseHandler := buildDefaultHttpHandler(proxy)
 
 	mwNames := middlewareNames(target.Middlewares)
+	backends := make([]string, 0)
 	if len(target.Paths) > 0 {
-		pathHandler, pathMwNames, err := buildPathDispatcher(ctx, baseHandler, target.Paths)
+		pathHandler, pathMwNames, pathBackends, err := buildPathDispatcher(ctx, baseHandler, target.Paths)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to build path dispatcher for backend %s: %w", target.Backend, err)
+			return nil, nil, nil, fmt.Errorf("failed to build path dispatcher for backend %s: %w", target.Backend, err)
 		}
 		mwNames = append(mwNames, pathMwNames...)
+		backends = append(backends, pathBackends...)
 		baseHandler = pathHandler.ServeHTTP
 	}
 	//global mw → route mw → path mw → proxy
 	defaultHandler, err := buildMiddlewareChain(ctx, baseHandler, target.Middlewares)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to build middleware chain for backend %s: %w", target.Backend, err)
+		return nil, nil, nil, fmt.Errorf("failed to build middleware chain for backend %s: %w", target.Backend, err)
 	}
-	return defaultHandler, mwNames, nil
+	return defaultHandler, mwNames, backends, nil
 }
