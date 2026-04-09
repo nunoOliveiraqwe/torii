@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strconv"
 	"strings"
@@ -13,10 +14,86 @@ import (
 )
 
 type redirectOptions struct {
+	mode       string
 	statusCode int
-	target     string
+	targetUrl  *url.URL
 	dropPath   bool
 	dropQuery  bool
+}
+
+type redirecter interface {
+	redirect(w http.ResponseWriter, r *http.Request)
+}
+
+type internalRedirecter struct {
+	opts  *redirectOptions
+	proxy *httputil.ReverseProxy
+}
+
+type externalRedirecter struct {
+	opts *redirectOptions
+}
+
+func (e *externalRedirecter) redirect(w http.ResponseWriter, r *http.Request) {
+	redirectURL := e.buildRedirectURL(r)
+	logger := GetRequestLoggerFromContext(r)
+	logger.Info(fmt.Sprintf("Redirecting request from %s to %s", r.Host, redirectURL))
+	http.Redirect(w, r, redirectURL, e.opts.statusCode)
+}
+
+func (e *externalRedirecter) buildRedirectURL(r *http.Request) string {
+	u := *e.opts.targetUrl
+
+	// If the target had no scheme, infer from the incoming request
+	if u.Scheme == "" {
+		if r.TLS != nil {
+			u.Scheme = "https"
+		} else {
+			u.Scheme = "http"
+		}
+	}
+
+	if !e.opts.dropPath {
+		u.Path = strings.TrimSuffix(u.Path, "/") + r.URL.Path
+	}
+	if !e.opts.dropQuery {
+		if u.RawQuery != "" && r.URL.RawQuery != "" {
+			u.RawQuery = u.RawQuery + "&" + r.URL.RawQuery
+		} else if r.URL.RawQuery != "" {
+			u.RawQuery = r.URL.RawQuery
+		}
+	}
+
+	return u.String()
+}
+
+func newInternalRedirecter(opts *redirectOptions) *internalRedirecter {
+	ir := &internalRedirecter{opts: opts}
+	ir.proxy = &httputil.ReverseProxy{
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.SetURL(opts.targetUrl)
+			pr.Out.Host = pr.In.Host
+
+			if opts.dropPath {
+				// Use only the target's path, ignore the original request path
+				pr.Out.URL.Path = opts.targetUrl.Path
+				pr.Out.URL.RawPath = ""
+			}
+			// When dropPath is false, SetURL already joins target path + request path
+
+			if opts.dropQuery {
+				pr.Out.URL.RawQuery = opts.targetUrl.RawQuery
+			}
+			// When dropQuery is false, SetURL already merges query params
+		},
+	}
+	return ir
+}
+
+func (e *internalRedirecter) redirect(w http.ResponseWriter, r *http.Request) {
+	logger := GetRequestLoggerFromContext(r)
+	logger.Info(fmt.Sprintf("Internally redirecting request from %s to %s", r.Host, e.opts.targetUrl.String()))
+	e.proxy.ServeHTTP(w, r)
 }
 
 func RedirectMiddleware(_ context.Context, _ http.HandlerFunc, conf Config) http.HandlerFunc {
@@ -27,30 +104,15 @@ func RedirectMiddleware(_ context.Context, _ http.HandlerFunc, conf Config) http
 			http.Error(writer, "RedirectMiddleware misconfigured", http.StatusServiceUnavailable)
 		}
 	}
+	var r redirecter
+	if opts.mode == "external" {
+		r = &externalRedirecter{opts: opts}
+	} else {
+		r = newInternalRedirecter(opts)
+	}
 	return func(writer http.ResponseWriter, request *http.Request) {
-		logger := GetRequestLoggerFromContext(request)
-		redirectURL := opts.buildRedirectURL(request)
-		logger.Info(fmt.Sprintf("Redirecting request from %s to %s", request.Host, redirectURL))
-		http.Redirect(writer, request, redirectURL, opts.statusCode)
+		r.redirect(writer, request)
 	}
-}
-
-func (opts *redirectOptions) buildRedirectURL(r *http.Request) string {
-	parsed, err := url.Parse(opts.target)
-	if err != nil {
-		return opts.target
-	}
-	if !opts.dropPath {
-		parsed.Path = strings.TrimSuffix(parsed.Path, "/") + r.URL.Path
-	}
-	if !opts.dropQuery {
-		if parsed.RawQuery != "" && r.URL.RawQuery != "" {
-			parsed.RawQuery = parsed.RawQuery + "&" + r.URL.RawQuery
-		} else if r.URL.RawQuery != "" {
-			parsed.RawQuery = r.URL.RawQuery
-		}
-	}
-	return parsed.String()
 }
 
 func parseRedirectConf(conf Config) (*redirectOptions, error) {
@@ -59,13 +121,24 @@ func parseRedirectConf(conf Config) (*redirectOptions, error) {
 		return nil, fmt.Errorf("options cannot be nil")
 	}
 
-	statusCodeRaw, ok := conf.Options["status-code"]
-	if !ok {
-		return nil, fmt.Errorf("missing required option 'status-code'")
+	mode, err := ParseStringOpt(conf.Options, "mode", "external")
+	if err != nil {
+		return nil, err
 	}
-	statusCode, err := strconv.Atoi(fmt.Sprintf("%v", statusCodeRaw))
-	if err != nil || statusCode < 300 || statusCode > 399 {
-		return nil, fmt.Errorf("invalid 'status-code' option: %v", statusCodeRaw)
+	if mode != "internal" && mode != "external" {
+		return nil, fmt.Errorf("invalid 'mode' option: must be 'internal' or 'external'")
+	}
+
+	var statusCode int
+	if mode == "external" {
+		statusCodeRaw, ok := conf.Options["status-code"]
+		if !ok {
+			return nil, fmt.Errorf("missing required option 'status-code' for external redirect")
+		}
+		statusCode, err = strconv.Atoi(fmt.Sprintf("%v", statusCodeRaw))
+		if err != nil || statusCode < 300 || statusCode > 399 {
+			return nil, fmt.Errorf("invalid 'status-code' option: %v", statusCodeRaw)
+		}
 	}
 
 	target, err := ParseStringRequired(conf.Options, "target")
@@ -73,20 +146,40 @@ func parseRedirectConf(conf Config) (*redirectOptions, error) {
 		return nil, err
 	}
 
-	zap.S().Debugf("RedirectMiddleware: successfully parsed configuration with status code %d and target %q", statusCode, target)
+	zap.S().Debugf("RedirectMiddleware: successfully parsed configuration with mode %q, status code %d and target %q", mode, statusCode, target)
 
 	parsed, err := url.Parse(target)
-	if err != nil || (parsed.Scheme == "" && parsed.Host == "") {
-		zap.S().Debug("RedirectMiddleware: 'target' option is not a valid URL. Trying as hostPort")
-		_, _, err = net.SplitHostPort(target)
-		if err != nil {
-			return nil, fmt.Errorf("'target' option is not a valid URL or host:port: %v", err)
+	if err != nil {
+		return nil, fmt.Errorf("'target' option is not a valid URL: %v", err)
+	}
+
+	// If url.Parse didn't find a scheme+host, try treating the raw value as host:port
+	// and construct a proper URL from it
+	if parsed.Scheme == "" || parsed.Host == "" {
+		zap.S().Debug("RedirectMiddleware: 'target' has no scheme, trying as host:port")
+		host, port, splitErr := net.SplitHostPort(target)
+		if splitErr != nil {
+			return nil, fmt.Errorf("'target' option is not a valid URL or host:port: %v", splitErr)
+		}
+		// For internal mode, we need a full URL for the reverse proxy
+		if mode == "internal" {
+
+			parsed = &url.URL{
+				Scheme: "http",
+				Host:   net.JoinHostPort(host, port),
+			}
+		} else {
+			// For external mode, keep it without scheme — buildRedirectURL will infer it
+			parsed = &url.URL{
+				Host: net.JoinHostPort(host, port),
+			}
 		}
 	}
 
 	return &redirectOptions{
+		mode:       mode,
 		statusCode: statusCode,
-		target:     target,
+		targetUrl:  parsed,
 		dropPath:   ParseBoolOpt(conf.Options, "drop-path", true),
 		dropQuery:  ParseBoolOpt(conf.Options, "drop-query", true),
 	}, nil

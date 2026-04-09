@@ -23,7 +23,7 @@ func TimeoutMiddleware(_ context.Context, next http.HandlerFunc, conf Config) ht
 
 func parseTimeoutConfig(conf Config) (time.Duration, error) {
 	zap.S().Debug("Parsing timeout config")
-	timeoutStr, err := ParseStringRequired(conf.Options, "timeout_seconds")
+	timeoutStr, err := ParseStringRequired(conf.Options, "request-timeout")
 	if err != nil {
 		return 0, err
 	}

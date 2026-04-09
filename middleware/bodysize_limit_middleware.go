@@ -27,7 +27,7 @@ func BodySizeLimitMiddleware(_ context.Context, next http.HandlerFunc, conf Conf
 
 func parseBodySizeLimitConfig(conf Config) (int64, error) {
 	zap.S().Debug("Parsing body size limit config")
-	limit, err := ParseStringRequired(conf.Options, "body_size_limit")
+	limit, err := ParseStringRequired(conf.Options, "max-size")
 	if err != nil {
 		return 0, err
 	}

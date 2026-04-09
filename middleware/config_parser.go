@@ -100,3 +100,23 @@ func ParseFloatOptRequired(opts map[string]interface{}, key string) (float64, er
 		return 0, fmt.Errorf("'%s' option must be a number, got %T", key, raw)
 	}
 }
+
+func ParseStringSliceOpt(opts map[string]interface{}, key string, defaultVal []string) ([]string, error) {
+	raw, ok := opts[key]
+	if !ok {
+		return defaultVal, nil
+	}
+	slice, ok := raw.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("'%s' option must be an array of strings, got %T", key, raw)
+	}
+	result := make([]string, 0, len(slice))
+	for _, item := range slice {
+		s, ok := item.(string)
+		if !ok {
+			return nil, fmt.Errorf("each entry in '%s' must be a string, got %T", key, item)
+		}
+		result = append(result, s)
+	}
+	return result, nil
+}

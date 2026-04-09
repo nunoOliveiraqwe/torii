@@ -105,11 +105,11 @@ func parseCircuitBreakerConfig(conf Config) (*circuitBreakerOpts, error) {
 	if conf.Options == nil {
 		return nil, fmt.Errorf("options cannot be nil")
 	}
-	failureThreshold, err := ParseIntOptRequired(conf.Options, "failure_threshold")
+	failureThreshold, err := ParseIntOptRequired(conf.Options, "failure-threshold")
 	if err != nil {
 		return nil, err
 	}
-	recTimeStr, err := ParseStringRequired(conf.Options, "recovery_time")
+	recTimeStr, err := ParseStringRequired(conf.Options, "recovery-time")
 	if err != nil {
 		return nil, err
 	}
@@ -118,9 +118,9 @@ func parseCircuitBreakerConfig(conf Config) (*circuitBreakerOpts, error) {
 		return nil, err
 	}
 
-	halfOpenThreshold := ParseIntOpt(conf.Options, "half_open_success_threshold", 3)
+	halfOpenThreshold := ParseIntOpt(conf.Options, "half-open-success-threshold", 3)
 	if halfOpenThreshold < 1 {
-		return nil, fmt.Errorf("'half_open_success_threshold' must be >= 1, got %d", halfOpenThreshold)
+		return nil, fmt.Errorf("'half-open-success-threshold' must be >= 1, got %d", halfOpenThreshold)
 	}
 
 	return &circuitBreakerOpts{
