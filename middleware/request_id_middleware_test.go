@@ -32,21 +32,40 @@ func TestRequestIDMiddleware_GeneratesID(t *testing.T) {
 }
 
 func TestRequestIDMiddleware_UsesExistingID(t *testing.T) {
-	existingID := "existing-request-id"
+	prefix := "my-prefix"
 
 	called := false
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		// Since we set a request ID in the context, the middleware should
-		// pass it through unchanged.
 		reqID := GetRequestIDFromContext(r.Context())
-		assert.Equal(t, existingID, reqID)
+		assert.Equal(t, prefix+"-42", reqID)
+	})
+
+	conf := Config{Options: map[string]interface{}{"prefix": prefix}}
+	mw := RequestIDMiddleware(context.Background(), next, conf)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	existingID := prefix + "-42"
+	ctx := context.WithValue(req.Context(), requestIdContextKey, existingID)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	mw.ServeHTTP(rec, req)
+
+	assert.True(t, called)
+}
+
+func TestRequestIDMiddleware_CompositeID_DifferentPrefix(t *testing.T) {
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		reqID := GetRequestIDFromContext(r.Context())
+		assert.Contains(t, reqID, "existing-request-id")
 	})
 
 	mw := RequestIDMiddleware(context.Background(), next, Config{})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx := context.WithValue(req.Context(), requestIdContextKey, existingID)
+	ctx := context.WithValue(req.Context(), requestIdContextKey, "existing-request-id")
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 	mw.ServeHTTP(rec, req)

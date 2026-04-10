@@ -29,7 +29,6 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 		if rule.Backend != "" {
 			zap.S().Infof("Building backend handler for path rule %q with backend %q", rule.Pattern, rule.Backend)
 			opts := proxyutil.ProxyOptions{
-				DropPath:  rule.DropPath != nil && *rule.DropPath,
 				DropQuery: rule.DropQuery != nil && *rule.DropQuery,
 			}
 			proxy, err := buildHttpRevProxy(rule.Backend, opts)
@@ -37,6 +36,16 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 				return nil, nil, nil, fmt.Errorf("failed to build reverse proxy for path rule %q: %w", rule.Pattern, err)
 			}
 			pathBaseHandler = buildDefaultHttpHandler(proxy)
+
+			// Strip the path-rule prefix before forwarding to the backend so
+			// that the backend sees the request at its own root.  For example,
+			// a rule with pattern "/jellyfino" proxying to 192.168.1.27:2884
+			// will forward "/" instead of "/jellyfino".
+			if prefix := pathRulePrefix(rule.Pattern); prefix != "" {
+				zap.S().Infof("Stripping prefix %q for path rule %q", prefix, rule.Pattern)
+				pathBaseHandler = http.StripPrefix(prefix, pathBaseHandler).ServeHTTP
+			}
+
 			backends = append(backends, rule.Backend)
 		}
 
@@ -56,6 +65,25 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 	mux.HandleFunc("/", defaultHandler)
 
 	return &PathDispatcher{mux: mux}, mwNames, backends, nil
+}
+
+// pathRulePrefix extracts the static prefix from a path-rule pattern so it
+// can be stripped before forwarding to the backend.
+//
+// Examples:
+//
+//	/jellyfino    → /jellyfino
+//	/jellyfino/   → /jellyfino
+//	/jellyfino/*  → /jellyfino
+//	/api/v1/      → /api/v1
+//	/             → ""          (root – nothing to strip)
+func pathRulePrefix(pattern string) string {
+	p := strings.TrimSuffix(pattern, "*")
+	p = strings.TrimRight(p, "/")
+	if p == "" {
+		return ""
+	}
+	return p
 }
 
 // normalizePattern converts user-friendly glob patterns into Go ServeMux

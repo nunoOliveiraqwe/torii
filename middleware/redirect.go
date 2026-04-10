@@ -129,11 +129,12 @@ func parseRedirectConf(conf Config) (*redirectOptions, error) {
 	if mode == "external" {
 		statusCodeRaw, ok := conf.Options["status-code"]
 		if !ok {
-			return nil, fmt.Errorf("missing required option 'status-code' for external redirect")
-		}
-		statusCode, err = strconv.Atoi(fmt.Sprintf("%v", statusCodeRaw))
-		if err != nil || statusCode < 300 || statusCode > 399 {
-			return nil, fmt.Errorf("invalid 'status-code' option: %v", statusCodeRaw)
+			statusCode = 302
+		} else {
+			statusCode, err = strconv.Atoi(fmt.Sprintf("%v", statusCodeRaw))
+			if err != nil || statusCode < 300 || statusCode > 399 {
+				return nil, fmt.Errorf("invalid 'status-code' option: %v", statusCodeRaw)
+			}
 		}
 	}
 

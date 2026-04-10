@@ -47,16 +47,29 @@ func ParseTimeString(timeStr string) (time.Duration, error) {
 		"m":  time.Minute,
 		"h":  time.Hour,
 	}
-	stringSuffix := timeStr[len(timeStr)-1:]
-	numberSuffix := timeStr[:len(timeStr)-1]
+
+	var stringSuffix string
+	var numberPart string
+	if len(timeStr) >= 3 {
+		twoChar := timeStr[len(timeStr)-2:]
+		if _, ok := acceptedSuffixes[twoChar]; ok {
+			stringSuffix = twoChar
+			numberPart = timeStr[:len(timeStr)-2]
+		}
+	}
+	if stringSuffix == "" {
+		stringSuffix = timeStr[len(timeStr)-1:]
+		numberPart = timeStr[:len(timeStr)-1]
+	}
+
 	unit, ok := acceptedSuffixes[stringSuffix]
 	if !ok {
 		zap.S().Errorf("Invalid time suffix: %s. Accepted suffixes are: ms, s, m, h", stringSuffix)
 		return 0, fmt.Errorf("invalid time suffix: %s. Accepted suffixes are: ms, s, m, h", stringSuffix)
 	}
-	number, err := strconv.ParseInt(numberSuffix, 10, 64)
+	number, err := strconv.ParseInt(numberPart, 10, 64)
 	if err != nil {
-		zap.S().Errorf("Invalid number in time string: %s. Error: %v", numberSuffix, err)
+		zap.S().Errorf("Invalid number in time string: %s. Error: %v", numberPart, err)
 		return 0, err
 	}
 	return time.Duration(number) * unit, err

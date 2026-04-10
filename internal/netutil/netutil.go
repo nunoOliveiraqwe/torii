@@ -39,7 +39,6 @@ func GetNetworkBindAddressesFromInterface(ifName string) (ipv4, ipv6 string, err
 		return "", "", err
 	}
 	if addrs == nil || len(addrs) == 0 {
-		zap.S().Errorf("No addresses found for interface %s", ifName)
 		return "", "", fmt.Errorf("no addresses found for interface %s", ifName)
 	}
 
@@ -66,7 +65,7 @@ func GetNetworkBindAddressesFromInterface(ifName string) (ipv4, ipv6 string, err
 			}
 			continue
 		}
-		if ip.To16() != nil && ipv6 == "" {
+		if ip.To16() != nil && ipv6 == "" && ip.IsLinkLocalUnicast() == false {
 			ipv6 = ip.String()
 		}
 		if ipv4 != "" && ipv6 != "" {

@@ -55,7 +55,7 @@ func (m *Torii) StartAll() error {
 	zap.S().Infof("Starting torii with %d HTTP servers", len(m.stoppedHttpServers))
 	for port, _ := range m.stoppedHttpServers {
 		//hmmm, i can't lock here, because i wanto to call start
-		err := m.StartProxy(port)
+		err := m.StartHttpProxy(port)
 		if err != nil {
 			zap.S().Errorf("Failed to start HTTP server on port %d: %v", port, err)
 			//should i stop everything if one fails??
@@ -69,7 +69,7 @@ func (m *Torii) StartAll() error {
 func (m *Torii) StopAll() error {
 	zap.S().Infof("Stopping torii with %d HTTP servers", len(m.startedHttpServers))
 	for port, _ := range m.startedHttpServers {
-		err := m.StopProxy(port)
+		err := m.StopHttpProxy(port)
 		if err != nil {
 			zap.S().Errorf("Failed to stop HTTP server on port %d: %v", port, err)
 		}
@@ -78,7 +78,7 @@ func (m *Torii) StopAll() error {
 	return nil
 }
 
-func (m *Torii) StartProxy(port int) error {
+func (m *Torii) StartHttpProxy(port int) error {
 	zap.S().Infof("Starting proxy server on port %d", port)
 	if port <= 0 {
 		return fmt.Errorf("invalid port number: %d", port)
@@ -103,7 +103,7 @@ func (m *Torii) StartProxy(port int) error {
 	return nil
 }
 
-func (m *Torii) StopProxy(port int) error {
+func (m *Torii) StopHttpProxy(port int) error {
 	zap.S().Infof("Stopping proxy server on port %d", port)
 	if port <= 0 {
 		return fmt.Errorf("invalid port number: %d", port)
@@ -127,6 +127,41 @@ func (m *Torii) StopProxy(port int) error {
 	}
 	m.stoppedHttpServers[port] = server
 	delete(m.startedHttpServers, port)
+	return nil
+}
+
+func (m *Torii) DeleteHttpProxy(port int) error {
+	zap.S().Infof("Deleting proxy server on port %d", port)
+	if port <= 0 {
+		return fmt.Errorf("invalid port number: %d", port)
+	}
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	_, isStopped := m.stoppedHttpServers[port]
+
+	if isStopped {
+		//server stopped, just delete
+		zap.S().Warnf("Deleting stopped proxy server on port %d", port)
+		delete(m.stoppedHttpServers, port)
+		zap.S().Warnf("Deleted stopped proxy server on port %d", port)
+		return nil
+	}
+
+	s, isStarted := m.startedHttpServers[port]
+
+	if !isStarted {
+		zap.S().Warnf("No started or stopped HTTP server found for port %d", port)
+		return fmt.Errorf("no started or stopped HTTP server found for port %d", port)
+	}
+	zap.S().Infof("Stopping HTTP server on port %d, following with a deletetion", port)
+	err := s.stop()
+	if err != nil {
+		zap.S().Errorf("Failed to stop HTTP server on port %d: %v", port, err)
+		return err
+	}
+	zap.S().Warnf("Deleting stopped proxy server on port %d", port)
+	delete(m.startedHttpServers, port)
+	zap.S().Warnf("Deleted stopped proxy server on port %d", port)
 	return nil
 }
 

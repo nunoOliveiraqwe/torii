@@ -143,16 +143,18 @@ type testSystemService struct {
 
 func (t *testSystemService) Start() error                                      { return nil }
 func (t *testSystemService) Stop() error                                       { return nil }
-func (t *testSystemService) ReloadAcme() error                                 { return nil }
+func (t *testSystemService) StartStopAcme() error                              { return nil }
 func (t *testSystemService) SessionRegistry() *session.Registry                { return t.sessions }
 func (t *testSystemService) GetServiceStore() *app.ServiceStore                { return t.serviceStore }
 func (t *testSystemService) GetConfiguredProxyServers() []*proxy.ProxySnapshot { return t.proxies }
 func (t *testSystemService) GetGlobalMetricsManager() *metrics.ConnectionMetricsManager {
 	return t.metricsManager
 }
-func (t *testSystemService) GetSSEBroker() *app.SSEBroker { return nil }
-func (t *testSystemService) StartProxy(port int) error    { return nil }
-func (t *testSystemService) StopProxy(port int) error     { return nil }
+func (t *testSystemService) GetSSEBroker() *app.SSEBroker                { return nil }
+func (t *testSystemService) StartProxy(port int) error                   { return nil }
+func (t *testSystemService) StopProxy(port int) error                    { return nil }
+func (t *testSystemService) DeleteProxy(port int) error                  { return nil }
+func (t *testSystemService) AddHttpListener(_ config.HTTPListener) error { return nil }
 func (t *testSystemService) GetSystemHealth() *app.SystemHealth {
 	return &app.SystemHealth{}
 }

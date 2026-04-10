@@ -29,10 +29,10 @@ func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *conf
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bind addresses from interface %s: %w", ifFace, err)
 	}
-	if conf.Bind&config.Ipv4Flag == 1 && ipv4 == "" {
+	if conf.Bind&config.Ipv4Flag != 0 && ipv4 == "" {
 		return nil, fmt.Errorf("IPv4 bind interface %s has no valid IPv4 address", conf.Interface)
 	}
-	if conf.Bind&config.Ipv6Flag == 1 && ipv6 == "" {
+	if conf.Bind&config.Ipv6Flag != 0 && ipv6 == "" {
 		return nil, fmt.Errorf("IPv6 bind interface %s has no valid IPv6 address", conf.Interface)
 	}
 	ctx = context.WithValue(ctx, "port", conf.Port)

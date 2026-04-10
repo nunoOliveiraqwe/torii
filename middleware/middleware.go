@@ -16,7 +16,7 @@ type Registry = map[string]Func
 
 type Config struct {
 	Type    string                 `json:"type"`
-	Options map[string]interface{} `json:"-"`
+	Options map[string]interface{} `json:"options,omitempty"`
 }
 
 var registry Registry
@@ -36,6 +36,7 @@ func init() {
 		"HoneyPot":         HoneyPotMiddleware,
 		"UserAgentBlocker": UserAgentBlockMiddleware,
 		"CircuitBreaker":   CircuitBreakerMiddleware,
+		"Cors":             CorsMiddleware,
 	}
 }
 

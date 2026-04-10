@@ -29,12 +29,17 @@ func RequestIDMiddleware(_ context.Context, next http.HandlerFunc, middlewareCon
 		prefix = generateRequestPrefix()
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
+		localPrefix := prefix
 		reqId := GetRequestIDFromContext(r.Context())
 		if reqId != "" {
-			next.ServeHTTP(w, r)
-			return
+			if !strings.HasPrefix(reqId, localPrefix) { //double injection, for example coming from global or default and this is applying at path levle
+				localPrefix = fmt.Sprintf("%s-%s", reqId, localPrefix)
+			} else {
+				next.ServeHTTP(w, r)
+				return
+			}
 		}
-		reqId = generateRequestID(prefix, requestIDCounter)
+		reqId = generateRequestID(localPrefix)
 		ctx := context.WithValue(r.Context(), requestIdContextKey, reqId)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
@@ -71,7 +76,7 @@ func GetRequestIDFromContext(ctx context.Context) string {
 	return ""
 }
 
-func generateRequestID(prefix string, id uint64) string {
+func generateRequestID(prefix string) string {
 	nextId := atomic.AddUint64(&requestIDCounter, 1)
 	return fmt.Sprintf("%s-%d", prefix, nextId)
 }

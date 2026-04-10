@@ -71,3 +71,60 @@ type AcmeProviderField struct {
 	Sensitive   bool   `json:"sensitive"`
 	Placeholder string `json:"placeholder"`
 }
+
+type NetworkInterfaceDTO struct {
+	Name string `json:"name"`
+	IPv4 string `json:"ipv4"`
+	IPv6 string `json:"ipv6"`
+}
+
+// CreateProxyServerRequest is a thin JSON-friendly wrapper around config.HTTPListener.
+// It mirrors the config types exactly but uses string durations ("30s", "1m")
+// instead of time.Duration (which JSON encodes as nanoseconds).
+// Routes, RouteTarget, PathRule, TLSConfig, and middleware.Config are used directly
+// from the config / middleware packages — no extra DTOs needed.
+type CreateProxyServerRequest struct {
+	Port              int             `json:"port"`
+	Bind              int             `json:"bind"` // 1=IPv4, 2=IPv6, 3=both
+	Interface         string          `json:"interface,omitempty"`
+	TLS               *TLSConfigDTO   `json:"tls,omitempty"`
+	ReadTimeout       string          `json:"read_timeout,omitempty"` // Go duration string
+	ReadHeaderTimeout string          `json:"read_header_timeout,omitempty"`
+	WriteTimeout      string          `json:"write_timeout,omitempty"`
+	IdleTimeout       string          `json:"idle_timeout,omitempty"`
+	Routes            []RouteDTO      `json:"routes,omitempty"`
+	Default           *RouteTargetDTO `json:"default,omitempty"`
+}
+
+// TLSConfigDTO mirrors config.TLSConfig with matching JSON tags.
+type TLSConfigDTO struct {
+	UseAcme bool   `json:"use_acme"`
+	Cert    string `json:"cert,omitempty"`
+	Key     string `json:"key,omitempty"`
+}
+
+// RouteDTO mirrors config.Route with matching JSON tags.
+type RouteDTO struct {
+	Host   string         `json:"host"`
+	Target RouteTargetDTO `json:"target"`
+}
+
+// RouteTargetDTO mirrors config.RouteTarget. Middlewares use middleware.Config directly.
+type RouteTargetDTO struct {
+	Backend     string                `json:"backend"`
+	Middlewares []MiddlewareConfigDTO `json:"middlewares,omitempty"`
+	Paths       []PathRuleDTO         `json:"paths,omitempty"`
+}
+
+// PathRuleDTO mirrors config.PathRule.
+type PathRuleDTO struct {
+	Pattern     string                `json:"pattern"`
+	Backend     string                `json:"backend,omitempty"`
+	DropQuery   *bool                 `json:"drop_query,omitempty"`
+	Middlewares []MiddlewareConfigDTO `json:"middlewares,omitempty"`
+}
+
+type MiddlewareConfigDTO struct {
+	Type    string                 `json:"type"`
+	Options map[string]interface{} `json:"options,omitempty"`
+}

@@ -31,3 +31,28 @@ func TestNormalizePattern(t *testing.T) {
 		})
 	}
 }
+
+func TestPathRulePrefix(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"/jellyfino", "/jellyfino"},
+		{"/jellyfino/", "/jellyfino"},
+		{"/jellyfino/*", "/jellyfino"},
+		{"/api/v1/", "/api/v1"},
+		{"/", ""},
+		{"/*", ""},
+		{"/a/b/c", "/a/b/c"},
+		{"/a/b/c/", "/a/b/c"},
+		{"/a/b/c/*", "/a/b/c"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := pathRulePrefix(tt.input)
+			if got != tt.expected {
+				t.Errorf("pathRulePrefix(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}

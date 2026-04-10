@@ -38,6 +38,8 @@ type SystemService interface {
 	GetSSEBroker() *SSEBroker
 	StartProxy(port int) error
 	StopProxy(port int) error
+	DeleteProxy(port int) error
+	AddHttpListener(conf config.HTTPListener) error
 	GetSystemHealth() *SystemHealth
 	GetRecentErrors(n int) []metrics.ErrorEntry
 	GetRecentRequests(n int) []metrics.RequestLogEntry
@@ -178,7 +180,7 @@ func (sm *systemService) StartStopAcme() error {
 
 func (sm *systemService) StartProxy(port int) error {
 	zap.S().Infof("Starting proxy server on port %d", port)
-	err := sm.micro.StartProxy(port)
+	err := sm.micro.StartHttpProxy(port)
 	if err != nil {
 		return fmt.Errorf("failed to start proxy server on port %d: %w", port, err)
 	}
@@ -188,11 +190,31 @@ func (sm *systemService) StartProxy(port int) error {
 
 func (sm *systemService) StopProxy(port int) error {
 	zap.S().Infof("Stopping proxy server on port %d", port)
-	err := sm.micro.StopProxy(port)
+	err := sm.micro.StopHttpProxy(port)
 	if err != nil {
 		return fmt.Errorf("failed to stop proxy server on port %d: %w", port, err)
 	}
 	zap.S().Infof("Proxy server stopped successfully on port %d", port)
+	return nil
+}
+
+func (sm *systemService) DeleteProxy(port int) error {
+	zap.S().Infof("Deleting proxy server on port %d", port)
+	err := sm.micro.DeleteHttpProxy(port)
+	if err != nil {
+		return fmt.Errorf("failed to stop proxy server on port %d: %w", port, err)
+	}
+	zap.S().Infof("Proxy server stopped successfully on port %d", port)
+	return nil
+}
+
+func (sm *systemService) AddHttpListener(conf config.HTTPListener) error {
+	zap.S().Infof("Adding HTTP listener on port %d", conf.Port)
+	ctx := context.WithValue(context.Background(), "metricsManager", sm.globalMetricsManager)
+	if err := sm.micro.AddHttpServer(ctx, conf, nil); err != nil {
+		return fmt.Errorf("failed to add HTTP listener on port %d: %w", conf.Port, err)
+	}
+	zap.S().Infof("HTTP listener added successfully on port %d", conf.Port)
 	return nil
 }
 
