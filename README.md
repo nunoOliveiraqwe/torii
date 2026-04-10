@@ -9,97 +9,66 @@
 </p>
 
 <p align="center">
-  <b>A reverse proxy that gets out of your way.</b>
+  <b>A reverse proxy built for your home lab that isn't afraid of the open internet.</b>
 </p>
 
 ---
 
-> **Early development.** Torii is being actively built. Expect rough edges, breaking changes, and new features showing up regularly.
+> **`v0.0.1` — early alpha.** Things will break. Things will change. But it works, and it's already running on a Pi exposed to the internet. If you find bugs, open an issue.
 
-## What is Torii?
+## Why Torii?
 
-Torii (鳥居) is the gate that stands at the entrance of a shrine — a threshold between the outside world and what's inside. This project is the same idea applied to your services: a single gateway that handles routing, TLS, security, and observability so your backends don't have to.
+You're running services at home. Jellyfin, Immich, Home Assistant, whatever. You want to expose some of them to the internet, but you don't want to think about nginx configs, certbot cron jobs, or figuring out how to block the entire country of China from scanning your `.env` files at 3am.
 
-It started as a small home-lab proxy, and it still works great for that. But it's grown into something more capable — a lightweight, self-contained reverse proxy with a real management layer, designed around simplicity without sacrificing the features you actually need.
+Torii is a single binary that handles all of that. Point it at your backends, set up your routes in a YAML file (or through the web UI), and it takes care of TLS certificates, rate limiting, bot detection, geo-blocking, and a bunch of other things that become important the moment you open a port to the world.
 
-## Features
+No Docker. No dependencies. Just the binary and a config file.
 
-### Reverse Proxy
-- **HTTP and HTTPS** listeners with independent configuration per port.
-- **Virtual-host routing** — route traffic by `Host` header to different backends.
-- **Path-based routing** — apply different middleware chains to specific URL patterns within a route, with wildcard support (`/api/*`, `/users/*/jobs`).
-- **Default fallback** — catch-all backend when no route matches.
-- **Dual-stack** — bind to IPv4, IPv6, or both per listener.
+## Screenshots
 
-### TLS & ACME
-- **Automatic TLS** via Let's Encrypt with DNS-01 challenges (no port 80 required).
-- **Bring your own certificates** — point to a cert and key file.
-- **Automatic renewal** — background loop checks and renews certificates before expiry.
-- **Per-domain SNI** — each hostname gets its own certificate, resolved at TLS handshake time.
-- **Pluggable DNS providers** — Cloudflare supported out of the box, with an extensible provider registry.
+| Dashboard | Proxy Routes |
+|:---------:|:------------:|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Proxy Routes](docs/screenshots/proxy-routes.png) |
 
-### Middleware
-Middlewares are configured per-route, per-path, or globally. Within each level they run in the order you define them.
+| Create HTTP Proxy | System |
+|:-----------------:|:------:|
+| ![Create Proxy](docs/screenshots/create-proxy.png) | ![System](docs/screenshots/system.png) |
 
-#### Execution Order
+## What You Get
 
-The middleware execution order is **fixed** across layers:
+**Routing** — HTTP/HTTPS listeners with virtual-host routing (route by domain), path-based routing with wildcards, per-path backend overrides, and path stripping. The usual stuff, but configured in one place.
 
-```
-Global middlewares → Route / Default middlewares → Path middlewares → Reverse Proxy
-```
+**Automatic TLS** — Let's Encrypt via DNS-01 challenges. No port 80 required, no certbot, no cron. Certificates renew automatically in the background. Per-domain SNI so each hostname gets its own cert.
 
-1. **Global** — middlewares defined in `netConfig.global.middlewares`. Applied to every request on every listener.
-2. **Route / Default** — middlewares defined on the matched `routes[].target.middlewares` (or `default.middlewares` when no host matches). Only one of these applies per request.
-3. **Path** — middlewares defined on a matching `paths[].middlewares` entry within the route or default target.
-4. **Reverse Proxy** — the request is forwarded to the backend.
+**A real web UI** — Dashboard with live metrics (requests/sec, latency, error rates, response codes), a proxy route viewer, a server creation wizard, system health monitoring, ACME/TLS management, and API key management. Not an afterthought.
 
-Each layer wraps the next, so a request always passes through Global first, then Route/Default, then Path, before reaching the upstream backend. You cannot reorder the layers — only the middlewares *within* each layer run in the sequence you list them.
+**Bot defense** — User-agent blocking with built-in pattern lists for scanners, scrapers, AI crawlers, and more. A honeypot system that traps bots hitting paths like `.git/config` or `wp-login.php` and blocks their IP. Optional trickster mode that wastes their time with tarpits, fake credential files, and infinite data streams. GeoIP blocking by country or continent.
 
-| Middleware | What it does |
-|---|---|
-| **`Metrics`** | Tracks request count, latency percentiles (P50/P95/P99), status code distribution, bytes in/out, upstream timeouts, and active connections. |
-| **`RequestId`** | Generates a unique ID per request and injects it into the context. Supports custom prefixes. |
-| **`RequestLog`** | Structured request logging with method, URL, host, remote address, user agent, and request ID via zap. |
-| **`Headers`** | Set, strip, or compare headers on requests and responses. Supports `$env:VAR` and `$file:/path` value resolution. |
-| **`RateLimiter`** | Token-bucket rate limiting — global or per-client IP. Configurable rate, burst, cache TTL, and cleanup. Returns `429` with `Retry-After`. |
-| **`CountryBlock`** | GeoIP-based allow/block lists using MaxMind databases. Supports remote DB download with auto-refresh and in-memory caching. |
-| **`IpBlock`** | IP-based allow/block lists with CIDR support. *(in progress)* |
+**Rate limiting** — Token-bucket rate limiter, global or per-client IP. Returns proper `429` with `Retry-After`.
 
-### Management API
-A REST API (default `127.0.0.1:27000`) for managing the proxy at runtime:
+**Header validation** — Set, strip, or require specific headers. Need a shared secret between services? `cmp-headers-req` rejects anything that doesn't match. Values can be loaded from files or environment variables at startup.
 
-- **First-time setup** — set admin credentials on first launch.
-- **Authentication** — session-based login/logout with secure cookies.
-- **Proxy control** — list configured proxy servers, start/stop individual listeners.
-- **Metrics** — global and per-server metrics, plus a real-time SSE stream.
-- **Observability** — recent request log, recent error log, system health (memory, goroutines, GC, uptime).
-- **ACME management** — view/update ACME configuration and list managed certificates.
-- **Password management** — change the admin password.
+**Circuit breaker** — If your backend starts returning 5xx errors, Torii stops sending it traffic until it recovers. Your users see a clean error instead of a cascade of failures.
 
-### Web UI
-A built-in admin interface served at `/ui` with:
-- **Setup wizard** — first-time setup flow for setting the admin password.
-- **Login page** — session-based authentication.
-- **Dashboard** — live view of proxy state and metrics.
+**14 middlewares total** — All composable, all configurable per-route or per-path. See the [full list](docs/configuration.md#middleware-reference).
 
-### Storage
-- **SQLite** with WAL mode — single-file database, no external dependencies.
-- **Embedded migrations** — schema versioning runs automatically on startup.
-- Stores users, roles, sessions, system configuration, ACME accounts, certificates, and proxy metrics.
+**SQLite storage** — Single-file database, WAL mode, embedded migrations. Stores users, sessions, ACME certs, and system config.
 
-### Debug Mode
-Pass `--debug` to automatically start stub HTTP and TCP servers for every configured backend. Useful for development and testing without real upstream services.
+**Debug mode** — Pass `--debug` and Torii spins up stub servers for all your configured backends. Useful for testing your config without running the actual services.
 
 ## Quick Start
 
-### Build
-
 ```bash
+# Build
 go build -o torii ./cmd/torii
+
+# Run
+./torii --config config.yaml
 ```
 
-### Create a config file
+On first launch, open `http://127.0.0.1:27000/ui` to set your admin password.
+
+### Minimal config
 
 ```yaml
 log:
@@ -112,32 +81,46 @@ apiServer:
 netConfig:
   http:
     - port: 80
-      bind: 3                          # 1 = IPv4, 2 = IPv6, 3 = both
+      bind: 3
       default:
         backend: http://192.168.1.50:8080
         middlewares:
           - type: "RequestId"
           - type: "RequestLog"
           - type: "Metrics"
+```
 
+### With TLS and route-level security
+
+```yaml
+netConfig:
+  http:
     - port: 443
       bind: 3
       tls:
         use-acme: true
       routes:
-        - host: app.home.local
+        - host: jellyfin.home.example.com
           target:
-            backend: http://192.168.1.50:8080
+            backend: http://192.168.1.100:8096
             middlewares:
               - type: "RequestId"
               - type: "RequestLog"
               - type: "Metrics"
+              - type: "UserAgentBlocker"
+                options:
+                  block-empty-ua: true
+                  block-defaults: ["scanners", "recon", "ai-crawlers"]
+                  allow-defaults: ["search-engines"]
+              - type: "HoneyPot"
+                options:
+                  defaults: ["git", "infra", "backups", "cgi"]
+                  response:
+                    trickster-mode: true
+                    max-slow-tricks: 10
               - type: "RateLimiter"
                 options:
                   mode: "per-client"
-                  cache-ttl: 24h
-                  cleanup-interval: 1h
-                  max-cache-size: 10000
                   limiter-req:
                     rate-per-second: 10
                     burst: 20
@@ -145,71 +128,7 @@ netConfig:
         backend: http://192.168.1.50:8080
 ```
 
-### Run
-
-```bash
-./torii --config config.yaml
-```
-
-On first launch, open `http://127.0.0.1:27000/ui` to complete the setup wizard and set your admin password.
-
-## Configuration Reference
-
-### Top-level
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `log.logLevel` | `string` | `INFO` | Log level: `DEBUG`, `INFO`, `WARN`, `ERROR`. |
-| `log.logPath` | `string` | | File path to write logs to. |
-| `log.logDebug` | `bool` | `false` | Enable development-mode logging. |
-| `apiServer.host` | `string` | `127.0.0.1` | Management API bind address. |
-| `apiServer.port` | `int` | `27000` | Management API port. |
-
-### HTTP Listener (`netConfig.http[]`)
-
-| Key | Type | Description |
-|---|---|---|
-| `port` | `int` | Port to listen on. |
-| `bind` | `int` | `1` = IPv4, `2` = IPv6, `3` = both. |
-| `interface` | `string` | Network interface name to bind to. Defaults to loopback. |
-| `read-timeout` | `duration` | Server read timeout. |
-| `read-header-timeout` | `duration` | Server read-header timeout. |
-| `write-timeout` | `duration` | Server write timeout. |
-| `idle-timeout` | `duration` | Server idle timeout. |
-| `tls.use-acme` | `bool` | Enable automatic TLS via ACME DNS-01. |
-| `tls.cert` | `string` | Path to TLS certificate (manual TLS). |
-| `tls.key` | `string` | Path to TLS private key (manual TLS). |
-| `routes[].host` | `string` | Hostname to match (virtual hosting). |
-| `routes[].target.backend` | `string` | Backend URL to proxy to. |
-| `routes[].target.middlewares` | `list` | Middleware chain for this route. |
-| `routes[].target.paths[]` | `list` | Path-specific rules with their own middleware chains. |
-| `default.backend` | `string` | Catch-all backend when no host matches. |
-| `default.middlewares` | `list` | Middleware chain for the default route. |
-
-### Global Middlewares (`netConfig.global`)
-
-| Key | Type | Description |
-|---|---|---|
-| `middlewares` | `list` | Middleware chain applied to all requests on all listeners. |
-
-### Session (`session`)
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `lifetime` | `duration` | `16h` | Maximum session lifetime. |
-| `idleTimeout` | `duration` | `60m` | Session idle timeout. |
-| `cleanupInterval` | `duration` | `1h` | Expired session cleanup interval. |
-| `cookieSecure` | `bool` | `true` | Set the `Secure` flag on session cookies. |
-| `cookieHttpOnly` | `bool` | `true` | Set the `HttpOnly` flag on session cookies. |
-| `cookieSameSite` | `string` | `lax` | `SameSite` cookie attribute: `strict`, `lax`, or `none`. |
-
-## CLI Flags
-
-```
---config <path>       Path to the YAML configuration file.
---debug               Start stub servers for all configured backends.
---log-level <level>   Override the log level from config.
-```
+Full configuration reference: [docs/configuration.md](docs/configuration.md)
 
 ## Architecture
 
@@ -218,21 +137,12 @@ On first launch, open `http://127.0.0.1:27000/ui` to complete the setup wizard a
                     │              torii                       │
   Incoming          │                                         │
   Request ─────────►│  Global Middlewares                      │
-                    │    │                                     │
                     │    ▼                                     │
-                    │  Virtual Host Dispatcher (by Host)       │
-                    │    │                                     │
+                    │  Host Dispatcher ──► Route Middlewares    │
                     │    ▼                                     │
-                    │  Route Middlewares                       │
-                    │    │                                     │
+                    │  Path Dispatcher ──► Path Middlewares     │
                     │    ▼                                     │
-                    │  Path Dispatcher (by URL pattern)        │
-                    │    │                                     │
-                    │    ▼                                     │
-                    │  Path Middlewares                        │
-                    │    │                                     │
-                    │    ▼                                     │
-                    │  httputil.ReverseProxy ──────────► Backend│
+                    │  Reverse Proxy ──────────────────► Backend│
                     └─────────────────────────────────────────┘
 
   Management        ┌─────────────────────────────────────────┐
@@ -242,16 +152,42 @@ On first launch, open `http://127.0.0.1:27000/ui` to complete the setup wizard a
                     │    └── SSE stream   Real-time metrics    │
                     │                                         │
                     │  SQLite (torii.db)                       │
-                    │    ├── Users & sessions                  │
-                    │    ├── ACME accounts & certificates      │
-                    │    └── System configuration              │
                     └─────────────────────────────────────────┘
 ```
 
+## Documentation
+
+- [Configuration & Middleware Reference](docs/configuration.md)
+- [Management API](docs/api.md)
+
+## TODO
+
+Keeping track of what's done and what's next. This is a side project so no promises on timelines.
+
+### Needs work
+- [ ] IP block lists — middleware is registered, filtering logic is stubbed out
+- [ ] Create HTTP Proxy UI — works, but the UX needs another pass
+- [ ] ACME UI — need a delete button for individual certificates, the reset button placement is bad
+- [ ] Proxy Routes UI — host names should be clickable links that open in a new tab
+- [ ] Server timeouts — review the defaults for the Create HTTP Proxy wizard
+
+### Up next
+- [ ] TCP proxying — config schema is there, implementation is not
+- [ ] Make `RequestId`, `RequestLog`, and `Metrics` default on all endpoints (too easy to forget and then the dashboard shows nothing)
+- [ ] Blocked IP observability — surface blocked IPs (from honeypot, UA blocker, country block) in the UI with timestamps and metadata, probably as a rolling log
+- [ ] GitHub Actions CI
+- [ ] Docker image
+- [ ] `.deb` package — want to run this on a Pi and let the bots come
+
+### Maybe
+- [ ] Proxy-level authentication — login pages so the proxy handles auth before forwarding to backends
+- [ ] Dedicated tar pitting middleware (separate from the honeypot trickster mode)
+- [ ] Login endpoint rate limiting
+
 ## Requirements
 
-- **Go 1.25+**
+- Go 1.25+
 
 ## License
 
-This project is licensed under the [Apache License 2.0](LICENSE).
+[Apache License 2.0](LICENSE)

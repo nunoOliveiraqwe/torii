@@ -28,5 +28,11 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+*.iml
+
+# Database
+*.db
+*.db-shm
+*.db-wal
