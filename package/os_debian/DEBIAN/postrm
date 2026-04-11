@@ -1,0 +1,32 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+  purge)
+    # Remove data directory (SQLite DB, WAL, SHM)
+    if [ -d /var/lib/torii ]; then
+      rm -rf /var/lib/torii
+    fi
+
+    # Remove configuration directory
+    if [ -d /etc/torii ]; then
+      rm -rf /etc/torii
+    fi
+
+    # Remove the torii system user
+    if id -u torii > /dev/null 2>&1; then
+      userdel torii 2>/dev/null || true
+    fi
+    ;;
+
+  remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+    ;;
+
+  *)
+    echo "postrm called with unknown argument: $1" >&2
+    exit 1
+    ;;
+esac
+
+exit 0
+

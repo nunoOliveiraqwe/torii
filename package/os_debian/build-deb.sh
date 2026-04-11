@@ -53,7 +53,7 @@ sed \
   "${SCRIPT_DIR}/DEBIAN/control" > "${BUILD_DIR}/DEBIAN/control"
 
 # Copy maintainer scripts
-for script in preinst postinst prerm; do
+for script in preinst postinst prerm postrm; do
   cp "${SCRIPT_DIR}/DEBIAN/${script}" "${BUILD_DIR}/DEBIAN/${script}"
   chmod 0755 "${BUILD_DIR}/DEBIAN/${script}"
 done
@@ -63,9 +63,9 @@ cp "${SCRIPT_DIR}/DEBIAN/copyright" "${BUILD_DIR}/DEBIAN/copyright"
 cp "${SCRIPT_DIR}/DEBIAN/conffiles" "${BUILD_DIR}/DEBIAN/conffiles"
 
 # -- Binary --
-mkdir -p "${BUILD_DIR}/usr/local/bin"
-cp "$BINARY" "${BUILD_DIR}/usr/local/bin/torii"
-chmod 0755 "${BUILD_DIR}/usr/local/bin/torii"
+mkdir -p "${BUILD_DIR}/usr/bin"
+cp "$BINARY" "${BUILD_DIR}/usr/bin/torii"
+chmod 0755 "${BUILD_DIR}/usr/bin/torii"
 
 # -- Systemd service --
 mkdir -p "${BUILD_DIR}/etc/systemd/system"

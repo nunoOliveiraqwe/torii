@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/var/lib/torii
-ExecStart=/usr/local/bin/torii --config /etc/torii/config.yaml
+ExecStart=/usr/bin/torii --config /etc/torii/config.yaml
 
 
 User=torii

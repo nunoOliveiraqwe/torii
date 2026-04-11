@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-if [ -f /usr/local/bin/torii ]; then
-  chmod +x /usr/local/bin/torii
+if [ -f /usr/bin/torii ]; then
+  chmod +x /usr/bin/torii
 fi
 
 mkdir -p /var/lib/torii
