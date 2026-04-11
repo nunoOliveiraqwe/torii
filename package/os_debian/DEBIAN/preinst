@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+
+if ! id -u torii > /dev/null 2>&1; then
+  useradd --system --no-create-home --shell /usr/sbin/nologin torii
+fi

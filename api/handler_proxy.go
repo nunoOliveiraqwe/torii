@@ -82,6 +82,7 @@ func handleDeleteProxy(service app.SystemService) http.HandlerFunc {
 			http.Error(writer, "Invalid port format", http.StatusBadRequest)
 			return
 		}
+		// TODO: persist deletion to the config file so removed routes don't reappear on restart.
 		err = service.DeleteProxy(portInt)
 		if err != nil {
 			logger.Error("Failed to delete proxy server", zap.String("port", port), zap.Error(err))
@@ -154,7 +155,8 @@ func handleCreateHttpProxyServer(svc app.SystemService) http.HandlerFunc {
 			http.Error(w, "Invalid configuration: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		//TODO -> this is added but yet persisted in the config
+		// TODO: persist the new listener to the config file so it survives restarts.
+		// Currently this is memory-only — the UI-created route is lost on restart.
 		if err := svc.AddHttpListener(conf); err != nil {
 			logger.Error("Failed to add HTTP listener", zap.Error(err))
 			http.Error(w, "Failed to create listener: "+err.Error(), http.StatusInternalServerError)

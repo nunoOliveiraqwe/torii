@@ -1,0 +1,15 @@
+#!/bin/bash
+set -e
+
+if [ -f /usr/local/bin/torii ]; then
+  chmod +x /usr/local/bin/torii
+fi
+
+mkdir -p /var/lib/torii
+chown torii:torii /var/lib/torii
+
+mkdir -p /etc/torii
+
+systemctl daemon-reload
+systemctl enable torii
+systemctl start torii

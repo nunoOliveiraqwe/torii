@@ -1,0 +1,11 @@
+Package: torii
+Version: {{torii.version}}
+Section: non-free/misc
+Priority: important
+Architecture: {{torii.arch}}
+Maintainer: Nuno Oliveira <torii@noliveira.eu>
+Description: Torii is a reverse proxy software written in Go.
+ It is designed to be lightweight and efficient, making it ideal
+ for use in various applications. With Torii, users can enjoy improved
+ performance and enhanced security for their web applications.
+

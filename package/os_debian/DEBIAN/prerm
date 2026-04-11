@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+if systemctl is-active --quiet torii; then
+  systemctl stop torii
+fi
+
+if systemctl is-enabled --quiet torii; then
+  systemctl disable torii
+fi
+
+

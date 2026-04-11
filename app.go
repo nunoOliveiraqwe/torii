@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var Version = "0.0.x"
+var Version = "0.1.0"
 var Build = "non commited"
 var BuildTime = "unknown"
 

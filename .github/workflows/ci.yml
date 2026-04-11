@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: CGO_ENABLED=1 go test ./...
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binary
+        run: |
+          CGO_ENABLED=1 go build \
+            -ldflags="-s -w -linkmode external -extldflags '-static'" \
+            -o torii \
+            ./cmd/torii
+
+      - name: Build .deb package (smoke test)
+        run: |
+          ./package/os_debian/build-deb.sh \
+            --binary torii \
+            --version 0.0.0-ci \
+            --arch amd64
+
+      - name: Verify .deb contents
+        run: dpkg-deb --contents package/os_debian/build/torii_0.0.0-ci_amd64.deb
+

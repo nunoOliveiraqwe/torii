@@ -36,3 +36,7 @@ go.work.sum
 *.db
 *.db-shm
 *.db-wal
+
+# Package build output
+package/os_debian/build/
+
