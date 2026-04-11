@@ -47,7 +47,8 @@ func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget,
 			zap.S().Errorf("Route host cannot be empty, skipping")
 			continue
 		}
-		handler, names, pathBackends, err := buildRouteHandler(ctx, route.Target)
+		routeCtx := context.WithValue(ctx, "host", route.Host)
+		handler, names, pathBackends, err := buildRouteHandler(routeCtx, route.Target)
 		if err != nil {
 			zap.S().Errorf("Failed to build handler for host %s: %v", route.Host, err)
 			continue
@@ -61,7 +62,8 @@ func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget,
 	}
 
 	if defaultTarget != nil {
-		handler, names, pathBackends, err := buildRouteHandler(ctx, *defaultTarget)
+		defaultCtx := context.WithValue(ctx, "host", "_default")
+		handler, names, pathBackends, err := buildRouteHandler(defaultCtx, *defaultTarget)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed to build default route handler: %w", err)
 		}

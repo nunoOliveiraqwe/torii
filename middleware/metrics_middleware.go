@@ -100,6 +100,14 @@ func resolveReportFunc(ctx context.Context) metrics.MetricsReportFunc {
 		}
 		portStr = strconv.Itoa(port.(int))
 	}
+	hostStr := ""
+	host := ctx.Value("host")
+	if host != nil {
+		hostStr2, ok := host.(string)
+		if ok {
+			hostStr = hostStr2
+		}
+	}
 	pathStr := ""
 	path := ctx.Value("path")
 	if path != nil {
@@ -108,7 +116,7 @@ func resolveReportFunc(ctx context.Context) metrics.MetricsReportFunc {
 			pathStr = pathStr2
 		}
 	}
-	conName := metrics.ProxyPathMetricsName(portStr, pathStr)
+	conName := metrics.ProxyHostPathMetricsName(portStr, hostStr, pathStr)
 
 	mgrManager := ctx.Value(MgrKey)
 	if mgrManager == nil {

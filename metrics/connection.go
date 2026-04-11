@@ -76,15 +76,20 @@ func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric
 	conMetrics.metricsLock.Unlock()
 	h.notifyListeners(metric.connectionName, conSnapshot)
 
-	// propagate to the parent so it aggregates all children.
-	if conMetrics.parentName != "" {
-		if parentMetrics, ok2 := h.connectionMetricsMap[conMetrics.parentName]; ok2 {
-			parentMetrics.metricsLock.Lock()
-			parentMetrics.accumulatedMetrics.AddRequestMetric(metric)
-			parentSnapshot := parentMetrics.accumulatedMetrics.Copy()
-			parentMetrics.metricsLock.Unlock()
-			h.notifyListeners(conMetrics.parentName, parentSnapshot)
+	// propagate up the parent chain so each ancestor aggregates all descendants.
+	// e.g. path → host → port (global is handled separately below).
+	cur := conMetrics
+	for cur.parentName != "" {
+		parentMetrics, ok2 := h.connectionMetricsMap[cur.parentName]
+		if !ok2 {
+			break
 		}
+		parentMetrics.metricsLock.Lock()
+		parentMetrics.accumulatedMetrics.AddRequestMetric(metric)
+		parentSnapshot := parentMetrics.accumulatedMetrics.Copy()
+		parentMetrics.metricsLock.Unlock()
+		h.notifyListeners(cur.parentName, parentSnapshot)
+		cur = parentMetrics
 	}
 
 	if metric.connectionName != globalMetricsConName {
@@ -156,6 +161,7 @@ func (h *ConnectionMetricsManager) ensureParentMetric(serverId, parentName strin
 		return
 	}
 	zap.S().Infof("Auto-creating parent metric %s for server %s", parentName, serverId)
+	grandparent := deriveParentMetricName(parentName)
 	m := NewMetric()
 	m.ConnectionName = parentName
 	parent := &ConnectionMetric{
@@ -163,17 +169,26 @@ func (h *ConnectionMetricsManager) ensureParentMetric(serverId, parentName strin
 		accumulatedMetrics: m,
 		metricsLock:        sync.RWMutex{},
 		connectionName:     parentName,
-		parentName:         "", // port-level has no parent (besides global)
+		parentName:         grandparent,
 	}
 	h.addConnectionMetric(parent)
+	if grandparent != "" {
+		h.ensureParentMetric(serverId, grandparent)
+	}
 }
 
 func deriveParentMetricName(connectionName string) string {
+	// Path-level → parent is everything before "-path-" (could be host-level or port-level).
 	idx := strings.Index(connectionName, "-path-")
-	if idx == -1 {
-		return ""
+	if idx != -1 {
+		return connectionName[:idx]
 	}
-	return connectionName[:idx]
+	// Host-level → parent is the port-level metric.
+	idx = strings.Index(connectionName, "-host-")
+	if idx != -1 {
+		return connectionName[:idx]
+	}
+	return ""
 }
 
 func (h *ConnectionMetricsManager) GetErrorLog() *ErrorLog {

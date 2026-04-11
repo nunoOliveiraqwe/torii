@@ -336,3 +336,131 @@ func TestGetRegisteredConnectionNames(t *testing.T) {
 	assert.Contains(t, names, "metric-port-9090")                    // standalone port
 	assert.Len(t, names, 4)
 }
+
+func TestHostMetricAutoCreatesPortParent(t *testing.T) {
+	ctx := context.Background()
+	h := NewGlobalMetricsHandler(2, ctx)
+
+	// Register a host-level metric — the port-level parent should be auto-created.
+	h.TrackMetricsForConnection("http-8443", "metric-port-8443-host-jellyfino.example.com")
+
+	parent := h.GetMetricForConnection("metric-port-8443")
+	assert.NotNil(t, parent, "port-level parent should be auto-created for host metric")
+	assert.Equal(t, "metric-port-8443", parent.ConnectionName)
+}
+
+func TestPathUnderHostAutoCreatesFullChain(t *testing.T) {
+	ctx := context.Background()
+	h := NewGlobalMetricsHandler(2, ctx)
+
+	// Register a path-under-host metric — both host-level and port-level parents should be auto-created.
+	h.TrackMetricsForConnection("http-8443", "metric-port-8443-host-jellyfino.example.com-path-/api")
+
+	hostParent := h.GetMetricForConnection("metric-port-8443-host-jellyfino.example.com")
+	assert.NotNil(t, hostParent, "host-level parent should be auto-created")
+
+	portParent := h.GetMetricForConnection("metric-port-8443")
+	assert.NotNil(t, portParent, "port-level grandparent should be auto-created")
+
+	names := h.GetRegisteredConnectionNames()
+	assert.Contains(t, names, "global")
+	assert.Contains(t, names, "metric-port-8443")
+	assert.Contains(t, names, "metric-port-8443-host-jellyfino.example.com")
+	assert.Contains(t, names, "metric-port-8443-host-jellyfino.example.com-path-/api")
+	assert.Len(t, names, 4)
+}
+
+func TestHostHierarchyPropagation(t *testing.T) {
+	ctx := context.Background()
+	h := NewGlobalMetricsHandler(2, ctx)
+	h.StartCollectingMetrics()
+	time.Sleep(100 * time.Millisecond)
+
+	// Two host routes on the same port.
+	report1 := h.TrackMetricsForConnection("http-8443", "metric-port-8443-host-jellyfino.example.com")
+	report2 := h.TrackMetricsForConnection("http-8443", "metric-port-8443-host-winnie.example.com")
+
+	report1(&RequestMetric{BytesReceived: 100, BytesSent: 200})
+	report2(&RequestMetric{BytesReceived: 50, BytesSent: 75})
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		global := h.GetMetricForConnection(globalMetricsConName)
+		if global != nil && global.RequestCount >= 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			assert.Fail(t, "timeout waiting for global metrics")
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Each host should have its own count.
+	leaf1 := h.GetMetricForConnection("metric-port-8443-host-jellyfino.example.com")
+	assert.Equal(t, int64(1), leaf1.RequestCount)
+	assert.Equal(t, int64(100), leaf1.BytesReceived)
+
+	leaf2 := h.GetMetricForConnection("metric-port-8443-host-winnie.example.com")
+	assert.Equal(t, int64(1), leaf2.RequestCount)
+	assert.Equal(t, int64(50), leaf2.BytesReceived)
+
+	// Port-level should aggregate both hosts.
+	port := h.GetMetricForConnection("metric-port-8443")
+	assert.NotNil(t, port)
+	assert.Equal(t, int64(2), port.RequestCount)
+	assert.Equal(t, int64(150), port.BytesReceived)
+	assert.Equal(t, int64(275), port.BytesSent)
+
+	// Global should equal port (only one port).
+	global := h.GetMetricForConnection(globalMetricsConName)
+	assert.Equal(t, int64(2), global.RequestCount)
+	assert.Equal(t, int64(150), global.BytesReceived)
+}
+
+func TestPathUnderHostPropagation(t *testing.T) {
+	ctx := context.Background()
+	h := NewGlobalMetricsHandler(2, ctx)
+	h.StartCollectingMetrics()
+	time.Sleep(100 * time.Millisecond)
+
+	// A path-level metric under a host route.
+	report := h.TrackMetricsForConnection("http-8443", "metric-port-8443-host-jellyfino.example.com-path-/api")
+
+	report(&RequestMetric{BytesReceived: 42, BytesSent: 84})
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		global := h.GetMetricForConnection(globalMetricsConName)
+		if global != nil && global.RequestCount >= 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			assert.Fail(t, "timeout waiting for global metrics")
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Path leaf should have its own count.
+	pathLeaf := h.GetMetricForConnection("metric-port-8443-host-jellyfino.example.com-path-/api")
+	assert.Equal(t, int64(1), pathLeaf.RequestCount)
+	assert.Equal(t, int64(42), pathLeaf.BytesReceived)
+
+	// Host-level should aggregate from the path.
+	hostParent := h.GetMetricForConnection("metric-port-8443-host-jellyfino.example.com")
+	assert.NotNil(t, hostParent)
+	assert.Equal(t, int64(1), hostParent.RequestCount)
+	assert.Equal(t, int64(42), hostParent.BytesReceived)
+
+	// Port-level should aggregate from host.
+	portParent := h.GetMetricForConnection("metric-port-8443")
+	assert.NotNil(t, portParent)
+	assert.Equal(t, int64(1), portParent.RequestCount)
+	assert.Equal(t, int64(42), portParent.BytesReceived)
+
+	// Global should equal port.
+	global := h.GetMetricForConnection(globalMetricsConName)
+	assert.Equal(t, int64(1), global.RequestCount)
+	assert.Equal(t, int64(42), global.BytesReceived)
+}

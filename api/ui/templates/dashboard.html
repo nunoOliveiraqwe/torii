@@ -973,13 +973,10 @@
             if (sparklineBuffers[connKey]) {
                 sparklineBuffers[connKey].count++;
             }
-            // Also feed the port-level sparkline buffer for path-level requests
-            var pathIdx = connKey.indexOf('-path-');
-            if (pathIdx !== -1) {
-                var parentKey = connKey.substring(0, pathIdx);
-                if (sparklineBuffers[parentKey]) {
-                    sparklineBuffers[parentKey].count++;
-                }
+            // Also feed the port-level sparkline buffer for host-level or path-level requests
+            var portKey = extractPortKey(connKey);
+            if (portKey !== connKey && sparklineBuffers[portKey]) {
+                sparklineBuffers[portKey].count++;
             }
         });
         metricsEventSource.onopen = function () {
@@ -1310,11 +1307,15 @@
 
     // Check if an entry's connection_name matches the given filter.
     // A port-level filter (e.g. "metric-port-8081") also matches its
+    // host-level children ("metric-port-8081-host-…") and
     // path-level children ("metric-port-8081-path-…").
+    // A host-level filter also matches its path-level children.
     function matchesConnectionFilter(connName, filter) {
         if (!filter) return true;
         if (!connName) return false;
-        return connName === filter || connName.indexOf(filter + '-path-') === 0;
+        if (connName === filter) return true;
+        return connName.indexOf(filter + '-host-') === 0 ||
+               connName.indexOf(filter + '-path-') === 0;
     }
 
     function buildRequestRow(e) {
@@ -1408,27 +1409,25 @@
     function buildLogFilterOptions() {
         var names = Object.keys(perConnectionSnapshots).sort();
         var html = '<option value="">All connections</option>';
-        // Reuse the same grouping logic as the dashboard selector
         var ports = {};
         names.forEach(function (name) {
             if (name === 'global') return;
-            var pathIdx = name.indexOf('-path-');
-            if (pathIdx !== -1) {
-                var parent = name.substring(0, pathIdx);
-                if (!ports[parent]) ports[parent] = [];
-                ports[parent].push(name);
-            } else {
+            var portKey = extractPortKey(name);
+            if (portKey === name) {
                 if (!ports[name]) ports[name] = [];
+            } else {
+                if (!ports[portKey]) ports[portKey] = [];
+                ports[portKey].push(name);
             }
         });
         Object.keys(ports).sort().forEach(function (portKey) {
             var portLabel = portKey.replace(/^metric-port-/, ':');
             var children = ports[portKey];
             if (children.length > 0) {
-                html += '<option value="' + portKey + '">' + portLabel + ' (all paths)</option>';
+                html += '<option value="' + portKey + '">' + portLabel + ' (all)</option>';
                 children.sort().forEach(function (childKey) {
-                    var path = childKey.substring(childKey.indexOf('-path-') + 6);
-                    html += '<option value="' + childKey + '">\u00A0\u00A0\u2514 ' + portLabel + ' ' + path + '</option>';
+                    var label = extractChildLabel(childKey, portKey);
+                    html += '<option value="' + childKey + '">\u00A0\u00A0\u2514 ' + portLabel + ' ' + label + '</option>';
                 });
             } else {
                 html += '<option value="' + portKey + '">' + portLabel + '</option>';
@@ -1540,18 +1539,17 @@
         // Build the dropdown from all connection names discovered via SSE.
         var names = Object.keys(perConnectionSnapshots).sort();
 
-        // Group: port-level → [path-level children]
-        var ports = {};    // portKey → [childKey, …]
+        // Group: port-level → [child names (hosts, paths, host+path)]
+        var ports = {};
         names.forEach(function (name) {
             if (name === 'global') return;
-            var pathIdx = name.indexOf('-path-');
-            if (pathIdx !== -1) {
-                var parent = name.substring(0, pathIdx);
-                if (!ports[parent]) ports[parent] = [];
-                ports[parent].push(name);
-            } else {
-                // port-level (or any non-path metric)
+            var portKey = extractPortKey(name);
+            if (portKey === name) {
+                // This is a port-level metric
                 if (!ports[name]) ports[name] = [];
+            } else {
+                if (!ports[portKey]) ports[portKey] = [];
+                ports[portKey].push(name);
             }
         });
 
@@ -1560,10 +1558,10 @@
             var portLabel = portKey.replace(/^metric-port-/, ':');
             var children = ports[portKey];
             if (children.length > 0) {
-                html += '<option value="' + portKey + '">' + portLabel + ' (all paths)</option>';
+                html += '<option value="' + portKey + '">' + portLabel + ' (all)</option>';
                 children.sort().forEach(function (childKey) {
-                    var path = childKey.substring(childKey.indexOf('-path-') + 6);
-                    html += '<option value="' + childKey + '">\u00A0\u00A0\u2514 ' + portLabel + ' ' + path + '</option>';
+                    var label = extractChildLabel(childKey, portKey);
+                    html += '<option value="' + childKey + '">\u00A0\u00A0\u2514 ' + portLabel + ' ' + label + '</option>';
                 });
             } else {
                 html += '<option value="' + portKey + '">' + portLabel + '</option>';
@@ -1572,6 +1570,33 @@
 
         sel.innerHTML = html;
         if (current && sel.querySelector('option[value="' + current + '"]')) sel.value = current;
+    }
+
+    function extractPortKey(name) {
+        var hostIdx = name.indexOf('-host-');
+        var pathIdx = name.indexOf('-path-');
+        if (hostIdx === -1 && pathIdx === -1) return name;
+        var idx = (hostIdx !== -1 && pathIdx !== -1) ? Math.min(hostIdx, pathIdx)
+                : (hostIdx !== -1 ? hostIdx : pathIdx);
+        return name.substring(0, idx);
+    }
+
+    function extractChildLabel(childKey, portKey) {
+        var rest = childKey.substring(portKey.length);
+        var label = '';
+        var hostIdx = rest.indexOf('-host-');
+        var pathIdx = rest.indexOf('-path-');
+        if (hostIdx !== -1) {
+            var hostStart = hostIdx + 6;
+            var hostEnd = pathIdx !== -1 ? pathIdx : rest.length;
+            var host = rest.substring(hostStart, hostEnd);
+            label += host === '_default' ? '(default)' : host;
+        }
+        if (pathIdx !== -1) {
+            var path = rest.substring(pathIdx + 6);
+            label += (label ? ' ' : '') + path;
+        }
+        return label || rest;
     }
 
     function metricsSummary(met) {

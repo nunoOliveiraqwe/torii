@@ -165,3 +165,20 @@ func ProxyPathMetricsName(port, path string) string {
 func ProxyMetricsName(port string) string {
 	return fmt.Sprintf("metric-port-%s", port)
 }
+
+func ProxyHostMetricsName(port, host string) string {
+	if host == "" {
+		return ProxyMetricsName(port)
+	}
+	return fmt.Sprintf("metric-port-%s-host-%s", port, host)
+}
+
+func ProxyHostPathMetricsName(port, host, path string) string {
+	if host == "" {
+		return ProxyPathMetricsName(port, path)
+	}
+	if path == "" {
+		return ProxyHostMetricsName(port, host)
+	}
+	return fmt.Sprintf("metric-port-%s-host-%s-path-%s", port, host, path)
+}
