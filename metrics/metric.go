@@ -22,6 +22,9 @@ type Metric struct {
 	CacheHits         int64  `json:"cache_hits"`
 	CacheMisses       int64  `json:"cache_misses"`
 
+	BlockedTotal        int64            `json:"blocked_total"`
+	BlockedByMiddleware map[string]int64 `json:"blocked_by_middleware,omitempty"`
+
 	// latencies is the internal ring buffer used to compute percentiles.
 	// It is not serialised to JSON and is only present on accumulated metrics.
 	latencies *latencyRing
@@ -72,6 +75,15 @@ func (m *Metric) AddRequestMetric(metric *RequestMetric) {
 	if metric.IsTimedOut {
 		m.UpstreamTimeouts++
 	}
+	if metric.IsMiddlewareBlockedRequest {
+		m.BlockedTotal++
+		if metric.BlockingMiddleware != "" {
+			if m.BlockedByMiddleware == nil {
+				m.BlockedByMiddleware = make(map[string]int64)
+			}
+			m.BlockedByMiddleware[metric.BlockingMiddleware]++
+		}
+	}
 	m.AvgResponseTimeMs = m.TotalLatencyMs / m.RequestCount
 	if m.latencies != nil {
 		m.latencies.Add(metric.LatencyMs)
@@ -93,6 +105,13 @@ func (m *Metric) Add(other *Metric) {
 	m.Request5xxCount += other.Request5xxCount
 	m.CacheHits += other.CacheHits
 	m.CacheMisses += other.CacheMisses
+	m.BlockedTotal += other.BlockedTotal
+	for mw, count := range other.BlockedByMiddleware {
+		if m.BlockedByMiddleware == nil {
+			m.BlockedByMiddleware = make(map[string]int64)
+		}
+		m.BlockedByMiddleware[mw] += count
+	}
 }
 
 func (m *Metric) Copy() *Metric {
@@ -112,6 +131,13 @@ func (m *Metric) Copy() *Metric {
 		Request5xxCount:   m.Request5xxCount,
 		CacheHits:         m.CacheHits,
 		CacheMisses:       m.CacheMisses,
+		BlockedTotal:      m.BlockedTotal,
+	}
+	if len(m.BlockedByMiddleware) > 0 {
+		cp.BlockedByMiddleware = make(map[string]int64, len(m.BlockedByMiddleware))
+		for mw, count := range m.BlockedByMiddleware {
+			cp.BlockedByMiddleware[mw] = count
+		}
 	}
 	if m.latencies != nil {
 		cp.P50Ms = m.latencies.Percentile(50)

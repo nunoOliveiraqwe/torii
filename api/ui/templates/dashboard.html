@@ -140,11 +140,6 @@
                     <p class="stat-sub">All blocked requests</p>
                 </div>
                 <div class="stat-card">
-                    <p class="stat-value" id="stat-blocked-ips" style="color:#c0392b">–</p>
-                    <p class="stat-label">Unique IPs</p>
-                    <p class="stat-sub">Distinct blocked sources</p>
-                </div>
-                <div class="stat-card">
                     <p class="stat-value" id="stat-blocked-honeypot" style="color:#d35400">–</p>
                     <p class="stat-label">🍯 Honeypot</p>
                     <p class="stat-sub">Honeypot trap hits</p>
@@ -381,21 +376,19 @@
 
             <!-- Unified Activity Feed -->
             <div class="obs-feed-panel" style="margin-top:1.5rem;">
-                <div class="obs-feed-header">
-                    <h5>Live Activity</h5>
-                    <div class="feed-toggles">
-                        <button type="button" class="feed-pill active" id="pill-requests" data-feed-type="requests">🟢 Requests</button>
-                        <button type="button" class="feed-pill active" id="pill-errors" data-feed-type="errors">🔴 Errors</button>
-                        <button type="button" class="feed-pill active" id="pill-blocked" data-feed-type="blocked">🟠 Blocked</button>
+                <div class="obs-feed-header" style="gap:0.75rem;flex-wrap:wrap;">
+                    <h5 style="margin:0;">Live Activity</h5>
+                    <div class="feed-toggles" style="flex:1 0 auto;">
+                        <a href="#" class="feed-link active" id="pill-requests" data-feed-type="requests">Requests</a>
+                        <a href="#" class="feed-link active" id="pill-errors" data-feed-type="errors">Errors</a>
+                        <a href="#" class="feed-link active" id="pill-blocked" data-feed-type="blocked">Blocked</a>
                     </div>
-                </div>
-                <div style="padding:0.4rem 1rem;border-bottom:1px solid var(--pico-muted-border-color);text-align:right;">
                     <select id="system-log-filter" aria-label="Filter logs"
-                            style="width:auto;min-width:180px;margin:0;margin-bottom:0;padding:0.25rem 0.5rem;font-size:0.75rem;">
+                            style="width:auto;min-width:140px;margin:0;padding:0.2rem 0.4rem;font-size:0.72rem;line-height:1.4;">
                         <option value="">All connections</option>
                     </select>
                 </div>
-                <div class="obs-feed-body" id="activity-feed" style="max-height:520px;">
+                <div class="obs-feed-body" id="activity-feed" style="max-height:calc(100vh - 380px);min-height:300px;">
                     <div class="error-empty">No activity recorded</div>
                 </div>
             </div>
@@ -1048,6 +1041,11 @@
         document.getElementById('stat-3xx').textContent = '–';
         document.getElementById('stat-4xx').textContent = '–';
         document.getElementById('stat-5xx').textContent = '–';
+        document.getElementById('stat-blocked-total').textContent = '–';
+        document.getElementById('stat-blocked-honeypot').textContent = '–';
+        document.getElementById('stat-blocked-ua').textContent = '–';
+        document.getElementById('stat-blocked-country').textContent = '–';
+        document.getElementById('stat-blocked-ratelimit').textContent = '–';
     }
 
     function updateStatCards(m) {
@@ -1073,6 +1071,14 @@
         document.getElementById('stat-3xx').textContent = fmtNum(m.request_3xx_count);
         document.getElementById('stat-4xx').textContent = fmtNum(m.request_4xx_count);
         document.getElementById('stat-5xx').textContent = fmtNum(m.request_5xx_count);
+
+        // Threat defense cards — read from backend snapshot
+        var bbm = m.blocked_by_middleware || {};
+        document.getElementById('stat-blocked-total').textContent = fmtNum(m.blocked_total);
+        document.getElementById('stat-blocked-honeypot').textContent = fmtNum(bbm['honeypot'] || 0);
+        document.getElementById('stat-blocked-ua').textContent = fmtNum(bbm['ua-block'] || 0);
+        document.getElementById('stat-blocked-country').textContent = fmtNum(bbm['country-block'] || 0);
+        document.getElementById('stat-blocked-ratelimit').textContent = fmtNum(bbm['rate-limit'] || 0);
     }
 
     function resetChartHistory() {
@@ -1381,32 +1387,8 @@
     }
 
     // ---------- Block Defense Stats (dashboard cards) ----------
-    var blockStats = { total: 0, ips: {}, honeypot: 0, ua: 0, country: 0, ratelimit: 0, other: 0 };
-
-    function trackBlockEntry(e) {
-        blockStats.total++;
-        if (e.remote_address) blockStats.ips[e.remote_address] = true;
-        var mw = (e.blocking_middleware || '').toLowerCase();
-        if (mw.indexOf('honeypot') !== -1 || mw.indexOf('honey') !== -1) blockStats.honeypot++;
-        else if (mw.indexOf('useragent') !== -1 || mw.indexOf('ua') !== -1) blockStats.ua++;
-        else if (mw.indexOf('country') !== -1 || mw.indexOf('geo') !== -1) blockStats.country++;
-        else if (mw.indexOf('rate') !== -1 || mw.indexOf('limiter') !== -1) blockStats.ratelimit++;
-        else blockStats.other++;
-    }
-
-    function updateBlockStatCards() {
-        document.getElementById('stat-blocked-total').textContent = fmtNum(blockStats.total);
-        document.getElementById('stat-blocked-ips').textContent = fmtNum(Object.keys(blockStats.ips).length);
-        document.getElementById('stat-blocked-honeypot').textContent = fmtNum(blockStats.honeypot);
-        document.getElementById('stat-blocked-ua').textContent = fmtNum(blockStats.ua);
-        document.getElementById('stat-blocked-country').textContent = fmtNum(blockStats.country);
-        document.getElementById('stat-blocked-ratelimit').textContent = fmtNum(blockStats.ratelimit);
-    }
-
-    function resetBlockStats() {
-        blockStats = { total: 0, ips: {}, honeypot: 0, ua: 0, country: 0, ratelimit: 0, other: 0 };
-        updateBlockStatCards();
-    }
+    // Blocked counts are now read from the backend metrics snapshot
+    // (blocked_total & blocked_by_middleware map) inside updateStatCards().
 
     // ---------- Block Log Feed ----------
     var MAX_BLOCK_ENTRIES = 50;
@@ -1460,8 +1442,6 @@
     function addBlockToFeed(entry) {
         blockEntries.unshift(entry);
         if (blockEntries.length > MAX_BLOCK_ENTRIES) blockEntries.pop();
-        trackBlockEntry(entry);
-        updateBlockStatCards();
         if (!matchesConnectionFilter(entry.connection_name, blockLogFilter)) return;
         var el = document.getElementById('block-feed');
         var empty = el.querySelector('.error-empty');
@@ -1500,8 +1480,6 @@
                 if (entries && entries.length) {
                     blockEntries = entries.slice(0, MAX_BLOCK_ENTRIES);
                     renderBlockFeed();
-                    entries.forEach(function(e) { trackBlockEntry(e); });
-                    updateBlockStatCards();
                     entries.slice(0, MAX_BLOCK_ENTRIES).forEach(function(e) {
                         activityEntries.push({type:'blocked', ts:new Date(e.timestamp), entry:e});
                     });
@@ -1531,6 +1509,23 @@
         }
     }
 
+    var activityFeedHeader = '<div class="activity-entry activity-header">' +
+        '<span class="activity-badge"></span>' +
+        '<span class="act-time">Time</span>' +
+        '<span class="act-remote">Address</span>' +
+        '<span class="act-method">Method</span>' +
+        '<span class="act-status">Code</span>' +
+        '<span class="act-latency">Latency</span>' +
+        '<span class="act-path">Path</span>' +
+        '<span class="act-reason">Reason</span>' +
+        '</div>';
+
+    function ensureActivityFeedHeader(el) {
+        if (!el.querySelector('.activity-header')) {
+            el.insertAdjacentHTML('afterbegin', activityFeedHeader);
+        }
+    }
+
     function fmtActivityTime(ts) {
         var d = new Date(ts);
         return d.getHours().toString().padStart(2,'0') + ':' +
@@ -1548,31 +1543,36 @@
         if (item.type === 'request') {
             var sc = e.status_code || 0;
             var scClass = sc >= 500 ? 's5xx' : sc >= 400 ? 's4xx' : sc >= 300 ? 's3xx' : 's2xx';
-            var detail = (e.latency_ms || 0) + ' ms';
             row.innerHTML = activityBadge('request') +
                 '<span class="act-time">' + time + '</span>' +
                 '<span class="act-remote">' + (e.remote_address || '–') + '</span>' +
                 '<span class="act-method">' + (e.method || '?') + '</span>' +
-                '<span class="act-path" title="' + (e.path||'').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
                 '<span class="act-status ' + scClass + '">' + (sc || '–') + '</span>' +
-                '<span class="act-detail">' + detail + '</span>';
+                '<span class="act-latency">' + (e.latency_ms || 0) + ' ms</span>' +
+                '<span class="act-path" title="' + (e.path||'').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
+                '<span class="act-reason"></span>';
         } else if (item.type === 'error') {
             row.innerHTML = activityBadge('error') +
                 '<span class="act-time">' + time + '</span>' +
                 '<span class="act-remote">' + (e.remote_address || '–') + '</span>' +
                 '<span class="act-method">' + (e.method || '?') + '</span>' +
-                '<span class="act-path" title="' + (e.path||'').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
                 '<span class="act-status s5xx">' + (e.status_code || '5xx') + '</span>' +
-                '<span class="act-detail">' + (e.latency_ms || 0) + ' ms</span>';
+                '<span class="act-latency">' + (e.latency_ms || 0) + ' ms</span>' +
+                '<span class="act-path" title="' + (e.path||'').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
+                '<span class="act-reason"></span>';
         } else if (item.type === 'blocked') {
             var icon = blockMwIcon(e.blocking_middleware);
+            var mwLabel = e.blocking_middleware || '?';
+            var reason = e.block_reason || '';
+            var fullDetail = mwLabel + (reason ? ': ' + reason : '');
             row.innerHTML = activityBadge('blocked') +
                 '<span class="act-time">' + time + '</span>' +
                 '<span class="act-remote">' + (e.remote_address || '–') + '</span>' +
                 '<span class="act-method">' + (e.method || '?') + '</span>' +
-                '<span class="act-path" title="' + (e.path||'').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
                 '<span class="act-status" style="color:#e67e22;">' + icon + '</span>' +
-                '<span class="act-detail" title="' + (e.block_reason||'').replace(/"/g,'&quot;') + '">' + (e.blocking_middleware || '?') + (e.block_reason ? ': ' + e.block_reason : '') + '</span>';
+                '<span class="act-latency"></span>' +
+                '<span class="act-path" title="' + (e.path||'').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
+                '<span class="act-reason" title="' + fullDetail.replace(/"/g,'&quot;') + '">' + fullDetail + '</span>';
         }
         return row;
     }
@@ -1591,15 +1591,14 @@
         var el = document.getElementById('activity-feed');
         var empty = el.querySelector('.error-empty');
         if (empty) empty.remove();
+        ensureActivityFeedHeader(el);
 
+        var header = el.querySelector('.activity-header');
         var row = buildActivityRow({type: type, ts: ts, entry: entry});
-        if (el.firstChild) {
-            el.insertBefore(row, el.firstChild);
-        } else {
-            el.appendChild(row);
-        }
-        // Trim excess
-        while (el.children.length > MAX_ACTIVITY_ENTRIES) {
+        header.insertAdjacentElement('afterend', row);
+
+        // Trim excess (children beyond header + MAX_ACTIVITY_ENTRIES)
+        while (el.children.length > MAX_ACTIVITY_ENTRIES + 1) {
             el.removeChild(el.lastElementChild);
         }
     }
@@ -1616,15 +1615,16 @@
             el.innerHTML = '<div class="error-empty">No activity recorded</div>';
             return;
         }
-        el.innerHTML = '';
+        el.innerHTML = activityFeedHeader;
         filtered.forEach(function(item) {
             el.appendChild(buildActivityRow(item));
         });
     }
 
-    // Wire up filter pill toggles
-    document.querySelectorAll('.feed-pill').forEach(function(pill) {
-        pill.addEventListener('click', function() {
+    // Wire up filter link toggles
+    document.querySelectorAll('.feed-link').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
             this.classList.toggle('active');
             var type = this.getAttribute('data-feed-type');
             if (type === 'requests') feedShowRequests = this.classList.contains('active');

@@ -39,8 +39,8 @@ func (w *responseWriterWithMetrics) Write(b []byte) (int, error) {
 		w.wroteHeader = true
 		if w.reqMetrics.StatusCode == 0 {
 			w.reqMetrics.StatusCode = 200
+			w.reqMetrics.Is2xxResponse = true
 		}
-		w.reqMetrics.Is2xxResponse = true
 	}
 	return n, err
 }

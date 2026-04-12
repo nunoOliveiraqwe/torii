@@ -375,6 +375,8 @@
             margin-left: 240px;
             padding: 2rem;
             min-width: 0;
+            height: 100vh;
+            overflow-y: auto;
         }
         .app-main > .main-header {
             display: flex;
@@ -772,12 +774,13 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.75rem 1rem;
+            padding: 0.5rem 1rem;
             border-bottom: 1px solid var(--pico-muted-border-color);
         }
         .obs-feed-header h5 {
             margin: 0;
             font-size: 0.85rem;
+            line-height: 1;
         }
         .obs-feed-header select {
             width: auto;
@@ -791,109 +794,109 @@
             overflow-y: auto;
         }
 
-        /* Unified activity feed */
+        /* Unified activity feed — CSS grid for perfect column alignment */
         .activity-entry {
-            display: flex;
+            display: grid;
+            grid-template-columns: 20px 60px 120px 56px 40px 64px 3fr 2fr;
             align-items: baseline;
-            gap: 0.5rem;
-            padding: 0.35rem 0.6rem;
+            column-gap: 0.75rem;
+            padding: 0.35rem 0.75rem;
             font-size: 0.76rem;
             border-bottom: 1px solid rgba(255,255,255,0.04);
             animation: fadeIn 0.2s ease-out;
         }
-        .activity-entry:hover { background: rgba(124,110,240,0.04); }
+        .activity-entry:nth-child(even) { background: rgba(255,255,255,0.015); }
+        .activity-entry:hover { background: rgba(124,110,240,0.06); }
+        .activity-header, .activity-header:hover {
+            font-weight: 600;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--pico-muted-color);
+            background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            animation: none;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            padding: 0.45rem 0.75rem;
+        }
         .activity-badge {
-            flex: 0 0 20px;
             font-size: 0.7rem;
             text-align: center;
         }
         .activity-entry .act-time {
-            flex: 0 0 55px;
-            font-size: 0.66rem;
+            font-size: 0.68rem;
             color: var(--pico-muted-color);
             white-space: nowrap;
         }
         .activity-entry .act-remote {
-            flex: 0 0 105px;
-            font-size: 0.66rem;
+            font-size: 0.68rem;
             color: var(--pico-muted-color);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .activity-entry .act-method {
-            flex: 0 0 42px;
             font-weight: 600;
             white-space: nowrap;
         }
+        .activity-entry .act-status {
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .activity-entry .act-latency {
+            font-size: 0.68rem;
+            color: var(--pico-muted-color);
+            white-space: nowrap;
+        }
         .activity-entry .act-path {
-            flex: 1 1 0;
             color: var(--pico-muted-color);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
             min-width: 0;
         }
-        .activity-entry .act-status {
-            flex: 0 0 32px;
-            font-weight: 700;
+        .activity-entry .act-reason {
+            min-width: 0;
+            font-size: 0.68rem;
+            color: #e67e22;
             white-space: nowrap;
-        }
-        .activity-entry .act-detail {
-            flex: 0 0 auto;
-            font-size: 0.66rem;
-            color: var(--pico-muted-color);
-            white-space: nowrap;
-            max-width: 180px;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        /* Feed toggle pills */
+        .activity-header .act-reason {
+            color: var(--pico-muted-color);
+        }
         .feed-toggles {
             display: flex;
-            gap: 0.3rem;
+            gap: 0.75rem;
             align-items: center;
         }
-        .feed-pill {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.25rem;
-            padding: 0.35rem 0.75rem;
-            font-size: 0.73rem;
+        .feed-link {
+            font-size: 0.75rem;
             font-weight: 500;
-            border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 1rem;
-            background: transparent;
-            color: rgba(255,255,255,0.35);
+            color: rgba(255,255,255,0.3);
+            text-decoration: none;
             cursor: pointer;
-            transition: all 0.15s;
+            transition: color 0.15s;
             white-space: nowrap;
-            box-sizing: border-box;
         }
-        .feed-pill:hover {
-            border-color: rgba(255,255,255,0.25);
+        .feed-link:hover {
             color: rgba(255,255,255,0.6);
         }
-        .feed-pill.active {
-            border-color: rgba(255,255,255,0.25);
-            background: rgba(255,255,255,0.08);
-            color: rgba(255,255,255,0.9);
+        .feed-link.active {
+            color: rgba(255,255,255,0.85);
+            font-weight: 600;
         }
-        .feed-pill[data-feed-type="requests"].active {
-            border-color: rgba(46,204,113,0.4);
-            background: rgba(46,204,113,0.1);
+        .feed-link[data-feed-type="requests"].active {
             color: #2ecc71;
         }
-        .feed-pill[data-feed-type="errors"].active {
-            border-color: rgba(231,76,60,0.4);
-            background: rgba(231,76,60,0.1);
+        .feed-link[data-feed-type="errors"].active {
             color: #e74c3c;
         }
-        .feed-pill[data-feed-type="blocked"].active {
-            border-color: rgba(230,126,34,0.4);
-            background: rgba(230,126,34,0.1);
+        .feed-link[data-feed-type="blocked"].active {
             color: #e67e22;
         }
         .obs-right-stack .obs-feed-body {
