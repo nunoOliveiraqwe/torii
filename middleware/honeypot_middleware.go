@@ -8,6 +8,7 @@ import (
 
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
+	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/middleware/honeypot"
 	"go.uber.org/zap"
 )
@@ -43,7 +44,7 @@ func HoneyPotMiddleware(_ context.Context, next http.HandlerFunc, conf Config) h
 		}
 	}
 
-	server, err := honeypot.NewHoneyPotServer(h)
+	honeyServer, err := honeypot.NewHoneyPotServer(h)
 	if err != nil {
 		zap.S().Errorf("HoneyPotMiddleware failed to initialize configuration: %v. Failing closed.", err)
 		return func(writer http.ResponseWriter, request *http.Request) {
@@ -67,25 +68,27 @@ func HoneyPotMiddleware(_ context.Context, next http.HandlerFunc, conf Config) h
 			return
 		}
 
-		isHoneyPotted := server.IsHoneyPottedIp(addr.String())
+		isHoneyPotted := honeyServer.IsHoneyPottedIp(addr.String())
 
 		logger.Debug("HoneyPotMiddleware: checking request against honeypot paths", zap.String("path", r.URL.Path), zap.Bool("is_honeypotted", isHoneyPotted))
 
 		if isHoneyPotted {
 			logger.Warn("HoneyPotMiddleware: blocked request from cached IP", zap.String("clientIp", clientIP))
-			server.Serve(w, r, logger)
+			metrics.CreateAndAddBlockInfo(r, "honeypot", "cached honeypot IP")
+			honeyServer.Serve(w, r, logger)
 			return
 		}
 
 		logger.Debug("HoneyPotMiddleware: checking if request path is a honeypot path", zap.String("path", r.URL.Path), zap.Bool("is_honeypot_path", isHoneyPotted))
-		isHoneyPath := server.IsHoneyPotPath(r.URL.Path)
+		isHoneyPath := honeyServer.IsHoneyPotPath(r.URL.Path)
 
 		if isHoneyPath {
 			logger.Warn("HoneyPotMiddleware: detected honeypot path access, caching IP",
 				zap.String("clientIp", clientIP), zap.String("path", r.URL.Path))
 
-			server.AddIpToHoneyPot(addr.String())
-			server.Serve(w, r, logger)
+			honeyServer.AddIpToHoneyPot(addr.String())
+			metrics.CreateAndAddBlockInfo(r, "honeypot", fmt.Sprintf("honeypot path: %s", r.URL.Path))
+			honeyServer.Serve(w, r, logger)
 			return
 		}
 
