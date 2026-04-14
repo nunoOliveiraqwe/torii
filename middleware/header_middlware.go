@@ -54,10 +54,15 @@ func (hw *headersWriter) WriteHeader(code int) {
 	hw.w.WriteHeader(code)
 }
 
+func (hw *headersWriter) Flush() {
+	if f, ok := hw.w.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 func (hw *headersWriter) Unwrap() http.ResponseWriter {
 	return hw.w
 }
-
 
 func (h *headersConfig) applySetRequestHeaders(r *http.Request) {
 	for key, val := range h.setHeadersReq {

@@ -46,6 +46,11 @@ func (w *responseWriterWithMetrics) Write(b []byte) (int, error) {
 	return n, err
 }
 
+func (w *responseWriterWithMetrics) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
 
 func (w *responseWriterWithMetrics) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter

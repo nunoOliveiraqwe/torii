@@ -36,6 +36,11 @@ func (cbw *circuitBreakerResponseWriter) WriteHeader(statusCode int) {
 	cbw.ResponseWriter.WriteHeader(statusCode)
 }
 
+func (cbw *circuitBreakerResponseWriter) Flush() {
+	if f, ok := cbw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
 
 func (cbw *circuitBreakerResponseWriter) Unwrap() http.ResponseWriter {
 	return cbw.ResponseWriter
