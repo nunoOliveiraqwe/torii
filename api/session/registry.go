@@ -59,8 +59,7 @@ func (reg *Registry) NewSession(r *http.Request, w http.ResponseWriter, username
 }
 
 func (reg *Registry) HasValidSession(r *http.Request) bool {
-	token := reg.manager.Token(r.Context())
-	return token != ""
+	return reg.manager.GetString(r.Context(), "username") != ""
 }
 
 func (reg *Registry) LogoutSession(w http.ResponseWriter, r *http.Request) {

@@ -199,6 +199,17 @@ func newTestFixture(t *testing.T) *testFixture {
 
 	mus := new(mockUserStore)
 	mscs := new(mockSysConfigStore)
+
+	// NewServiceStore calls GetSystemConfiguration() once at init to fetch
+	// the HMAC secret. Use .Once() so this expectation is consumed during
+	// setup. Tests can then register their own GetSystemConfiguration mocks
+	// for handler-level calls without conflicting.
+	mscs.On("GetSystemConfiguration").
+		Return(&domain.SystemConfiguration{
+			ID:                        1,
+			IsFirstTimeSetupConcluded: true,
+			ApiKeyHmacSecret:          []byte("test-hmac-secret-32-bytes-long!!"),
+		}, nil).Once()
 	mrs := new(mockRoleStore)
 	mpms := new(mockProxyMetricsStore)
 

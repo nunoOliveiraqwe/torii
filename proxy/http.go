@@ -73,9 +73,9 @@ func (m *ToriiHttpServer) start(_ *acme.LegoAcmeManager) error {
 		WriteTimeout:      m.writeTimeout,
 		IdleTimeout:       m.idleTimeout,
 	}
+	m.isStarted.Store(true)
 	for _, listener := range listeners {
 		go func(ln net.Listener) {
-			m.isStarted.Store(true)
 			if err := m.httpServer.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				zap.S().Errorf("HTTP server error: %v", err)
 				if err := ln.Close(); err != nil {
@@ -92,8 +92,11 @@ func (m *ToriiHttpServer) stop() error {
 	if m.httpServer == nil {
 		return nil
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	err := m.httpServer.Shutdown(ctx)
 	m.isStarted.Store(false)
-	return m.httpServer.Shutdown(context.Background())
+	return err
 }
 
 func (m *ToriiHttpServer) getHandler() http.Handler {

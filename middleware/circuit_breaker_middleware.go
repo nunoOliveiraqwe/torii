@@ -36,6 +36,11 @@ func (cbw *circuitBreakerResponseWriter) WriteHeader(statusCode int) {
 	cbw.ResponseWriter.WriteHeader(statusCode)
 }
 
+
+func (cbw *circuitBreakerResponseWriter) Unwrap() http.ResponseWriter {
+	return cbw.ResponseWriter
+}
+
 func CircuitBreakerMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	opts, err := parseCircuitBreakerConfig(conf)
 	if err != nil {

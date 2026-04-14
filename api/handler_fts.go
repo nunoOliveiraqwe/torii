@@ -3,11 +3,17 @@ package api
 import (
 	"errors"
 	"net/http"
+	"sync"
 
 	"github.com/nunoOliveiraqwe/torii/internal/app"
 	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
+
+// ftsLock serialises first-time-setup completion so that concurrent
+// requests cannot both pass the "is FTS done?" guard and race to set
+// the admin password.
+var ftsLock sync.Mutex
 
 func handleGetFtsStatus(systemService app.SystemService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -33,6 +39,18 @@ func handleCompleteFts(systemService app.SystemService) http.HandlerFunc {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
+
+		ftsLock.Lock()
+		defer ftsLock.Unlock()
+
+		// Re-check under the lock: another request may have completed FTS
+		// while this one was waiting.
+		if systemService.GetServiceStore().GetSystemConfigurationService().IsFirstTimeSetupCompleted() {
+			logger.Warn("FTS already completed, rejecting duplicate request")
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
 		logger.Info("Received FTS completion request, setting admin user password")
 		err = systemService.GetServiceStore().GetUserService().
 			SetPasswordForUser(f.Password, "admin")
@@ -56,7 +74,6 @@ func handleCompleteFts(systemService app.SystemService) http.HandlerFunc {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		handleLogin(systemService).ServeHTTP(w, r)
 		logger.Info("FTS completed successfully")
 	}
 }

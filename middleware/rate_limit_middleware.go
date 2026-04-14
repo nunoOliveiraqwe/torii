@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
@@ -40,7 +39,6 @@ type clientEntry struct {
 }
 
 type perClientLimiter struct {
-	mu            sync.RWMutex
 	clientCache   *util.Cache[*clientEntry]
 	ratePerSecond float64
 	burst         int

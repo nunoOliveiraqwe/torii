@@ -84,11 +84,11 @@ func (m *ToriiHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
 			return fmt.Errorf("ACME is enabled but no ACME manager is configured")
 		}
 		m.httpServer.TLSConfig = acmeManager.GetTLSConfig()
+		m.isStarted.Store(true)
 		for _, listener := range listeners {
 			tlsListener := tls.NewListener(listener, m.httpServer.TLSConfig)
 			go func(ln net.Listener) {
 				zap.S().Infof("Starting ACME HTTPS server on %d, ipv4 = %s, ipv6 = %s", m.bindPort, m.iPV4BindInterface, m.iPV6BindInterface)
-				m.isStarted.Store(true)
 				if err := m.httpServer.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 					zap.S().Errorf("Error serving ACME HTTPS server: %v", err)
 				}
@@ -101,10 +101,10 @@ func (m *ToriiHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
 		m.httpServer.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12,
 		}
+		m.isStarted.Store(true)
 		for _, listener := range listeners {
 			go func(ln net.Listener) {
 				zap.S().Infof("Starting HTTPS server on %d, ipv4 = %s, ipv6 = %s", m.bindPort, m.iPV4BindInterface, m.iPV6BindInterface)
-				m.isStarted.Store(true)
 				if err := m.httpServer.ServeTLS(ln, m.certFilepath, m.keyFilePath); err != nil && !errors.Is(err, http.ErrServerClosed) {
 					zap.S().Errorf("Error serving HTTPS server: %v", err)
 				}
@@ -116,12 +116,15 @@ func (m *ToriiHttpsServer) start(acmeManager *acme.LegoAcmeManager) error {
 }
 
 func (m *ToriiHttpsServer) stop() error {
-	zap.S().Infof("Stopping HTTP server")
+	zap.S().Infof("Stopping HTTPS server")
 	if m.httpServer == nil {
 		return nil
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	err := m.httpServer.Shutdown(ctx)
 	m.isStarted.Store(false)
-	return m.httpServer.Shutdown(context.Background())
+	return err
 }
 
 func (m *ToriiHttpsServer) getHandler() http.Handler {

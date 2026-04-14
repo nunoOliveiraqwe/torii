@@ -58,7 +58,6 @@ func WriteResponseAsJSON(data interface{}, w http.ResponseWriter) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
 func EncodeToJson(data interface{}) ([]byte, error) {

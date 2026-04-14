@@ -23,6 +23,7 @@ type ApplicationRoute struct {
 	IsAllowedBeforeFts bool
 	IsAllowedAfterFts  bool
 	IsSecure           bool
+	IsRateLimited      bool
 	KeyAuth            KeyAuth
 	HandlerFunc        ApplicationHandlerFunc
 }
@@ -67,6 +68,7 @@ var routes = []ApplicationRoute{
 		IsAllowedBeforeFts: false,
 		IsAllowedAfterFts:  true,
 		IsSecure:           false,
+		IsRateLimited:      true,
 		HandlerFunc:        handleLogin,
 	},
 	{

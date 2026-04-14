@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/api"
@@ -42,7 +43,6 @@ func (a *Application) LoadConfiguration() error {
 	}
 	a.appConfig = conf
 	a.applyFlagOverrides()
-	zap.S().Infof("Configuration loaded from %s", a.flags.ConfigPath)
 	return nil
 }
 
@@ -78,9 +78,15 @@ func (a *Application) Start() error {
 	}
 
 	a.apiServer = api.StartServer(a.appConfig.APIServer, a.service)
+
+	ln, err := net.Listen("tcp", a.apiServer.Addr)
+	if err != nil {
+		return fmt.Errorf("failed to bind API server on %s: %w", a.apiServer.Addr, err)
+	}
+	zap.S().Infof("API server listening on %s", a.apiServer.Addr)
+
 	go func() {
-		zap.S().Infof("Starting API server on %s", a.apiServer.Addr)
-		if err := a.apiServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := a.apiServer.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			zap.S().Fatalf("API server failed: %v", err)
 		}
 	}()

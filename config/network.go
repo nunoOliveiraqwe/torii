@@ -10,7 +10,7 @@ type IpFlag byte
 
 const (
 	Ipv4Flag IpFlag = 1 << iota
-	Ipv6Flag IpFlag = 2
+	Ipv6Flag IpFlag = Ipv4Flag << 1
 	BothFlag IpFlag = Ipv4Flag | Ipv6Flag
 )
 

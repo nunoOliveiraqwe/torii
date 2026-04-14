@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-acme/lego/v4/log"
 	"github.com/nunoOliveiraqwe/torii"
 	"go.uber.org/zap"
 )
@@ -35,7 +36,8 @@ func main() {
 	app.ParseFlags()
 
 	if err := app.LoadConfiguration(); err != nil {
-		fmt.Print(fmt.Errorf("failed to load configuration: %v", err))
+		log.Fatalf("failed to load configuration: %v", err)
+		os.Exit(1)
 	}
 	app.InitLogger()
 

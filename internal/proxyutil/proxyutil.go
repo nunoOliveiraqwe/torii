@@ -2,12 +2,29 @@ package proxyutil
 
 import (
 	"fmt"
+	"net"
+	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 )
+
+// sharedTransport is a custom transport with sensible connection pool settings
+// for reverse proxying. The stdlib default has MaxIdleConnsPerHost=2 which
+// causes constant connection churn under any real concurrency.
+var sharedTransport = &http.Transport{
+	MaxIdleConns:        200,
+	MaxIdleConnsPerHost: 100,
+	IdleConnTimeout:     90 * time.Second,
+	DialContext: (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext,
+	TLSHandshakeTimeout: 10 * time.Second,
+}
 
 type ProxyOptions struct {
 	DropPath  bool
@@ -25,7 +42,12 @@ func NewReverseProxy(backend string, opts ProxyOptions) (*httputil.ReverseProxy,
 		return nil, fmt.Errorf("failed to parse proxy URL: %w", err)
 	}
 	proxy := &httputil.ReverseProxy{
-		Rewrite: rewriteFunc(parsedUrl, opts),
+		Rewrite:   rewriteFunc(parsedUrl, opts),
+		Transport: sharedTransport,
+		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+			zap.S().Errorf("proxy error: backend=%s path=%s err=%v", parsedUrl.Host, r.URL.Path, err)
+			w.WriteHeader(http.StatusBadGateway)
+		},
 	}
 	return proxy, nil
 }

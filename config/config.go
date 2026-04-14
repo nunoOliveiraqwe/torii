@@ -90,7 +90,7 @@ func DefaultConfiguration() AppConfig {
 			Lifetime:        16 * time.Hour,
 			IdleTimeout:     60 * time.Minute,
 			CleanupInterval: 1 * time.Hour,
-			CookieSecure:    true,
+			CookieSecure:    false,
 			CookieHttpOnly:  true,
 			CookieSameSite:  "lax",
 		},

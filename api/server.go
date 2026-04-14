@@ -9,6 +9,7 @@ import (
 
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/app"
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
@@ -37,16 +38,27 @@ func StartServer(conf config.APIServerConfig, systemService app.SystemService) *
 func buildMux(port int, svc app.SystemService) *http.ServeMux {
 	zap.S().Debugf("Building http mux for proxy API")
 	mux := http.NewServeMux()
+
+	ctx := context.WithValue(context.Background(), ctxkeys.Port, strconv.Itoa(port))
+	ctx = context.WithValue(ctx, ctxkeys.MetricsMgr, svc.GetGlobalMetricsManager())
+	ctx = context.WithValue(ctx, ctxkeys.ServerID, fmt.Sprintf("http-%d", port))
+
+	globalHandler := mux.ServeHTTP
+
+	globalHandler = middleware.MetricsMiddleware(ctx, globalHandler, middleware.Config{})
+	globalHandler = middleware.BodySizeLimitMiddleware(ctx, globalHandler, middleware.Config{
+		Options: map[string]interface{}{"max-size": "20m"},
+	})
+	globalHandler = middleware.RequestLoggerMiddleware(ctx, globalHandler, middleware.Config{})
+	globalHandler = middleware.RequestIDMiddleware(ctx, globalHandler, middleware.Config{})
+
 	for _, route := range routes {
 		zap.S().Debugf("Initializing route named %s with path %s", route.Name, route.Pattern)
 		fullPathWithMethod := fmt.Sprintf("%s %s%s", route.Method, APPLICATION_ROUTE_BASE_PATH, route.Pattern)
 		zap.S().Debugf("Full path for route %s is %s", route.Name, fullPathWithMethod)
+
 		routeHandlerFunc := route.HandlerFunc(svc)
 
-		ctx := context.WithValue(context.Background(), "port", strconv.Itoa(port))
-		//ctx = context.WithValue(ctx, "path", route.Pattern)
-		ctx = context.WithValue(ctx, middleware.MgrKey, svc.GetGlobalMetricsManager())
-		ctx = context.WithValue(ctx, "serverId", fmt.Sprintf("http-%d", port))
 		if route.IsSecure {
 			if len(route.KeyAuth.Scopes) > 0 {
 				routeHandlerFunc = isAuthenticatedBySessionOrApiKey(routeHandlerFunc, route.KeyAuth.Scopes, svc)
@@ -55,9 +67,25 @@ func buildMux(port int, svc app.SystemService) *http.ServeMux {
 			}
 		}
 		routeHandlerFunc = checkIfRouteIsAllowedIfFtsIsNotDone(routeHandlerFunc, route.IsAllowedBeforeFts, route.IsAllowedAfterFts, svc)
-		routeHandlerFunc = middleware.MetricsMiddleware(ctx, routeHandlerFunc, middleware.Config{})
-		//routeHandlerFunc = middleware.RequestLoggerMiddleware(ctx, routeHandlerFunc, middleware.Config{}) TODO -> decide if i want this, it can be noisy, but maybe it's worth it for debugging. maybe only enable if debug is enabled?
-		//routeHandlerFunc = middleware.RequestIDMiddleware(ctx, routeHandlerFunc, middleware.Config{})
+		if route.IsRateLimited {
+			limiterReq := map[string]interface{}{
+				"rate-per-second": 10.0,
+				"burst":           15,
+			}
+			optMap := map[string]interface{}{
+				"mode":        "per-client",
+				"limiter-req": limiterReq,
+				"cache-ttl":   "72h", //we really want the limiter to not refresh/be recreated,
+				// however, for clients that connect, send a shit burst, then disconnect, we effectively hold up memory for assholes
+				// and wasting resources for assholes is kinda bad, so like everything in life, we compromise
+				"cleanup-interval": "6h",
+				"max-cache-size":   100000,
+			}
+			conf := middleware.Config{
+				Options: optMap,
+			}
+			routeHandlerFunc = middleware.RateLimitMiddleware(ctx, routeHandlerFunc, conf)
+		}
 		mux.HandleFunc(fullPathWithMethod, routeHandlerFunc)
 		zap.S().Debugf("Route %s initialized", route.Name)
 	}
@@ -65,5 +93,7 @@ func buildMux(port int, svc app.SystemService) *http.ServeMux {
 	zap.S().Debugf("Registering UI routes")
 	registerUIRoutes(mux, svc)
 
-	return mux
+	wrappedMux := http.NewServeMux()
+	wrappedMux.HandleFunc("/", globalHandler)
+	return wrappedMux
 }

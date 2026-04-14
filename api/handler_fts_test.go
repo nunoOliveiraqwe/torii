@@ -98,10 +98,8 @@ func TestHandleCompleteFts_Success(t *testing.T) {
 	handler := handleCompleteFts(f.svc)
 	rec := serveWithSession(f, handler, req)
 
-	// NOTE: The handler calls handleLogin at the end which tries to re-read
-	// the already-consumed request body, so the auto-login portion fails with
-	// 401. The FTS itself completed successfully (verified via store assertions).
-	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	// FTS completed successfully — password set + system config updated.
+	assert.Equal(t, http.StatusOK, rec.Code)
 	f.userStore.AssertExpectations(t)
 	f.sysConfigStore.AssertExpectations(t)
 }
@@ -122,6 +120,11 @@ func TestHandleCompleteFts_WeakPassword(t *testing.T) {
 	// "short" does not meet password rules
 	body := CompleteFtsRequest{Password: "short"}
 
+	// The handler re-checks FTS status under the lock before attempting
+	// to set the password — mock that call so it returns "not completed".
+	f.sysConfigStore.On("GetSystemConfiguration").
+		Return(&domain.SystemConfiguration{ID: 1, IsFirstTimeSetupConcluded: false}, nil)
+
 	// The validator runs before touching the store for UpdateUser, but
 	// SetPasswordForUser first generates a salt, then validates.
 	// The GetUserByUsername is called to fetch the user before update.
@@ -140,6 +143,9 @@ func TestHandleCompleteFts_WeakPassword(t *testing.T) {
 func TestHandleCompleteFts_SetPasswordDBError(t *testing.T) {
 	f := newTestFixture(t)
 	password := "NewAdmin1!"
+
+	f.sysConfigStore.On("GetSystemConfiguration").
+		Return(&domain.SystemConfiguration{ID: 1, IsFirstTimeSetupConcluded: false}, nil)
 
 	f.userStore.On("GetUserByUsername", mock.Anything, "admin").
 		Return(nil, errors.New("db error"))
@@ -163,9 +169,13 @@ func TestHandleCompleteFts_CompleteFtsDBError(t *testing.T) {
 	f.userStore.On("UpdateUser", mock.Anything, mock.AnythingOfType("*domain.User")).
 		Return(nil)
 
-	// CompleteFistTimeSetup fails
+	// CompleteFistTimeSetup fails — first call is the re-check under the
+	// lock (must succeed so the handler proceeds), second call is the
+	// actual CompleteFistTimeSetup which fails.
 	f.sysConfigStore.On("GetSystemConfiguration").
-		Return(nil, errors.New("db error"))
+		Return(&domain.SystemConfiguration{ID: 1, IsFirstTimeSetupConcluded: false}, nil).Once()
+	f.sysConfigStore.On("GetSystemConfiguration").
+		Return(nil, errors.New("db error")).Once()
 
 	body := CompleteFtsRequest{Password: password}
 	req := newJSONRequest(t, http.MethodPost, "/api/v1/fts", body)
@@ -191,6 +201,9 @@ func TestHandleCompleteFts_PasswordRuleViolations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newTestFixture(t)
+
+			f.sysConfigStore.On("GetSystemConfiguration").
+				Return(&domain.SystemConfiguration{ID: 1, IsFirstTimeSetupConcluded: false}, nil)
 
 			f.userStore.On("GetUserByUsername", mock.Anything, "admin").
 				Return(&domain.User{ID: 1, Username: "admin", Password: ""}, nil).Maybe()

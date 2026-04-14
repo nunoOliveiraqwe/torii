@@ -58,6 +58,7 @@ func (hw *headersWriter) Unwrap() http.ResponseWriter {
 	return hw.w
 }
 
+
 func (h *headersConfig) applySetRequestHeaders(r *http.Request) {
 	for key, val := range h.setHeadersReq {
 		r.Header.Set(key, val)
@@ -227,6 +228,10 @@ func parseHeader(header, headerValue string) (string, string) {
 		}
 		//$file:
 		firstIndexOf := strings.Index(headerValue, ":")
+		if firstIndexOf < 0 {
+			zap.S().Errorf("Header resolver syntax invalid (missing ':'): %s", headerValue)
+			return "", ""
+		}
 		resolverKey := headerValue[1:firstIndexOf]
 		if resolverKey == "" {
 			zap.S().Error("Header resolver key cannot be empty")
