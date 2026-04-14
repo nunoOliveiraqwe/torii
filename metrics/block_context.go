@@ -3,9 +3,11 @@ package metrics
 import (
 	"context"
 	"net/http"
+
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 )
 
-var blockInfoContextKey = "block-info"
+var blockInfoContextKey = ctxkeys.BlockInfo
 
 type BlockInfo struct {
 	Middleware string

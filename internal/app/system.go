@@ -8,6 +8,7 @@ import (
 
 	"github.com/nunoOliveiraqwe/torii/api/session"
 	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
 	"github.com/nunoOliveiraqwe/torii/internal/store"
 	"github.com/nunoOliveiraqwe/torii/metrics"
@@ -159,6 +160,14 @@ func (sm *systemService) Stop() error {
 		return fmt.Errorf("failed to stop micro proxy: %w", err)
 	}
 	sm.globalMetricsManager.StopCollectingMetrics()
+
+	if sm.db != nil {
+		zap.S().Info("Closing database")
+		if err := sm.db.Close(); err != nil {
+			zap.S().Errorf("Failed to close database: %v", err)
+		}
+	}
+
 	zap.S().Info("System service stopped successfully")
 	return nil
 }
@@ -215,7 +224,7 @@ func (sm *systemService) DeleteProxy(port int) error {
 
 func (sm *systemService) AddHttpListener(conf config.HTTPListener) error {
 	zap.S().Infof("Adding HTTP listener on port %d", conf.Port)
-	ctx := context.WithValue(context.Background(), "metricsManager", sm.globalMetricsManager)
+	ctx := context.WithValue(context.Background(), ctxkeys.MetricsMgr, sm.globalMetricsManager)
 	if err := sm.micro.AddHttpServer(ctx, conf, nil); err != nil {
 		return fmt.Errorf("failed to add HTTP listener on port %d: %w", conf.Port, err)
 	}

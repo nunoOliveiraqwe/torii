@@ -8,7 +8,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const MgrKey = "metricsManager"
 
 type Func func(ctx context.Context, next http.HandlerFunc, middlewareConf Config) http.HandlerFunc
 

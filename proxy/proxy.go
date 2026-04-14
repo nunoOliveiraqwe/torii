@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy/acme"
 	"go.uber.org/zap"
@@ -38,13 +39,13 @@ func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager, 
 		metricsManager:     mgr,
 		acmeManager:        acmeMgr,
 	}
-	ctx := context.WithValue(context.Background(), "metricsManager", mgr)
+	ctx := context.WithValue(context.Background(), ctxkeys.MetricsMgr, mgr)
 	err := m.initializeHttpNetworkStackFromConf(ctx, conf)
 	if err != nil {
 		return nil, err
 	}
 	if acmeMgr != nil {
-		domains := m.collectWorkingDomains() //this is bugged. only do this for use-acme HTTPS servers
+		domains := m.collectWorkingDomains()
 		acmeMgr.SetDomains(domains)
 		acmeMgr.StartRenewalLoop()
 	}
@@ -250,6 +251,13 @@ func appendDomainsFromServers(servers map[int]MicroHttpServer, domains []string)
 			zap.S().Warnf("Found nil server, skipping")
 			continue
 		}
+
+		// Only collect domains from ACME-enabled HTTPS servers.
+		httpsServer, ok := server.(*ToriiHttpsServer)
+		if !ok || !httpsServer.useAcme {
+			continue
+		}
+
 		handler := server.getHandler()
 
 		if handler == nil {

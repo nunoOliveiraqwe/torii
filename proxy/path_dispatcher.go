@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/proxyutil"
 	"go.uber.org/zap"
 )
@@ -50,7 +51,7 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 		}
 
 		pattern := normalizePattern(rule.Pattern)
-		ctx2 := context.WithValue(ctx, "path", rule.Pattern)
+		ctx2 := context.WithValue(ctx, ctxkeys.Path, rule.Pattern)
 		handler, err := buildMiddlewareChain(ctx2, pathBaseHandler, rule.Middlewares)
 		if err != nil {
 			return nil, nil, nil, err

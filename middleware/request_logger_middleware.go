@@ -4,10 +4,11 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"go.uber.org/zap"
 )
 
-var logEntryContextKey = "logger"
+var logEntryContextKey = ctxkeys.Logger
 
 type zapLogFormatter struct {
 	logger *zap.Logger

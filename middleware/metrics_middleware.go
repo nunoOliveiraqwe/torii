@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"go.uber.org/zap"
 )
@@ -31,7 +32,7 @@ func (w *responseWriterWithMetrics) WriteHeader(statusCode int) {
 }
 
 func (w *responseWriterWithMetrics) Write(b []byte) (int, error) {
-	w.reqMetrics.BytesSent = int64(len(b))
+	w.reqMetrics.BytesSent += int64(len(b))
 	//htto/server.go writes the header when calling write
 	// if I write twice, i get a superfluous response.WriteHeader call log which annoys me to no end
 	n, err := w.ResponseWriter.Write(b)
@@ -45,11 +46,6 @@ func (w *responseWriterWithMetrics) Write(b []byte) (int, error) {
 	return n, err
 }
 
-func (w *responseWriterWithMetrics) Flush() {
-	if f, ok := w.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
-}
 
 func (w *responseWriterWithMetrics) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
@@ -74,7 +70,7 @@ func MetricsMiddleware(ctx context.Context, next http.HandlerFunc, _ Config) htt
 			metric.IsTimedOut = true
 		}
 		metric.LatencyMs = elapsedTime.Milliseconds()
-		countryCode := r.Context().Value("country-code")
+		countryCode := r.Context().Value(ctxkeys.CountryCode)
 		if countryCode != nil {
 			countryStr, ok := countryCode.(string)
 			if ok {
@@ -93,7 +89,7 @@ func MetricsMiddleware(ctx context.Context, next http.HandlerFunc, _ Config) htt
 }
 
 func resolveReportFunc(ctx context.Context) metrics.MetricsReportFunc {
-	port := ctx.Value("port")
+	port := ctx.Value(ctxkeys.Port)
 	if port == nil || port == "" {
 		zap.S().Warnf("Port not found in middleware options for metrics resolution")
 		return nil
@@ -108,7 +104,7 @@ func resolveReportFunc(ctx context.Context) metrics.MetricsReportFunc {
 		portStr = strconv.Itoa(port.(int))
 	}
 	hostStr := ""
-	host := ctx.Value("host")
+	host := ctx.Value(ctxkeys.Host)
 	if host != nil {
 		hostStr2, ok := host.(string)
 		if ok {
@@ -116,7 +112,7 @@ func resolveReportFunc(ctx context.Context) metrics.MetricsReportFunc {
 		}
 	}
 	pathStr := ""
-	path := ctx.Value("path")
+	path := ctx.Value(ctxkeys.Path)
 	if path != nil {
 		pathStr2, ok := path.(string)
 		if ok {
@@ -125,7 +121,7 @@ func resolveReportFunc(ctx context.Context) metrics.MetricsReportFunc {
 	}
 	conName := metrics.ProxyHostPathMetricsName(portStr, hostStr, pathStr)
 
-	mgrManager := ctx.Value(MgrKey)
+	mgrManager := ctx.Value(ctxkeys.MetricsMgr)
 	if mgrManager == nil {
 		zap.S().Warnf("Mgr not found in middleware options for metrics resolution")
 		return nil
@@ -136,7 +132,7 @@ func resolveReportFunc(ctx context.Context) metrics.MetricsReportFunc {
 		return nil
 	}
 	serverIdStr := ""
-	serverId := ctx.Value("serverId")
+	serverId := ctx.Value(ctxkeys.ServerID)
 	if serverId == nil {
 		zap.S().Warnf("ServerId not found in middleware options for metrics resolution")
 		return nil

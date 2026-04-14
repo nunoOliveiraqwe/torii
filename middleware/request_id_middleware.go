@@ -9,9 +9,11 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
+
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 )
 
-const requestIdContextKey = "requestID"
+var requestIdContextKey = ctxkeys.RequestID
 
 var requestIDCounter uint64
 

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/middleware"
 	"github.com/stretchr/testify/assert"
@@ -117,7 +118,7 @@ func newEchoBackend(t *testing.T) *httptest.Server {
 func createTestContext() context.Context {
 	mgr := metrics.NewGlobalMetricsHandler(1, context.Background())
 	mgr.StartCollectingMetrics()
-	return context.WithValue(context.Background(), "metricsManager", mgr)
+	return context.WithValue(context.Background(), ctxkeys.MetricsMgr, mgr)
 }
 
 // buildAndStart builds a proxy server, starts it, waits for readiness,

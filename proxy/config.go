@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"go.uber.org/zap"
 )
@@ -35,9 +36,10 @@ func buildHttpServer(ctx context.Context, conf config.HTTPListener, global *conf
 	if conf.Bind&config.Ipv6Flag != 0 && ipv6 == "" {
 		return nil, fmt.Errorf("IPv6 bind interface %s has no valid IPv6 address", conf.Interface)
 	}
-	ctx = context.WithValue(ctx, "port", conf.Port)
+	ctx = context.WithValue(ctx, ctxkeys.Port, conf.Port)
 	serverId := fmt.Sprintf("http-%d", conf.Port)
-	ctx = context.WithValue(ctx, "serverId", serverId)
+	ctx = context.WithValue(ctx, ctxkeys.ServerID, serverId)
+
 	hostHandler, mwNames, backends, routeSnapshots, err := buildHostDispatcher(ctx, conf.Default, conf.Routes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build host dispatcher: %w", err)

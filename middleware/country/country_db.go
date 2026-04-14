@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/oschwald/maxminddb-golang/v2"
@@ -192,8 +193,8 @@ func (c *Filter) IsFromAllowedCountry(logger *zap.Logger, r *http.Request, ip ne
 		}
 		return c.onUnknown
 	}
-	ctx := context.WithValue(r.Context(), "country-code", entry.countryCode)
-	ctx = context.WithValue(ctx, "continent-code", entry.continentCode)
+	ctx := context.WithValue(r.Context(), ctxkeys.CountryCode, entry.countryCode)
+	ctx = context.WithValue(ctx, ctxkeys.ContinentCode, entry.continentCode)
 	*r = *r.WithContext(ctx)
 
 	if !entry.IsAllowed {

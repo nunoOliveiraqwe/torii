@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/config"
+	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/proxyutil"
 	"go.uber.org/zap"
 )
@@ -20,7 +22,14 @@ type VirtualHostDispatcher struct {
 }
 
 func (d *VirtualHostDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if handler, ok := d.routes[r.Host]; ok {
+	// strip port from Host so that "example.com:443" matches a route
+	// keyed as "example.com". net.SplitHostPort fails when there is no
+	// port, in which case we fall back to the raw Host value.
+	host := r.Host
+	if h, _, err := net.SplitHostPort(r.Host); err == nil {
+		host = h
+	}
+	if handler, ok := d.routes[host]; ok {
 		handler.ServeHTTP(w, r)
 		return
 	}
@@ -47,7 +56,7 @@ func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget,
 			zap.S().Errorf("Route host cannot be empty, skipping")
 			continue
 		}
-		routeCtx := context.WithValue(ctx, "host", route.Host)
+		routeCtx := context.WithValue(ctx, ctxkeys.Host, route.Host)
 		handler, names, pathBackends, err := buildRouteHandler(routeCtx, route.Target)
 		if err != nil {
 			zap.S().Errorf("Failed to build handler for host %s: %v", route.Host, err)
@@ -62,7 +71,7 @@ func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget,
 	}
 
 	if defaultTarget != nil {
-		defaultCtx := context.WithValue(ctx, "host", "_default")
+		defaultCtx := context.WithValue(ctx, ctxkeys.Host, "_default")
 		handler, names, pathBackends, err := buildRouteHandler(defaultCtx, *defaultTarget)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed to build default route handler: %w", err)
