@@ -117,6 +117,7 @@ func (sm *systemService) SessionRegistry() *session.Registry {
 
 func (sm *systemService) GetSystemHealth() *SystemHealth {
 	var mem runtime.MemStats
+	runtime.CPUProfile()
 	runtime.ReadMemStats(&mem)
 	return &SystemHealth{
 		UptimeSeconds:  time.Since(sm.startTime).Seconds(),

@@ -18,13 +18,11 @@
 
 ## Why Torii?
 
-You're running services at home. Jellyfin, Immich, Home Assistant, whatever. You want to expose some of them to the internet, but you don't want to think about nginx configs, certbot cron jobs, or figuring out how to block an entire country from scanning your `.env` files at 3am.
+You're running services at home and you want to expose some of them to the internet without managing nginx configs, certbot cron jobs, or a monitoring stack with three dependencies just to see what's going on.
 
-Torii is a single binary that handles all of that. Point it at your backends, set up your routes in a YAML file or through the web UI, and it takes care of TLS certificates, rate limiting, bot detection, geo-blocking, and a bunch of other things that become important the moment you open a port to the world.
+Torii is a single binary that handles routing, TLS, rate limiting, bot defense, geo-blocking, and observability. No Docker required. No dependencies. Just the binary and a config file.
 
-I wanted observability first. I didn't want to manage an entire stack just to see what was going on with my home setup. No compose file with three or four dependencies just to watch traffic. No Grafana (it does a great job, but you still need to route your traffic to it, set up time spans, and keep the whole thing running). No ELK with the entire Beats suite on top. I just wanted to see what was happening, and the more complex the stack, the harder that gets. So the dashboard was the first thing built, before the proxy even forwarded a single request. The metrics go deep because of that.
-
-No Docker required. No dependencies. Just the binary and a config file.
+The dashboard was the first thing built, before the proxy even forwarded a single request. I wanted to see what was happening without spinning up Grafana, Prometheus, or ELK.
 
 ## Screenshots
 
@@ -32,47 +30,33 @@ No Docker required. No dependencies. Just the binary and a config file.
 |:--------------------------------------------:|:--------------------------------------------------:|
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Proxy Routes](docs/screenshots/proxy-routes.png) |
 
-|                    System Requests                    |                 System Health                 |
-|:-----------------------------------------------------:|:---------------------------------------------:|
-| ![Create Proxy](docs/screenshots/system-requests.png) | ![System](docs/screenshots/system-health.png) |
+<p align="center">
+  <img src="docs/screenshots/activity.png" alt="Activity" width="80%"/>
+</p>
 
-## What You Get
+## Features
 
-**Routing:** HTTP/HTTPS listeners with virtual-host routing (route by domain), path-based routing with wildcards, per-path backend overrides, and path stripping. The usual stuff, but configured in one place, either in the YAML file or through the web UI.
-
-**Automatic TLS:** Let's Encrypt via DNS-01 challenges. No port 80 required, no certbot, no cron. Certificates renew automatically in the background. Per-domain SNI so each hostname gets its own cert.
-
-**Hierarchical metrics:** every Metrics middleware emits data that bubbles up through a tree: global -> route -> path. Each node aggregates its own traffic plus everything beneath it. The dashboard lets you switch between them through a single dropdown, drilling from the full system down to a specific route or path, all in one place. Other proxies don't really do this without a separate stack. Request logs and error logs update live via SSE, served straight from the binary.
-
-**A real web UI:** built with HTMX, fast and no build pipeline needed. Dashboard with live metrics (requests/sec, latency, error rates, response codes), a proxy route viewer, a server creation wizard, system health monitoring, ACME/TLS management, and API key management. Everything configurable here or in the YAML, whichever you prefer.
-
-**Bot defense:** user-agent blocking with built-in pattern lists for scanners, scrapers, AI crawlers, and more. A honeypot system that traps bots hitting paths like `.git/config` or `wp-login.php` and blocks their IP. Optional trickster mode that wastes their time with tarpits, fake credential files, and infinite data streams. GeoIP blocking by country or continent.
-
-**Rate limiting:** token-bucket rate limiter, global or per-client IP. Returns proper `429` with `Retry-After`.
-
-**Header validation:** set, strip, or require specific headers. Need a shared secret between services? `cmp-headers-req` rejects anything that doesn't match. Values can be loaded from files or environment variables at startup.
-
-**Circuit breaker:** if your backend starts returning 5xx errors, Torii stops sending it traffic until it recovers. Your users see a clean error instead of a cascade of failures.
-
-**API keys:** scoped API keys for external access. Currently supports the `read_stats` scope, which is useful for surfacing Torii metrics in tools like [Homepage](https://gethomepage.dev) without putting passwords in your config file.
-
-**14 middlewares total:** all composable, all configurable per-route or per-path. See the [full list](docs/configuration.md#middleware-reference).
-
-**SQLite storage:** single-file database, WAL mode, embedded migrations. Stores users, sessions, ACME certs, and system config.
-
-**Debug mode:** pass `--debug` and Torii spins up stub servers for all your configured backends. Useful for testing your config without running the actual services.
+- **Routing** — HTTP/HTTPS, virtual-host routing, path-based routing with wildcards, per-path backend overrides, path stripping
+- **Automatic TLS** — Let's Encrypt via DNS-01. No port 80 required. Per-domain SNI. Background renewal.
+- **Hierarchical metrics** — global → route → path. Drill down from one dropdown. Live request/error logs via SSE.
+- **Web UI** — HTMX, no build pipeline. Dashboard, route viewer, server wizard, ACME management, API keys.
+- **Bot defense** — UA blocking (scanners, scrapers, AI crawlers), honeypot traps (`.git/config`, `wp-login.php`), optional trickster mode (tarpits, fake creds, infinite streams), GeoIP blocking
+- **Rate limiting** — token-bucket, global or per-client IP, proper `429` + `Retry-After`
+- **Circuit breaker** — stops forwarding to unhealthy backends until they recover
+- **Header validation** — set, strip, or require headers. Values from files or env vars.
+- **API keys** — scoped keys (e.g. `read_stats` for [Homepage](https://gethomepage.dev) integration)
+- **14 middlewares** — all composable, per-route or per-path. [Full list →](docs/configuration.md#middleware-reference)
+- **SQLite** — single-file DB, WAL mode, embedded migrations
+- **Debug mode** — `--debug` spins up stub backends for testing config without real services
 
 ## Quick Start
 
 ```bash
-# Build
 go build -o torii ./cmd/torii
-
-# Run
 ./torii -config config.yaml
 ```
 
-On first launch, open `http://127.0.0.1:27000/ui` to set your admin password.
+Open `http://127.0.0.1:27000/ui` to set your admin password.
 
 ### Minimal config
 
@@ -95,45 +79,6 @@ net-config:
           - type: "RequestLog"
           - type: "Metrics"
 ```
-
-### With TLS and route-level security
-
-```yaml
-net-config:
-  http:
-    - port: 443
-      bind: 3
-      tls:
-        use-acme: true
-      routes:
-        - host: jellyfin.home.example.com
-          target:
-            backend: http://192.168.1.100:8096
-            middlewares:
-              - type: "RequestId"
-              - type: "RequestLog"
-              - type: "Metrics"
-              - type: "UserAgentBlocker"
-                options:
-                  block-empty-ua: true
-                  block-defaults: ["scanners", "recon", "ai-crawlers"]
-                  allow-defaults: ["search-engines"]
-              - type: "HoneyPot"
-                options:
-                  defaults: ["git", "infra", "backups", "cgi"]
-                  response:
-                    trickster-mode: true
-                    max-slow-tricks: 10
-              - type: "RateLimiter"
-                options:
-                  mode: "per-client"
-                  limiter-req:
-                    rate-per-second: 10
-                    burst: 20
-      default:
-        backend: http://192.168.1.50:8080
-```
-
 Full configuration reference: [docs/configuration.md](docs/configuration.md)
 
 ## Architecture
@@ -173,12 +118,6 @@ go build -o torii ./cmd/torii
 ### Docker
 
 ```bash
-docker pull ghcr.io/nunoOliveiraqwe/torii:latest
-```
-
-Since Torii is a reverse proxy, `--network host` is recommended so it can bind directly to host interfaces and ports without Docker's network layer getting in the way.
-
-```bash
 docker run -d \
   --network host \
   -v torii-data:/data \
@@ -186,33 +125,54 @@ docker run -d \
   ghcr.io/nunoOliveiraqwe/torii:latest
 ```
 
-**Volumes:**
+`--network host` is recommended so Torii can bind directly to host interfaces.
+
 | Mount | Purpose |
 |---|---|
-| `torii-data:/data` | SQLite database (`torii.db` + WAL/SHM). Named volume so data persists across container restarts. |
-| `/path/to/config.yaml:/etc/torii/config.yaml` | Your configuration file. Mounted read-write because the web UI can write proxy route changes back to the config. |
+| `torii-data:/data` | SQLite database (persists across restarts) |
+| `/path/to/config.yaml:/etc/torii/config.yaml` | Config file (read-write — UI can write changes back) |
 
-#### Building from source
+<details>
+<summary>Building from source (Docker)</summary>
 
 ```bash
-# Multi-stage (builds inside Docker, outputs a static binary on scratch)
+# Multi-stage
 docker build -f docker/Multistage.Dockerfile -t torii .
 
-# Single-stage (for CI — copy a pre-built binary into the image)
-# Build the binary first with CGO and static linking:
-#   CGO_ENABLED=1 go build -ldflags="-s -w -linkmode external -extldflags '-static'" -o torii ./cmd/torii
+# Single-stage (pre-built binary)
+CGO_ENABLED=1 go build -ldflags="-s -w -linkmode external -extldflags '-static'" -o torii ./cmd/torii
 cp torii docker/
 docker build -f docker/Dockerfile -t torii docker/
 ```
 
-> **Note:** Torii uses `mattn/go-sqlite3` which requires CGO. The binary must be built with `CGO_ENABLED=1` and statically linked for the `scratch` base image to work.
+> Torii uses `mattn/go-sqlite3` which requires CGO. The binary must be built with `CGO_ENABLED=1`.
+
+</details>
 
 ### Debian / Ubuntu
 
-Download the `.deb` from the [releases page](https://github.com/nunoOliveiraqwe/torii/releases) and install:
-
 ```bash
 dpkg -i torii_<version>_amd64.deb
+```
+
+## Performance
+
+Tested on a **Raspberry Pi 4** (4-core ARM, 906 MB RAM) over HTTPS with full middleware chain, using [`hey`](https://github.com/rakyll/hey):
+
+| Concurrency | Req/s | p50 | p95 | p99 |
+|:-----------:|------:|----:|----:|----:|
+| 10 | **663** | 12 ms | 24 ms | 98 ms |
+| 100 | **656** | 146 ms | 239 ms | 359 ms |
+
+~660 req/s sustained (~57M requests/day). Throughput stays flat as concurrency increases — latency scales linearly, which means the Pi's CPU is the bottleneck, not the proxy.
+
+Resource usage under load: ~3 of 4 CPU cores, ~100 MB RSS. Goroutines drain back to baseline (~20) within a minute after traffic stops.
+
+```bash
+# Run your own benchmarks
+go install github.com/rakyll/hey@latest
+./torii -config config.yaml --debug
+hey -z 2m -c 50 http://localhost:<proxy-port>/
 ```
 
 ## Documentation
