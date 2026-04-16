@@ -30,9 +30,9 @@ The dashboard was the first thing built, before the proxy even forwarded a singl
 |:--------------------------------------------:|:--------------------------------------------------:|
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Proxy Routes](docs/screenshots/proxy-routes.png) |
 
-<p align="center">
-  <img src="docs/screenshots/activity.png" alt="Activity" width="80%"/>
-</p>
+|                    Activity                    |                    Under Load                    |
+|:----------------------------------------------:|:------------------------------------------------:|
+| ![Activity](docs/screenshots/activity.png)     | ![Load Test](docs/screenshots/load-test.png)     |
 
 ## Features
 
@@ -157,22 +157,32 @@ dpkg -i torii_<version>_amd64.deb
 
 ## Performance
 
-Tested on a **Raspberry Pi 4** (4-core ARM, 906 MB RAM) over HTTPS with full middleware chain, using [`hey`](https://github.com/rakyll/hey):
+Benchmarked over HTTPS with full middleware chain (`RequestId` → `RequestLog` → `Metrics`), debug stub backends, using [`hey`](https://github.com/rakyll/hey).
+
+**Raspberry Pi 3** (4-core ARM, 906 MB RAM):
 
 | Concurrency | Req/s | p50 | p95 | p99 |
 |:-----------:|------:|----:|----:|----:|
 | 10 | **663** | 12 ms | 24 ms | 98 ms |
 | 100 | **656** | 146 ms | 239 ms | 359 ms |
 
-~660 req/s sustained (~57M requests/day). Throughput stays flat as concurrency increases — latency scales linearly, which means the Pi's CPU is the bottleneck, not the proxy.
+~660 req/s sustained. CPU-bound at ~3 of 4 cores, ~100 MB RSS.
 
-Resource usage under load: ~3 of 4 CPU cores, ~100 MB RSS. Goroutines drain back to baseline (~20) within a minute after traffic stops.
+**Desktop** (AMD 9800X3D, 32 GB RAM):
+
+| Concurrency | Req/s | p50 | p95 | p99 |
+|:-----------:|------:|----:|----:|----:|
+| 100 | **9,540** | 9 ms | 12 ms | 96 ms |
+| 200 | **13,114** | 12 ms | 22 ms | 100 ms |
+| 300 | **10,189** | 15 ms | 98 ms | 333 ms |
+
+Peak throughput at c200: **~13K req/s** (~1.1B requests/day). Throughput drops at c300 due to TLS handshake contention.
 
 ```bash
 # Run your own benchmarks
 go install github.com/rakyll/hey@latest
 ./torii -config config.yaml --debug
-hey -z 2m -c 50 http://localhost:<proxy-port>/
+hey -z 1m -c 200 https://localhost:<proxy-port>/
 ```
 
 ## Documentation
