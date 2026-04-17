@@ -295,9 +295,7 @@ func appendDomainsFromServers(servers map[int]MicroHttpServer, domains []string)
 		}
 
 		if dispatcher, ok := handler.(*VirtualHostDispatcher); ok {
-			for host := range dispatcher.routes {
-				domains = append(domains, host)
-			}
+			domains = append(domains, dispatcher.routeTrie.GetAllHosts()...)
 		}
 	}
 	return domains

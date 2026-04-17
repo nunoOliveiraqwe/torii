@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/config"
@@ -18,22 +17,20 @@ import (
 // the Host header, implementing name-based virtual hosting. Unmatched hosts
 // fall through to the default handler if one is configured.
 type VirtualHostDispatcher struct {
-	routes   map[string]http.Handler
-	default_ http.Handler
+	routeTrie *HostTrie
+	default_  http.Handler
 }
 
 func (d *VirtualHostDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// strip port from Host so that "example.com:443" matches a route
-	// keyed as "example.com". net.SplitHostPort fails when there is no
-	// port, in which case we fall back to the raw Host value.
 	host := r.Host
-	if h, _, err := net.SplitHostPort(r.Host); err == nil {
-		host = h
-	}
-	if handler, ok := d.routes[host]; ok {
+
+	handler := d.routeTrie.Contains(host)
+
+	if handler != nil {
 		handler.ServeHTTP(w, r)
 		return
 	}
+
 	if d.default_ != nil {
 		d.default_.ServeHTTP(w, r)
 		return
@@ -46,7 +43,7 @@ func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget,
 	zap.S().Infof("Building host dispatcher with %d routes, default: %v", len(routes), defaultTarget != nil)
 
 	d := &VirtualHostDispatcher{
-		routes: make(map[string]http.Handler),
+		routeTrie: NewHostTrie(),
 	}
 	var mwNames []string
 	var backends []string
@@ -63,7 +60,7 @@ func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget,
 			zap.S().Errorf("Failed to build handler for host %s: %v", route.Host, err)
 			continue
 		}
-		d.routes[route.Host] = handler
+		d.routeTrie.InsertHost(route.Host, handler)
 		mwNames = append(mwNames, names...)
 		backends = append(backends, route.Target.Backend)
 		backends = append(backends, pathBackends...)
@@ -85,7 +82,7 @@ func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget,
 		zap.S().Infof("Registered default route with backend %s", defaultTarget.Backend)
 	}
 
-	if len(d.routes) == 0 && d.default_ == nil {
+	if !d.routeTrie.HasAnyEntry() && d.default_ == nil {
 		return nil, nil, nil, nil, errors.New("no valid routes configured")
 	}
 
