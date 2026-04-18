@@ -1,21 +1,13 @@
 package auth
 
 import (
-	"bytes"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 )
-
-type Argon2Params struct {
-	Memory      uint32
-	Iterations  uint32
-	Parallelism uint8
-	KeyLength   uint32
-}
 
 type Argon2Hash struct {
 	AlgorithmName string
@@ -34,7 +26,6 @@ const (
 )
 
 var (
-	delimiter   = regexp.MustCompile(`\$`)
 	algo_argon2 = map[string]struct{}{
 		ARGON2i:  {},
 		ARGON2d:  {},
@@ -46,7 +37,7 @@ func FromArgon2String(input string) (*Argon2Hash, error) {
 	if !strings.HasPrefix(input, "$") {
 		return nil, fmt.Errorf("unsupported input: %s", input)
 	}
-	parts := delimiter.Split(input[1:], -1)
+	parts := strings.Split(input[1:], "$")
 	if len(parts) < 5 {
 		return nil, errors.New("invalid input format")
 	}
@@ -135,10 +126,9 @@ func (h *Argon2Hash) Equals(other *Argon2Hash) bool {
 	if h.Memory != other.Memory {
 		return false
 	}
-	if !bytes.Equal(h.HashedData, other.HashedData) {
-		return false
-	}
-	return bytes.Equal(h.Salt, other.Salt)
+
+	return subtle.ConstantTimeCompare(h.HashedData, other.HashedData) == 1 &&
+		subtle.ConstantTimeCompare(h.Salt, other.Salt) == 1
 }
 
 func getAlgorithmNames() []string {

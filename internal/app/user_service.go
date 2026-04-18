@@ -36,11 +36,7 @@ func (s *UserService) PasswordMatchesForUser(password, username string) error {
 
 func (s *UserService) SetPasswordForUser(password, username string) error {
 	zap.S().Debugf("Setting password for user %s", username)
-	salt, err := s.passwordEncoder.GenerateSecureSalt()
-	if err != nil {
-		return fmt.Errorf("failed to generate salt: %w", err)
-	}
-	err = s.validator.IsValidPassword(password)
+	err := s.validator.IsValidPassword(password)
 	if err != nil {
 		return fmt.Errorf("invalid password: %w", err)
 	}
@@ -49,7 +45,7 @@ func (s *UserService) SetPasswordForUser(password, username string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get user by username: %w", err)
 	}
-	hashedPassword, err := s.passwordEncoder.Encrypt(salt, password)
+	hashedPassword, err := s.passwordEncoder.Encrypt(password)
 	if err != nil {
 		return fmt.Errorf("failed to encode password: %w", err)
 	}
