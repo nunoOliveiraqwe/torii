@@ -17,11 +17,7 @@ import (
 func hashPassword(t *testing.T, cleartext string) string {
 	t.Helper()
 	enc := auth.NewDefaultEncoder()
-	salt, err := enc.GenerateSecureSalt()
-	if err != nil {
-		t.Fatalf("generate salt: %v", err)
-	}
-	h, err := enc.Encrypt(salt, cleartext)
+	h, err := enc.Encrypt(cleartext)
 	if err != nil {
 		t.Fatalf("hash password: %v", err)
 	}
