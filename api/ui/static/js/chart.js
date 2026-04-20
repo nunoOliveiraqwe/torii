@@ -248,6 +248,7 @@ function resetStatCards() {
     document.getElementById('stat-blocked-honeypot').textContent = '–';
     document.getElementById('stat-blocked-ua').textContent = '–';
     document.getElementById('stat-blocked-country').textContent = '–';
+    document.getElementById('stat-blocked-ip').textContent = '–';
     document.getElementById('stat-blocked-ratelimit').textContent = '–';
 }
 
@@ -280,6 +281,7 @@ function updateStatCards(m) {
     document.getElementById('stat-blocked-honeypot').textContent = fmtNum(bbm['honeypot'] || 0);
     document.getElementById('stat-blocked-ua').textContent = fmtNum(bbm['ua-block'] || 0);
     document.getElementById('stat-blocked-country').textContent = fmtNum(bbm['country-block'] || 0);
+    document.getElementById('stat-blocked-ip').textContent = fmtNum(bbm['ip-block'] || 0);
     document.getElementById('stat-blocked-ratelimit').textContent = fmtNum(bbm['rate-limit'] || 0);
 }
 

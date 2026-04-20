@@ -110,9 +110,9 @@ Torii has scoped API keys for read-only stats access. Add this to your [Homepage
     href: http://127.0.0.1:27000/ui
     widget:
       type: customapi
-      url: http://127.0.0.1:27000/api/v1/health
+      url: http://127.0.0.1:27000/api/v1/proxy/metrics
       headers:
-        X-API-Key: your-read-stats-key
+        Authorization: Bearer <your-api-key>
       mappings:
         - field: total_requests
           label: Requests
