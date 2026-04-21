@@ -250,7 +250,9 @@ func (m *LegoAcmeManager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certi
 	if ok {
 		return cert, nil
 	}
-	return nil, fmt.Errorf("acme: no certificate for %q", hello.ServerName)
+	//return nil so that direct requests to IP are stopped with alert 112
+	//	alertUnrecognizedName             alert = 112
+	return nil, nil
 }
 
 func (m *LegoAcmeManager) GetTLSConfig() *tls.Config {
