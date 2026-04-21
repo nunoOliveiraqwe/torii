@@ -197,6 +197,12 @@ function MwChainBuilder(containerEl, schemas) {
             item.querySelector('.mw-chain-num').textContent = (i + 1) + '.';
         });
         emptyEl.style.display = items.length === 0 ? '' : 'none';
+        // Update the badge in the parent details summary
+        var details = containerEl.closest('.lf-mw-section');
+        if (details) {
+            var badge = details.querySelector('summary .lf-mw-badge');
+            if (badge) badge.textContent = items.length > 0 ? items.length + ' middleware' + (items.length > 1 ? 's' : '') : '';
+        }
     }
 
     this.add = function(type, existingOptions) {
@@ -673,6 +679,15 @@ function lfAddMapRow(container, key, val) {
 
 // ========== Path Rules ==========
 
+function lfUpdatePathBadge(pathsContainer) {
+    var details = pathsContainer.closest('.lf-mw-section');
+    if (details) {
+        var badge = details.querySelector('summary .lf-mw-badge');
+        var count = pathsContainer.querySelectorAll('.lf-path-card').length;
+        if (badge) badge.textContent = count > 0 ? count + ' rule' + (count > 1 ? 's' : '') : '';
+    }
+}
+
 function lfCreatePathCard(pathsContainer, pathsList) {
     lfIdCounter++;
     var pathId = 'lf-path-' + lfIdCounter;
@@ -698,7 +713,7 @@ function lfCreatePathCard(pathsContainer, pathsList) {
         '<input type="checkbox" class="lf-path-drop-query"> Drop query</label>' +
         '</div>' +
         '<details class="lf-mw-section">' +
-        '<summary>Path Middleware Chain</summary>' +
+        '<summary>Path Middleware Chain <span class="lf-mw-badge lf-path-mw-badge"></span></summary>' +
         '<fieldset style="margin:0.5rem 0 0.5rem;padding:0;border:none;">' +
         '<label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.78rem;cursor:pointer;">' +
         '<input type="checkbox" class="lf-path-disable-defaults" role="switch"> Disable default middlewares' +
@@ -716,11 +731,13 @@ function lfCreatePathCard(pathsContainer, pathsList) {
             if (pathsList[i].id === pathId) { pathsList.splice(i, 1); break; }
         }
         card.remove();
+        lfUpdatePathBadge(pathsContainer);
     });
 
     pathsContainer.appendChild(card);
     var pathObj = { id: pathId, el: card, mwChain: mwChain };
     pathsList.push(pathObj);
+    lfUpdatePathBadge(pathsContainer);
     return pathObj;
 }
 
@@ -757,7 +774,7 @@ function lfCreateHostRouteCard() {
         '<input type="text" class="lf-route-backend" placeholder="e.g. http://192.168.1.100:8096" style="margin-bottom:0.5rem;"></label>' +
         '</div>' +
         '<details class="lf-mw-section" open>' +
-        '<summary>Middleware Chain</summary>' +
+        '<summary>Middleware Chain <span class="lf-mw-badge lf-route-mw-badge"></span></summary>' +
         '<fieldset style="margin:0.5rem 0 0.5rem;padding:0;border:none;">' +
         '<label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer;">' +
         '<input type="checkbox" class="lf-route-disable-defaults" role="switch"> Disable default middlewares' +
@@ -767,7 +784,7 @@ function lfCreateHostRouteCard() {
         '<div class="lf-route-mw-container"></div>' +
         '</details>' +
         '<details class="lf-mw-section" style="margin-top:0.75rem;">' +
-        '<summary>Path Rules</summary>' +
+        '<summary>Path Rules <span class="lf-mw-badge lf-route-paths-badge"></span></summary>' +
         '<div class="lf-route-paths-container" style="margin-top:0.5rem;"></div>' +
         '<button type="button" class="lf-add-btn lf-route-add-path">+ Add Path Rule</button>' +
         '</details>';
