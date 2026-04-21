@@ -121,7 +121,7 @@ Torii has scoped API keys for read-only stats access. Add this to your [Homepage
 ```
 
 <p align="center">
-  <img src="docs/screenshots/homepage.png" alt="Homepage Integration" width="400" />
+  <img src="docs/screenshots/homepage.png" alt="Homepage Integration"/>
 </p>
 
 ---
