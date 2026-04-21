@@ -1,4 +1,4 @@
-package ip_block
+package ip_filter
 
 import (
 	"testing"
@@ -10,10 +10,10 @@ import (
 func TestIpList_MixedIPsAndSubnets(t *testing.T) {
 	// Feed it plain IPs and CIDRs — one structure handles both
 	entries := []string{
-		"192.168.1.53",    // single IP  → /32
-		"10.0.0.0/8",      // subnet
-		"172.16.0.0/12",   // subnet
-		"8.8.8.8",         // single IP  → /32
+		"192.168.1.53",  // single IP  → /32
+		"10.0.0.0/8",    // subnet
+		"172.16.0.0/12", // subnet
+		"8.8.8.8",       // single IP  → /32
 	}
 
 	list, err := buildIpList(entries)

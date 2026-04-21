@@ -32,7 +32,7 @@ func init() {
 		"Headers":          {Fn: HeadersMiddleware},
 		"RateLimiter":      {Fn: RateLimitMiddleware},
 		"CountryBlock":     {Fn: CountryBlockMiddleware},
-		"IpBlock":          {Fn: IpBlockMiddleware},
+		"IpFilter":         {Fn: IpFilterMiddleware},
 		"Redirect":         {Fn: RedirectMiddleware, Terminates: true},
 		"BodySizeLimit":    {Fn: BodySizeLimitMiddleware},
 		"Timeout":          {Fn: TimeoutMiddleware},

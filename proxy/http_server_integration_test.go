@@ -516,7 +516,7 @@ func TestMiddleware_RateLimiter_PerClient(t *testing.T) {
 // ── IpBlock (not yet implemented) ────────────────────────────────────────────
 
 func TestMiddleware_IpBlock_PassesThrough(t *testing.T) {
-	// IpBlockMiddleware is registered but is a no-op (TODO stub).
+	// IpFilterMiddleware is registered but is a no-op (TODO stub).
 	// This test documents that it currently passes all traffic through.
 	backend := newEchoBackend(t)
 	port := getFreePort(t)

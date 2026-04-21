@@ -1,4 +1,4 @@
-package ip_block
+package ip_filter
 
 import (
 	"net/netip"
@@ -129,8 +129,8 @@ func TestSubnetTrie_InsertIP(t *testing.T) {
 
 func TestSubnetTrie_InsertFromString_PlainIP(t *testing.T) {
 	trie := NewSubnetTrie()
-	require.NoError(t, trie.InsertFromString("1.2.3.4"))     // plain IP, not CIDR
-	require.NoError(t, trie.InsertFromString("10.0.0.0/8"))   // CIDR
+	require.NoError(t, trie.InsertFromString("1.2.3.4"))    // plain IP, not CIDR
+	require.NoError(t, trie.InsertFromString("10.0.0.0/8")) // CIDR
 
 	// Plain IP match
 	assert.True(t, trie.Contains(netip.MustParseAddr("1.2.3.4")))
@@ -148,4 +148,3 @@ func TestSubnetTrie_InsertFromString_PlainIPv6(t *testing.T) {
 	assert.True(t, trie.Contains(netip.MustParseAddr("::1")))
 	assert.False(t, trie.Contains(netip.MustParseAddr("::2")))
 }
-

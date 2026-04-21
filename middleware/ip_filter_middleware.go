@@ -7,16 +7,16 @@ import (
 
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"github.com/nunoOliveiraqwe/torii/metrics"
-	"github.com/nunoOliveiraqwe/torii/middleware/ip_block"
+	"github.com/nunoOliveiraqwe/torii/middleware/ip_filter"
 	"go.uber.org/zap"
 )
 
-func IpBlockMiddleware(ctx context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func IpFilterMiddleware(ctx context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	filter, err := initIpFilter(conf)
 	if err != nil {
-		zap.S().Errorf("IpBlockMiddleware: failed to initialize: %v. Failing closed.", err)
+		zap.S().Errorf("IpFilterMiddleware: failed to initialize: %v. Failing closed.", err)
 		return func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "IpBlockMiddleware misconfigured", http.StatusServiceUnavailable)
+			http.Error(w, "IpFilterMiddleware misconfigured", http.StatusServiceUnavailable)
 		}
 	}
 
@@ -24,14 +24,14 @@ func IpBlockMiddleware(ctx context.Context, next http.HandlerFunc, conf Config) 
 		logger := GetRequestLoggerFromContext(r)
 		clientIP, err := netutil.GetClientIP(r)
 		if err != nil {
-			logger.Warn("IpBlockMiddleware: failed to get client IP", zap.Error(err))
+			logger.Warn("IpFilterMiddleware: failed to get client IP", zap.Error(err))
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
 
 		blocked, err := filter.IsBlocked(clientIP)
 		if err != nil {
-			logger.Error("IpBlockMiddleware: error checking IP", zap.String("clientIp", clientIP), zap.Error(err))
+			logger.Error("IpFilterMiddleware: error checking IP", zap.String("clientIp", clientIP), zap.Error(err))
 			metrics.CreateAndAddBlockInfo(r, "IpBlock", fmt.Sprintf("An error occurred check if IP %s is blocked. err = %s",
 				clientIP,
 				err.Error()))
@@ -40,7 +40,7 @@ func IpBlockMiddleware(ctx context.Context, next http.HandlerFunc, conf Config) 
 		}
 
 		if blocked {
-			logger.Warn("IpBlockMiddleware: blocked request", zap.String("clientIp", clientIP))
+			logger.Warn("IpFilterMiddleware: blocked request", zap.String("clientIp", clientIP))
 			metrics.CreateAndAddBlockInfo(r, "IpBlock", fmt.Sprintf("Blocked IP: %s", clientIP))
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
@@ -50,7 +50,7 @@ func IpBlockMiddleware(ctx context.Context, next http.HandlerFunc, conf Config) 
 	}
 }
 
-func initIpFilter(conf Config) (*ip_block.IpFilter, error) {
+func initIpFilter(conf Config) (*ip_filter.IpFilter, error) {
 	opts := conf.Options
 
 	allowList, err := ParseStringSliceOpt(opts, "allow", nil)
@@ -72,13 +72,13 @@ func initIpFilter(conf Config) (*ip_block.IpFilter, error) {
 			return nil, err
 		}
 
-		loader, err := ip_block.NewAbuseIpDbBlockListLoader(apiKey, confidence, refreshInterval, allowList)
+		loader, err := ip_filter.NewAbuseIpDbBlockListLoader(apiKey, confidence, refreshInterval, allowList)
 		if err != nil {
 			return nil, err
 		}
-		return ip_block.NewIpFilter(loader)
+		return ip_filter.NewIpFilter(loader)
 	}
 
-	loader := ip_block.NewStaticLoader(allowList, blockList)
-	return ip_block.NewIpFilter(loader)
+	loader := ip_filter.NewStaticLoader(allowList, blockList)
+	return ip_filter.NewIpFilter(loader)
 }

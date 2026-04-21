@@ -171,7 +171,7 @@ func GetMiddlewareSchemas() []MiddlewareSchema {
 			}, cacheFields...),
 		},
 		{
-			Name:        "IpBlock",
+			Name:        "IpFilter",
 			Description: "Blocks or allows requests based on client IP address or CIDR range. Optionally fetches block lists from AbuseIPDB.",
 			Fields: []OptionField{
 				{Key: "allow", Label: "Allow List", Type: FieldTypeStringList,

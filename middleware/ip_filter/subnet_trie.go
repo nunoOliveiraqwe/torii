@@ -1,4 +1,4 @@
-package ip_block
+package ip_filter
 
 import (
 	"fmt"
@@ -134,7 +134,6 @@ func (t *SubnetTrie) InsertFromString(ipOrCIDR string) error {
 	t.InsertIP(addr)
 	return nil
 }
-
 
 func (t *SubnetTrie) ContainsFromString(ipStr string) (bool, error) {
 	addr, err := netip.ParseAddr(ipStr)

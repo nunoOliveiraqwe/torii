@@ -1,4 +1,4 @@
-package ip_block
+package ip_filter
 
 import (
 	"bufio"
