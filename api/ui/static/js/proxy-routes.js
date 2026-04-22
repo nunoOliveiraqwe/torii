@@ -314,11 +314,13 @@ function renderRouteDetail(routes) {
     routes.forEach(function (r) {
         var host = r.host || '<em>default</em>';
         var mw = (r.middlewares && r.middlewares.length) ? r.middlewares.join(', ') : '<em>none</em>';
-        h += '<tr><td>' + host + '</td><td><code>' + r.backend + '</code></td><td>' + mw + '</td></tr>';
+        var backendAddr = (typeof r.backend === 'object' && r.backend) ? r.backend.address : (r.backend || '');
+        h += '<tr><td>' + host + '</td><td><code>' + backendAddr + '</code></td><td>' + mw + '</td></tr>';
         if (r.paths && r.paths.length > 0) {
             r.paths.forEach(function (p) {
                 var pmw = (p.middlewares && p.middlewares.length) ? p.middlewares.join(', ') : '<em>none</em>';
-                var pbackend = p.backend ? '<code>' + p.backend + '</code>' : 'Defined by parent';
+                var rawPb = (typeof p.backend === 'object' && p.backend) ? p.backend.address : p.backend;
+                var pbackend = rawPb ? '<code>' + rawPb + '</code>' : 'Defined by parent';
                 h += '<tr style="color:var(--pico-muted-color);">' +
                     '<td style="padding-left:1.5rem;">↳ <code>' + p.pattern + '</code></td>' +
                     '<td>' + pbackend + '</td>' +
@@ -449,7 +451,10 @@ function lfPopulateForm(data) {
     if (data.default) {
         document.getElementById('lf-default-enable').checked = true;
         document.getElementById('lf-default-route-fields').style.display = '';
-        document.getElementById('lf-default-backend').value = data.default.backend || '';
+        document.getElementById('lf-default-backend').value = (data.default.backend && data.default.backend.address) || '';
+        if (data.default.backend && data.default.backend.replace_host_header) {
+            document.getElementById('lf-default-replace-host').checked = true;
+        }
         if (data.default.disable_default_middlewares) {
             document.getElementById('lf-default-disable-defaults').checked = true;
         }
@@ -460,9 +465,10 @@ function lfPopulateForm(data) {
             data.default.paths.forEach(function(p) {
                 var pathObj = lfCreatePathCard(document.getElementById('lf-default-paths'), lfDefaultPaths);
                 pathObj.el.querySelector('.lf-path-pattern').value = p.pattern || '';
-                pathObj.el.querySelector('.lf-path-backend').value = p.backend || '';
+                pathObj.el.querySelector('.lf-path-backend').value = (p.backend && p.backend.address) || '';
+                if (p.backend && p.backend.replace_host_header) pathObj.el.querySelector('.lf-path-replace-host').checked = true;
                 if (p.drop_query) pathObj.el.querySelector('.lf-path-drop-query').checked = true;
-                if (p.strip_prefix) pathObj.el.querySelector('.lf-path-drop-path').checked = true;
+                if (p.strip_prefix) pathObj.el.querySelector('.lf-path-strip-prefix').checked = true;
                 if (p.disable_default_middlewares) {
                     var pddCb = pathObj.el.querySelector('.lf-path-disable-defaults');
                     if (pddCb) pddCb.checked = true;
@@ -479,7 +485,10 @@ function lfPopulateForm(data) {
         data.routes.forEach(function(route) {
             var routeObj = lfCreateHostRouteCard();
             routeObj.el.querySelector('.lf-route-host').value = route.host || '';
-            routeObj.el.querySelector('.lf-route-backend').value = (route.target && route.target.backend) || '';
+            routeObj.el.querySelector('.lf-route-backend').value = (route.target && route.target.backend && route.target.backend.address) || '';
+            if (route.target && route.target.backend && route.target.backend.replace_host_header) {
+                routeObj.el.querySelector('.lf-route-replace-host').checked = true;
+            }
             var target = route.target || {};
             if (target.disable_default_middlewares) {
                 var ddCb = routeObj.el.querySelector('.lf-route-disable-defaults');
@@ -493,9 +502,10 @@ function lfPopulateForm(data) {
                 target.paths.forEach(function(p) {
                     var pathObj = lfCreatePathCard(pathsContainer, routeObj.paths);
                     pathObj.el.querySelector('.lf-path-pattern').value = p.pattern || '';
-                    pathObj.el.querySelector('.lf-path-backend').value = p.backend || '';
+                    pathObj.el.querySelector('.lf-path-backend').value = (p.backend && p.backend.address) || '';
+                    if (p.backend && p.backend.replace_host_header) pathObj.el.querySelector('.lf-path-replace-host').checked = true;
                     if (p.drop_query) pathObj.el.querySelector('.lf-path-drop-query').checked = true;
-                    if (p.strip_prefix) pathObj.el.querySelector('.lf-path-drop-path').checked = true;
+                    if (p.strip_prefix) pathObj.el.querySelector('.lf-path-strip-prefix').checked = true;
                     if (p.disable_default_middlewares) {
                         var pddCb = pathObj.el.querySelector('.lf-path-disable-defaults');
                         if (pddCb) pddCb.checked = true;

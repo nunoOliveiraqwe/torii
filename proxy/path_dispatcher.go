@@ -20,56 +20,77 @@ func (d *PathDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.mux.ServeHTTP(w, r)
 }
 
-func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, pathRules []config.PathRule) (http.Handler, []string, []string, error) {
+func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, pathRules []config.PathRule) (http.Handler, []string, []PathSnapshot, error) {
 	mux := http.NewServeMux()
 
-	mwNames := make([]string, 0)
 	backends := make([]string, 0)
-	hasCatchAll := false
+	var pathSnapshots []PathSnapshot
+
+	registeredPatternMap := make(map[string]struct{})
+
 	for _, rule := range pathRules {
 		pathBaseHandler := defaultHandler
-		if rule.Backend != "" {
+
+		if rule.Backend != nil && rule.Backend.Address == "" {
+			zap.S().Errorf("Path rule %q has a backend defined but no address specified. Skipping backend handler setup for this rule.", rule.Pattern)
+			return nil, nil, nil, fmt.Errorf("path rule %q has a backend defined but no address specified", rule.Pattern)
+		}
+
+		pattern := normalizePattern(rule.Pattern)
+		_, ok := registeredPatternMap[pattern]
+		if ok {
+			zap.S().Errorf("Duplicate path pattern detected: %q. Each path pattern must be unique. Please check your configuration.", pattern)
+			//this seems not intentional, this is why it aborts
+			return nil, nil, nil, fmt.Errorf("duplicate path pattern detected: %q", pattern)
+		}
+
+		if rule.Backend != nil && rule.Backend.Address != "" {
 			zap.S().Infof("Building backend handler for path rule %q with backend %q", rule.Pattern, rule.Backend)
 			handler, err := buildPathBackendHandler(rule)
 			if err != nil {
 				return nil, nil, nil, err
 			}
 			pathBaseHandler = handler
-			backends = append(backends, rule.Backend)
+			backends = append(backends, rule.Backend.Address)
 		}
 
-		pattern := normalizePattern(rule.Pattern)
 		ctx2 := context.WithValue(ctx, ctxkeys.Path, rule.Pattern)
-		handler, err := buildMiddlewareChain(ctx2, pathBaseHandler, rule.Middlewares, rule.DisableDefaults)
+		handler, appliedMw, err := buildMiddlewareChain(ctx2, pathBaseHandler, rule.Middlewares, rule.DisableDefaults)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 
+		// When the rule has its own backend, ensure the pattern covers
+		// sub-paths too (e.g. "/jellyfino" → "/jellyfino/{path...}").
+		if rule.Backend != nil && rule.Backend.Address != "" {
+			pattern = ensureSubtree(pattern)
+		}
+
 		mux.HandleFunc(pattern, handler)
+		registeredPatternMap[pattern] = struct{}{}
 
-		if pattern == "/" || pattern == "/{path...}" {
-			hasCatchAll = true
-		}
-		// When the rule has its own backend and the pattern is a bare path
-		// (e.g. "/jellyfino"), Go's ServeMux treats it as an exact match
-		// only.  We also need a catch-all so that sub-paths like
-		// "/jellyfino/library" are routed to this backend instead of
-		// falling through to the default handler.
-		if rule.Backend != "" && !strings.HasSuffix(pattern, "/") && !strings.Contains(pattern, "{path...}") {
-			mux.HandleFunc(pattern+"/{path...}", handler)
-		}
 
-		mwNames = append(mwNames, middlewareNames(rule.Middlewares)...)
-		zap.S().Infof("Registered path rule %q with %d middlewares", pattern, len(rule.Middlewares))
+		backend := ""
+		if rule.Backend != nil {
+			backend = rule.Backend.Address
+		}
+		pathSnapshots = append(pathSnapshots, PathSnapshot{
+			Pattern:     rule.Pattern,
+			Backend:     backend,
+			Middlewares: middlewareNames(appliedMw),
+		})
+		zap.S().Infof("Registered path rule %q with %d middlewares", pattern, len(appliedMw))
 	}
 
 	// Default catch-all: the route-level middleware chain wrapping the backend.
 	// Skip if a path rule already registered a catch-all (e.g. "/*" → "/{path...}").
-	if !hasCatchAll {
+	_, hasCatchAll := registeredPatternMap["/"]
+	_, hasCatchAllWild := registeredPatternMap["/{path...}"]
+	if !hasCatchAll && !hasCatchAllWild {
 		mux.HandleFunc("/", defaultHandler)
 	}
 
-	return &PathDispatcher{mux: mux}, mwNames, backends, nil
+	return &PathDispatcher{mux: mux}, backends, pathSnapshots, nil
 }
 
 // buildPathBackendHandler creates the handler for a path rule that has its own
@@ -77,9 +98,10 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 // optionally strips the path prefix when explicitly requested.
 func buildPathBackendHandler(rule config.PathRule) (http.HandlerFunc, error) {
 	opts := proxyutil.ProxyOptions{
-		DropQuery: rule.DropQuery != nil && *rule.DropQuery,
+		DropQuery:         rule.DropQuery != nil && *rule.DropQuery,
+		ReplaceHostHeader: rule.Backend != nil && rule.Backend.ReplaceHostHeader,
 	}
-	proxy, err := buildHttpRevProxy(rule.Backend, opts)
+	proxy, err := buildHttpRevProxy(rule.Backend.Address, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build reverse proxy for path rule %q: %w", rule.Pattern, err)
 	}
@@ -155,17 +177,25 @@ func normalizePattern(pattern string) string {
 	segments := strings.Split(pattern, "/")
 	wildIdx := 0
 	for i, seg := range segments {
-		if seg != "*" {
-			continue
-		}
-		if i == len(segments)-1 {
-			// Trailing /* → catch-all
-			segments[i] = "{path...}"
-		} else {
-			// Mid-path * → single-segment named wildcard
-			wildIdx++
-			segments[i] = fmt.Sprintf("{_seg%d}", wildIdx)
+		if seg == "*" {
+			if i == len(segments)-1 {
+				segments[i] = "{path...}"
+			} else {
+				wildIdx++
+				segments[i] = fmt.Sprintf("{_seg%d}", wildIdx)
+			}
+		} else if i == len(segments)-1 && strings.HasSuffix(seg, "*") {
+			// Glued trailing star: "/api*" → "/api/{path...}"
+			segments[i] = strings.TrimSuffix(seg, "*")
+			segments = append(segments, "{path...}")
 		}
 	}
 	return strings.Join(segments, "/")
+}
+
+func ensureSubtree(pattern string) string {
+	if strings.HasSuffix(pattern, "/") || strings.Contains(pattern, "{path...}") {
+		return pattern
+	}
+	return pattern + "/{path...}"
 }

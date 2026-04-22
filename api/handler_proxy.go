@@ -76,6 +76,10 @@ func handleStopProxy(systemService app.SystemService) http.HandlerFunc {
 func handleDeleteProxy(service app.SystemService) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		logger := mw.GetRequestLoggerFromContext(request)
+		if service.IsReadOnly() {
+			http.Error(writer, "Server is in read-only mode", http.StatusForbidden)
+			return
+		}
 		port := request.PathValue("serverId")
 		logger.Info("Deleting proxy server", zap.String("port", port))
 		portInt, err := strconv.Atoi(port)
@@ -84,12 +88,15 @@ func handleDeleteProxy(service app.SystemService) http.HandlerFunc {
 			http.Error(writer, "Invalid port format", http.StatusBadRequest)
 			return
 		}
-		// TODO: persist deletion to the config file so removed routes don't reappear on restart.
+		// persist deletion to the config file so removed routes don't reappear on restart.
 		err = service.DeleteProxy(portInt)
 		if err != nil {
 			logger.Error("Failed to delete proxy server", zap.String("port", port), zap.Error(err))
 			http.Error(writer, "Failed to delete proxy server: "+err.Error(), http.StatusInternalServerError)
 			return
+		}
+		if err := service.PersistConfig(); err != nil {
+			logger.Error("Proxy deleted but failed to persist config", zap.Error(err))
 		}
 		WriteResponseAsJSON(map[string]string{"status": "deleted"}, writer)
 	}
@@ -135,6 +142,10 @@ func handleGetNetworkInterfaces(_ app.SystemService) http.HandlerFunc {
 func handleCreateHttpProxyServer(svc app.SystemService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := mw.GetRequestLoggerFromContext(r)
+		if svc.IsReadOnly() {
+			http.Error(w, "Server is in read-only mode", http.StatusForbidden)
+			return
+		}
 		req, err := DecodeJSONBody[CreateProxyServerRequest](r)
 		if err != nil {
 			logger.Error("Failed to decode listener request", zap.Error(err))
@@ -153,12 +164,12 @@ func handleCreateHttpProxyServer(svc app.SystemService) http.HandlerFunc {
 			http.Error(w, "At least one route or a default route is required", http.StatusBadRequest)
 			return
 		}
-		if req.Default != nil && req.Default.Backend == "" && !hasTerminatingMiddlewareDTO(req.Default.Middlewares) {
+		if req.Default != nil && req.Default.Backend.Address == "" && !hasTerminatingMiddlewareDTO(req.Default.Middlewares) {
 			http.Error(w, "Default route requires a backend or a terminating middleware", http.StatusBadRequest)
 			return
 		}
 		for _, route := range req.Routes {
-			if route.Target.Backend == "" && !hasTerminatingMiddlewareDTO(route.Target.Middlewares) {
+			if route.Target.Backend.Address == "" && !hasTerminatingMiddlewareDTO(route.Target.Middlewares) {
 				http.Error(w, fmt.Sprintf("Route %q requires a backend or a terminating middleware", route.Host), http.StatusBadRequest)
 				return
 			}
@@ -169,12 +180,13 @@ func handleCreateHttpProxyServer(svc app.SystemService) http.HandlerFunc {
 			http.Error(w, "Invalid configuration: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		// TODO: persist the new listener to the config file so it survives restarts.
-		// Currently this is memory-only — the UI-created route is lost on restart.
 		if err := svc.AddHttpListener(conf); err != nil {
 			logger.Error("Failed to add HTTP listener", zap.Error(err))
 			http.Error(w, "Failed to create listener: "+err.Error(), http.StatusInternalServerError)
 			return
+		}
+		if err := svc.PersistConfig(); err != nil {
+			logger.Error("Listener created but failed to persist config", zap.Error(err))
 		}
 		logger.Info("HTTP listener created", zap.Int("port", req.Port))
 		WriteResponseAsJSON(map[string]interface{}{
@@ -252,7 +264,7 @@ func convertToHTTPListener(req *CreateProxyServerRequest) (config.HTTPListener, 
 
 func convertRouteTarget(dto RouteTargetDTO) config.RouteTarget {
 	target := config.RouteTarget{
-		Backend:         dto.Backend,
+		Backend:         config.BackendConfig{Address: dto.Backend.Address, ReplaceHostHeader: dto.Backend.ReplaceHostHeader},
 		DisableDefaults: dto.DisableDefaults,
 	}
 	for _, m := range dto.Middlewares {
@@ -264,10 +276,12 @@ func convertRouteTarget(dto RouteTargetDTO) config.RouteTarget {
 	for _, p := range dto.Paths {
 		pr := config.PathRule{
 			Pattern:         p.Pattern,
-			Backend:         p.Backend,
 			DropQuery:       p.DropQuery,
 			StripPrefix:     p.StripPrefix,
 			DisableDefaults: p.DisableDefaults,
+		}
+		if p.Backend != nil {
+			pr.Backend = &config.BackendConfig{Address: p.Backend.Address, ReplaceHostHeader: p.Backend.ReplaceHostHeader}
 		}
 		for _, m := range p.Middlewares {
 			pr.Middlewares = append(pr.Middlewares, mw.Config{
@@ -357,7 +371,10 @@ func configToDTO(conf *config.HTTPListener) CreateProxyServerRequest {
 }
 
 func routeTargetToDTO(t config.RouteTarget) RouteTargetDTO {
-	dto := RouteTargetDTO{Backend: t.Backend, DisableDefaults: t.DisableDefaults}
+	dto := RouteTargetDTO{
+		Backend:         BackendConfigDTO{Address: t.Backend.Address, ReplaceHostHeader: t.Backend.ReplaceHostHeader},
+		DisableDefaults: t.DisableDefaults,
+	}
 	for _, m := range t.Middlewares {
 		mDTO := MiddlewareConfigDTO{Type: m.Type, Options: m.Options}
 		dto.Middlewares = append(dto.Middlewares, mDTO)
@@ -365,10 +382,12 @@ func routeTargetToDTO(t config.RouteTarget) RouteTargetDTO {
 	for _, p := range t.Paths {
 		pDTO := PathRuleDTO{
 			Pattern:         p.Pattern,
-			Backend:         p.Backend,
 			DropQuery:       p.DropQuery,
 			StripPrefix:     p.StripPrefix,
 			DisableDefaults: p.DisableDefaults,
+		}
+		if p.Backend != nil {
+			pDTO.Backend = &BackendConfigDTO{Address: p.Backend.Address, ReplaceHostHeader: p.Backend.ReplaceHostHeader}
 		}
 		for _, m := range p.Middlewares {
 			pDTO.Middlewares = append(pDTO.Middlewares, MiddlewareConfigDTO{Type: m.Type, Options: m.Options})
@@ -381,6 +400,10 @@ func routeTargetToDTO(t config.RouteTarget) RouteTargetDTO {
 func handleEditProxy(svc app.SystemService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := mw.GetRequestLoggerFromContext(r)
+		if svc.IsReadOnly() {
+			http.Error(w, "Server is in read-only mode", http.StatusForbidden)
+			return
+		}
 		port := r.PathValue("serverId")
 		portInt, err := strconv.Atoi(port)
 		if err != nil {
@@ -410,6 +433,9 @@ func handleEditProxy(svc app.SystemService) http.HandlerFunc {
 			return
 		}
 		logger.Info("Proxy edited", zap.Int("port", portInt))
+		if err := svc.PersistConfig(); err != nil {
+			logger.Error("Proxy edited but failed to persist config", zap.Error(err))
+		}
 		WriteResponseAsJSON(map[string]interface{}{
 			"status": "updated",
 			"port":   conf.Port,

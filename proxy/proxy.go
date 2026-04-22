@@ -225,7 +225,7 @@ func (m *Torii) HotSwapHandler(ctx context.Context, port int, conf config.HTTPLi
 
 	//TODO -> optimize by only rebuilding the affected route's handler's instead of the whole handler chain.
 	//only swap what's changed
-	handler, mwNames, backends, routeSnapshots, err := buildHandlerChain(ctx, server.GetServerId(), conf, globalConf)
+	handler, backends, routeSnapshots, err := buildHandlerChain(ctx, server.GetServerId(), conf, globalConf)
 	if err != nil {
 		return fmt.Errorf("failed to build handler chain: %w", err)
 	}
@@ -234,7 +234,7 @@ func (m *Torii) HotSwapHandler(ctx context.Context, port int, conf config.HTTPLi
 		return fmt.Errorf("failed to swap handler: %w", err)
 	}
 
-	m.updateServerMetadata(server, mwNames, backends, routeSnapshots, conf)
+	m.updateServerMetadata(server, backends, routeSnapshots, conf)
 
 	zap.S().Infof("Hot-swapped handler for server on port %d", port)
 	return nil
@@ -275,6 +275,21 @@ func (m *Torii) GetProxyConfig(port int) *config.HTTPListener {
 		return &c
 	}
 	return nil
+}
+
+func (m *Torii) GetAllHTTPConfigs() []config.HTTPListener {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	var configs []config.HTTPListener
+	for _, server := range m.stoppedHttpServers {
+		c := server.GetCurrentConfig()
+		configs = append(configs, c)
+	}
+	for _, server := range m.startedHttpServers {
+		c := server.GetCurrentConfig()
+		configs = append(configs, c)
+	}
+	return configs
 }
 
 func (m *Torii) IsStarted(port int) bool {
@@ -347,7 +362,8 @@ func appendDomainsFromServers(servers map[int]MicroHttpServer, domains []string)
 	return domains
 }
 
-func (m *Torii) updateServerMetadata(server MicroHttpServer, mwNames []string, backends []string, routes []RouteSnapshot, conf config.HTTPListener) {
+func (m *Torii) updateServerMetadata(server MicroHttpServer, backends []string, routes []RouteSnapshot, conf config.HTTPListener) {
+	mwNames := collectMiddlewareNames(routes)
 	switch s := server.(type) {
 	case *ToriiHttpServer:
 		s.middlewareChain = mwNames

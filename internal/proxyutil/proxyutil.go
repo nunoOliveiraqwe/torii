@@ -27,8 +27,9 @@ var sharedTransport = &http.Transport{
 }
 
 type ProxyOptions struct {
-	DropPath  bool
-	DropQuery bool
+	DropPath          bool
+	DropQuery         bool
+	ReplaceHostHeader bool
 }
 
 func NewReverseProxy(backend string, opts ProxyOptions) (*httputil.ReverseProxy, error) {
@@ -45,7 +46,7 @@ func NewReverseProxy(backend string, opts ProxyOptions) (*httputil.ReverseProxy,
 		Rewrite:   rewriteFunc(parsedUrl, opts),
 		Transport: sharedTransport,
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
-			zap.S().Errorf("proxy error: backend=%s path=%s err=%v", parsedUrl.Host, r.URL.Path, err)
+			zap.S().Warnf("proxy error: backend=%s path=%s err=%v", parsedUrl.Host, r.URL.Path, err)
 			w.WriteHeader(http.StatusBadGateway)
 		},
 	}
@@ -56,6 +57,9 @@ func rewriteFunc(proxyUrl *url.URL, opts ProxyOptions) func(r *httputil.ProxyReq
 	return func(r *httputil.ProxyRequest) {
 		r.SetURL(proxyUrl)
 		r.SetXForwarded()
+		if !opts.ReplaceHostHeader {
+			r.Out.Host = r.In.Host // preserve the original Host header, set url already re-writes it
+		}
 		r.Out.Header.Set("X-Origin-Host", proxyUrl.Host)
 
 		if opts.DropPath {

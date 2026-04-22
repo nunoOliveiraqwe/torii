@@ -27,3 +27,25 @@ type ProxySnapshot struct {
 	Routes          []RouteSnapshot   `json:"routes,omitempty"`
 	ErrorMessage    string            `json:"errorMessage,omitempty"`
 }
+
+func collectMiddlewareNames(routes []RouteSnapshot) []string {
+	seen := make(map[string]struct{})
+	var names []string
+	for _, r := range routes {
+		for _, n := range r.Middlewares {
+			if _, ok := seen[n]; !ok {
+				seen[n] = struct{}{}
+				names = append(names, n)
+			}
+		}
+		for _, p := range r.Paths {
+			for _, n := range p.Middlewares {
+				if _, ok := seen[n]; !ok {
+					seen[n] = struct{}{}
+					names = append(names, n)
+				}
+			}
+		}
+	}
+	return names
+}

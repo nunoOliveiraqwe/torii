@@ -182,7 +182,7 @@ func simpleListener(port int, backend string, mws []middleware.Config) config.HT
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend:     backend,
+			Backend:     config.BackendConfig{Address: backend},
 			Middlewares: mws,
 		},
 	}
@@ -1058,7 +1058,7 @@ func TestMiddlewareChain_GlobalBeforeRoute(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{{
 				Type: "Headers",
 				Options: map[string]interface{}{
@@ -1087,7 +1087,7 @@ func TestMiddlewareChain_RouteBeforePath(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{{
 				Type: "Headers",
 				Options: map[string]interface{}{
@@ -1138,7 +1138,7 @@ func TestMiddlewareChain_GlobalRoutePathAllApply(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{{
 				Type: "Headers",
 				Options: map[string]interface{}{
@@ -1197,7 +1197,7 @@ func TestMiddlewareChain_FullOrderProof(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{
 				{
 					// First: check that global already ran
@@ -1278,7 +1278,7 @@ func TestMiddlewareChain_PathMatchVsNonPathMatch(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{{
 				Type: "Headers",
 				Options: map[string]interface{}{
@@ -1355,7 +1355,7 @@ func TestMiddlewareChain_HostRoutingWithGlobalAndPathMiddleware(t *testing.T) {
 			{
 				Host: "alpha.local",
 				Target: config.RouteTarget{
-					Backend: backendA.URL,
+					Backend: config.BackendConfig{Address: backendA.URL},
 					Middlewares: []middleware.Config{{
 						Type: "Headers",
 						Options: map[string]interface{}{
@@ -1390,7 +1390,7 @@ func TestMiddlewareChain_HostRoutingWithGlobalAndPathMiddleware(t *testing.T) {
 			{
 				Host: "beta.local",
 				Target: config.RouteTarget{
-					Backend: backendB.URL,
+					Backend: config.BackendConfig{Address: backendB.URL},
 					Middlewares: []middleware.Config{{
 						Type: "Headers",
 						Options: map[string]interface{}{
@@ -1403,7 +1403,7 @@ func TestMiddlewareChain_HostRoutingWithGlobalAndPathMiddleware(t *testing.T) {
 			},
 		},
 		Default: &config.RouteTarget{
-			Backend: backendDefault.URL,
+			Backend: config.BackendConfig{Address: backendDefault.URL},
 		},
 	}
 	baseURL := buildAndStart(t, listener, globalConf)
@@ -1478,7 +1478,7 @@ func TestMiddlewareChain_MixedMiddlewareTypesPerLevel(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{{
 				Type: "Headers",
 				Options: map[string]interface{}{
@@ -1527,10 +1527,10 @@ func TestMiddlewareChain_MixedMiddlewareTypesPerLevel(t *testing.T) {
 			Port: port2,
 			Bind: config.Ipv4Flag,
 			Default: &config.RouteTarget{
-				Backend: backend2.URL,
+				Backend: config.BackendConfig{Address: backend2.URL},
 				Paths: []config.PathRule{{
 					Pattern:     "/slow-path/*",
-					Backend:     backend2.URL,
+					Backend:     &config.BackendConfig{Address: backend2.URL},
 					StripPrefix: &stripPrefix,
 					Middlewares: []middleware.Config{{
 						Type: "Timeout",
@@ -1575,7 +1575,7 @@ func TestChainBattle_RequestIdLog_HeadersCmp_BodySizeLimit(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{
 				{Type: "Headers", Options: map[string]interface{}{
 					"set-headers-req": map[string]interface{}{"X-Battle": "1"},
@@ -1583,7 +1583,7 @@ func TestChainBattle_RequestIdLog_HeadersCmp_BodySizeLimit(t *testing.T) {
 			},
 			Paths: []config.PathRule{{
 				Pattern: "/upload/*",
-				Backend: backend.URL,
+				Backend: &config.BackendConfig{Address: backend.URL},
 				Middlewares: []middleware.Config{
 					{Type: "BodySizeLimit", Options: map[string]interface{}{"max-size": "1k"}},
 				},
@@ -1642,7 +1642,7 @@ func TestChainBattle_GlobalRateLimit_RouteIdHeaders_PathTimeout(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{
 				{Type: "RequestId", Options: map[string]interface{}{"prefix": "battle2"}},
 				{Type: "Headers", Options: map[string]interface{}{
@@ -1651,7 +1651,7 @@ func TestChainBattle_GlobalRateLimit_RouteIdHeaders_PathTimeout(t *testing.T) {
 			},
 			Paths: []config.PathRule{{
 				Pattern:     "/timed/*",
-				Backend:     backend.URL,
+				Backend:     &config.BackendConfig{Address: backend.URL},
 				StripPrefix: &stripPrefix,
 				Middlewares: []middleware.Config{{
 					Type:    "Timeout",
@@ -1708,7 +1708,7 @@ func TestChainBattle_GlobalHoneyPot_RouteStripHeaders_PathSetHeaders(t *testing.
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{{
 				Type: "Headers", Options: map[string]interface{}{
 					"strip-headers-req": []interface{}{"X-Internal"},
@@ -1778,7 +1778,7 @@ func TestChainBattle_GlobalUABlocker_RouteMetricsLog_PathHeadersCmp(t *testing.T
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{
 				{Type: "Metrics"},
 				{Type: "RequestLog"},
@@ -1846,7 +1846,7 @@ func TestChainBattle_GlobalResHeaders_RouteCircuitBreaker_PathReqHeaders(t *test
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{{
 				Type: "CircuitBreaker",
 				Options: map[string]interface{}{
@@ -1907,7 +1907,7 @@ func TestChainBattle_GlobalTimeout_RouteHeaders_PathRateLimiter(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{
 				{Type: "Headers", Options: map[string]interface{}{
 					"set-headers-req":   map[string]interface{}{"X-Route": "set"},
@@ -1979,7 +1979,7 @@ func TestChainBattle_GlobalBodyLimit_RouteIdTimeout_PathCmpSet(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{
 				{Type: "RequestId", Options: map[string]interface{}{"prefix": "b7"}},
 				{Type: "Timeout", Options: map[string]interface{}{"request-timeout": "5s"}},
@@ -2048,7 +2048,7 @@ func TestChainBattle_TwoHosts_DifferentStacks_GlobalShared(t *testing.T) {
 			{
 				Host: "app.local",
 				Target: config.RouteTarget{
-					Backend: backendApp.URL,
+					Backend: config.BackendConfig{Address: backendApp.URL},
 					Middlewares: []middleware.Config{
 						{Type: "Headers", Options: map[string]interface{}{
 							"set-headers-req": map[string]interface{}{"X-Service": "app"},
@@ -2077,7 +2077,7 @@ func TestChainBattle_TwoHosts_DifferentStacks_GlobalShared(t *testing.T) {
 			{
 				Host: "api.local",
 				Target: config.RouteTarget{
-					Backend: backendApi.URL,
+					Backend: config.BackendConfig{Address: backendApi.URL},
 					Middlewares: []middleware.Config{
 						{Type: "Headers", Options: map[string]interface{}{
 							"set-headers-req": map[string]interface{}{"X-Service": "api"},
@@ -2187,7 +2187,7 @@ func TestChainBattle_GlobalResHeaders_RouteRedirect(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{{
 				Type: "Redirect",
 				Options: map[string]interface{}{
@@ -2234,7 +2234,7 @@ func TestChainBattle_MaxDepth_ThreeMiddlewaresPerLevel(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{
 				{Type: "Timeout", Options: map[string]interface{}{"request-timeout": "5s"}},
 				{Type: "Headers", Options: map[string]interface{}{
@@ -2246,7 +2246,7 @@ func TestChainBattle_MaxDepth_ThreeMiddlewaresPerLevel(t *testing.T) {
 			},
 			Paths: []config.PathRule{{
 				Pattern: "/deep/*",
-				Backend: backend.URL,
+				Backend: &config.BackendConfig{Address: backend.URL},
 				Middlewares: []middleware.Config{
 					{Type: "BodySizeLimit", Options: map[string]interface{}{"max-size": "5m"}},
 					{Type: "Headers", Options: map[string]interface{}{
@@ -2290,7 +2290,7 @@ func TestChainBattle_ConcurrentFullChain(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{
 				{Type: "Metrics"},
 				{Type: "Headers", Options: map[string]interface{}{
@@ -2378,7 +2378,7 @@ func TestRouting_HostBasedRouting(t *testing.T) {
 			{
 				Host: "alpha.local",
 				Target: config.RouteTarget{
-					Backend: backendA.URL,
+					Backend: config.BackendConfig{Address: backendA.URL},
 					Middlewares: []middleware.Config{{
 						Type: "Headers",
 						Options: map[string]interface{}{
@@ -2392,7 +2392,7 @@ func TestRouting_HostBasedRouting(t *testing.T) {
 			{
 				Host: "beta.local",
 				Target: config.RouteTarget{
-					Backend: backendB.URL,
+					Backend: config.BackendConfig{Address: backendB.URL},
 					Middlewares: []middleware.Config{{
 						Type: "Headers",
 						Options: map[string]interface{}{
@@ -2435,11 +2435,11 @@ func TestRouting_UnmatchedHostWithDefault(t *testing.T) {
 		Routes: []config.Route{{
 			Host: "specific.local",
 			Target: config.RouteTarget{
-				Backend: backendRouted.URL,
+				Backend: config.BackendConfig{Address: backendRouted.URL},
 			},
 		}},
 		Default: &config.RouteTarget{
-			Backend: backendDefault.URL,
+			Backend: config.BackendConfig{Address: backendDefault.URL},
 			Middlewares: []middleware.Config{{
 				Type: "Headers",
 				Options: map[string]interface{}{
@@ -2469,7 +2469,7 @@ func TestRouting_UnmatchedHostNoDefault_502(t *testing.T) {
 		Routes: []config.Route{{
 			Host: "specific.local",
 			Target: config.RouteTarget{
-				Backend: backend.URL,
+				Backend: config.BackendConfig{Address: backend.URL},
 			},
 		}},
 	}
@@ -2494,10 +2494,10 @@ func TestRouting_PathSpecificBackend(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: mainBackend.URL,
+			Backend: config.BackendConfig{Address: mainBackend.URL},
 			Paths: []config.PathRule{{
 				Pattern: "/api/*",
-				Backend: apiBackend.URL,
+				Backend: &config.BackendConfig{Address: apiBackend.URL},
 				Middlewares: []middleware.Config{{
 					Type: "Headers",
 					Options: map[string]interface{}{
@@ -2532,7 +2532,7 @@ func TestRouting_PathMiddlewareOnlyNoBackend(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Paths: []config.PathRule{{
 				Pattern: "/protected/*",
 				Middlewares: []middleware.Config{{
@@ -2727,8 +2727,8 @@ func TestGlobalMiddleware_AppliedToAllRoutes(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Routes: []config.Route{
-			{Host: "a.local", Target: config.RouteTarget{Backend: backendA.URL}},
-			{Host: "b.local", Target: config.RouteTarget{Backend: backendB.URL}},
+			{Host: "a.local", Target: config.RouteTarget{Backend: config.BackendConfig{Address: backendA.URL}}},
+			{Host: "b.local", Target: config.RouteTarget{Backend: config.BackendConfig{Address: backendB.URL}}},
 		},
 	}
 	baseURL := buildAndStart(t, listener, globalConf)
@@ -3016,9 +3016,9 @@ func TestEdge_EmptyRouteHost_Skipped(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Routes: []config.Route{
-			{Host: "", Target: config.RouteTarget{Backend: backend.URL}},
+			{Host: "", Target: config.RouteTarget{Backend: config.BackendConfig{Address: backend.URL}}},
 		},
-		Default: &config.RouteTarget{Backend: backend.URL},
+		Default: &config.RouteTarget{Backend: config.BackendConfig{Address: backend.URL}},
 	}
 	baseURL := buildAndStart(t, listener, nil)
 
@@ -3062,7 +3062,7 @@ func TestEdge_MultiplePathRulesOnSameRoute(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Paths: []config.PathRule{
 				{
 					Pattern: "/admin/*",
@@ -3107,7 +3107,7 @@ func TestEdge_ServerTimeouts(t *testing.T) {
 		ReadHeaderTimeout: 2 * time.Second,
 		WriteTimeout:      5 * time.Second,
 		IdleTimeout:       30 * time.Second,
-		Default:           &config.RouteTarget{Backend: backend.URL},
+		Default:           &config.RouteTarget{Backend: config.BackendConfig{Address: backend.URL}},
 	}
 	baseURL := buildAndStart(t, listener, nil)
 
@@ -3134,10 +3134,10 @@ func TestPathPrefixStripping_DedicatedBackend(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: mainBackend.URL,
+			Backend: config.BackendConfig{Address: mainBackend.URL},
 			Paths: []config.PathRule{{
 				Pattern:     "/api/*",
-				Backend:     apiBackend.URL,
+				Backend: &config.BackendConfig{Address: apiBackend.URL},
 				StripPrefix: &stripPrefix,
 			}},
 		},
@@ -3161,10 +3161,10 @@ func TestPathPrefixStripping_NestedPrefix(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: mainBackend.URL,
+			Backend: config.BackendConfig{Address: mainBackend.URL},
 			Paths: []config.PathRule{{
 				Pattern:     "/app/v1/*",
-				Backend:     apiBackend.URL,
+				Backend: &config.BackendConfig{Address: apiBackend.URL},
 				StripPrefix: &stripPrefix,
 			}},
 		},
@@ -3191,10 +3191,10 @@ func TestPathRule_DropQuery_True(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Paths: []config.PathRule{{
 				Pattern:   "/api/*",
-				Backend:   backend.URL,
+				Backend: &config.BackendConfig{Address: backend.URL},
 				DropQuery: &dropQuery,
 			}},
 		},
@@ -3218,10 +3218,10 @@ func TestPathRule_DropQuery_False(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Paths: []config.PathRule{{
 				Pattern:   "/api/*",
-				Backend:   backend.URL,
+				Backend: &config.BackendConfig{Address: backend.URL},
 				DropQuery: &dropQuery,
 			}},
 		},
@@ -3414,7 +3414,7 @@ func TestRouting_ExactMatchPathPattern(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Paths: []config.PathRule{{
 				Pattern: "/health",
 				Middlewares: []middleware.Config{{
@@ -3634,7 +3634,7 @@ func TestGlobalBlock_PreventsRouteExecution(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Middlewares: []middleware.Config{{
 				Type: "Headers",
 				Options: map[string]interface{}{
@@ -3676,7 +3676,7 @@ func TestRouting_PathPriority_SpecificOverWildcard(t *testing.T) {
 		Port: port,
 		Bind: config.Ipv4Flag,
 		Default: &config.RouteTarget{
-			Backend: backend.URL,
+			Backend: config.BackendConfig{Address: backend.URL},
 			Paths: []config.PathRule{
 				{
 					Pattern: "/api/*",
@@ -3738,7 +3738,7 @@ func TestEdge_DefaultOnlyNoRoutes(t *testing.T) {
 	listener := config.HTTPListener{
 		Port:    port,
 		Bind:    config.Ipv4Flag,
-		Default: &config.RouteTarget{Backend: backend.URL},
+		Default: &config.RouteTarget{Backend: config.BackendConfig{Address: backend.URL}},
 	}
 	baseURL := buildAndStart(t, listener, nil)
 	resp := doGet(t, baseURL+"/")
@@ -3763,7 +3763,7 @@ func TestEdge_GlobalMiddlewareOnly_NoRouteMiddleware(t *testing.T) {
 	listener := config.HTTPListener{
 		Port:    port,
 		Bind:    config.Ipv4Flag,
-		Default: &config.RouteTarget{Backend: backend.URL},
+		Default: &config.RouteTarget{Backend: config.BackendConfig{Address: backend.URL}},
 	}
 	baseURL := buildAndStart(t, listener, globalConf)
 

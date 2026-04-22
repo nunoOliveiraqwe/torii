@@ -55,7 +55,7 @@ type Route struct {
 
 type PathRule struct {
 	Pattern         string              `yaml:"pattern" json:"pattern"`
-	Backend         string              `yaml:"backend" json:"backend,omitempty"`
+	Backend         *BackendConfig      `yaml:"backend" json:"backend,omitempty"`
 	DropQuery       *bool               `yaml:"drop-query" json:"drop-query,omitempty"`
 	StripPrefix     *bool               `yaml:"strip-prefix" json:"strip-prefix,omitempty"`
 	Middlewares     []middleware.Config `yaml:"middlewares" json:"middlewares,omitempty"`
@@ -63,7 +63,7 @@ type PathRule struct {
 }
 
 type RouteTarget struct {
-	Backend         string              `yaml:"backend" json:"backend"`
+	Backend         BackendConfig       `yaml:"backend" json:"backend"`
 	Middlewares     []middleware.Config `yaml:"middlewares" json:"middlewares,omitempty"`
 	Paths           []PathRule          `yaml:"paths" json:"paths,omitempty"`
 	DisableDefaults bool                `yaml:"disable-default-middlewares" json:"disable-default-middlewares,omitempty"`
@@ -73,4 +73,9 @@ type TLSConfig struct {
 	UseAcme bool   `yaml:"use-acme" json:"use-acme"`
 	Cert    string `yaml:"cert" json:"cert,omitempty"`
 	Key     string `yaml:"key" json:"key,omitempty"`
+}
+
+type BackendConfig struct {
+	Address           string `yaml:"address" json:"address"`
+	ReplaceHostHeader bool   `yaml:"replace-host-header" json:"replace-host-header,omitempty"`
 }

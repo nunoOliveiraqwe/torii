@@ -112,7 +112,7 @@ type RouteDTO struct {
 
 // RouteTargetDTO mirrors config.RouteTarget. Middlewares use middleware.Config directly.
 type RouteTargetDTO struct {
-	Backend         string                `json:"backend"`
+	Backend         BackendConfigDTO      `json:"backend"`
 	Middlewares     []MiddlewareConfigDTO `json:"middlewares,omitempty"`
 	Paths           []PathRuleDTO         `json:"paths,omitempty"`
 	DisableDefaults bool                  `json:"disable_default_middlewares,omitempty"`
@@ -121,11 +121,17 @@ type RouteTargetDTO struct {
 // PathRuleDTO mirrors config.PathRule.
 type PathRuleDTO struct {
 	Pattern         string                `json:"pattern"`
-	Backend         string                `json:"backend,omitempty"`
+	Backend         *BackendConfigDTO     `json:"backend,omitempty"`
 	DropQuery       *bool                 `json:"drop_query,omitempty"`
 	StripPrefix     *bool                 `json:"strip_prefix,omitempty"`
 	Middlewares     []MiddlewareConfigDTO `json:"middlewares,omitempty"`
 	DisableDefaults bool                  `json:"disable_default_middlewares,omitempty"`
+}
+
+// BackendConfigDTO mirrors config.BackendConfig.
+type BackendConfigDTO struct {
+	Address           string `json:"address"`
+	ReplaceHostHeader bool   `json:"replace_host_header,omitempty"`
 }
 
 type MiddlewareConfigDTO struct {

@@ -86,11 +86,11 @@ func (a *Application) ShutdownDebug(ctx context.Context) {
 
 func httpListenerBackends(ln config.HTTPListener) []string {
 	if ln.Default != nil {
-		return []string{ln.Default.Backend}
+		return []string{ln.Default.Backend.Address}
 	}
 	backends := make([]string, 0, len(ln.Routes))
 	for _, r := range ln.Routes {
-		backends = append(backends, r.Target.Backend)
+		backends = append(backends, r.Target.Backend.Address)
 	}
 	return backends
 }
