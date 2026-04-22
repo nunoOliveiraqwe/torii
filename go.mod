@@ -7,6 +7,7 @@ require (
 	github.com/alexedwards/scs/v2 v2.9.0
 	github.com/cloudflare/ahocorasick v0.0.0-20240916140611-054963ec9396
 	github.com/go-acme/lego/v4 v4.33.0
+	github.com/klauspost/compress v1.18.5
 	github.com/mattn/go-sqlite3 v1.14.6
 	github.com/oschwald/maxminddb-golang/v2 v2.1.1
 	github.com/shirou/gopsutil/v4 v4.26.3
