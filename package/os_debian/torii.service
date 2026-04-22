@@ -41,7 +41,7 @@ RestrictSUIDSGID=yes
 ReadWritePaths=/var/lib/torii /etc/torii
 
 
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 SystemCallFilter=~@mount @reboot @swap @clock @cpu-emulation @debug @module @obsolete @raw-io @privileged
 SystemCallArchitectures=native
 
