@@ -61,7 +61,7 @@ func TestGetMiddleware_EmptyKey(t *testing.T) {
 
 func TestGetAvailableMiddlewares(t *testing.T) {
 	names := GetAvailableMiddlewares()
-	assert.Len(t, names, 15)
+	assert.Len(t, names, 16)
 	assert.Contains(t, names, "Metrics")
 	assert.Contains(t, names, "RequestId")
 	assert.Contains(t, names, "RequestLog")
@@ -77,6 +77,7 @@ func TestGetAvailableMiddlewares(t *testing.T) {
 	assert.Contains(t, names, "CircuitBreaker")
 	assert.Contains(t, names, "StaticResponse")
 	assert.Contains(t, names, "Cors")
+	assert.Contains(t, names, "Compression")
 }
 
 // ---------------------------------------------------------------------------
@@ -84,14 +85,14 @@ func TestGetAvailableMiddlewares(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestApplyMiddlewares_NilHandler(t *testing.T) {
-	_, err := ApplyMiddlewares(context.Background(), nil, []Config{{Type: "RequestId"}}, false)
+	_, _, err := ApplyMiddlewares(context.Background(), nil, []Config{{Type: "RequestId"}}, false)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "nil")
 }
 
 func TestApplyMiddlewares_UnknownMiddleware(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-	_, err := ApplyMiddlewares(context.Background(), handler, []Config{{Type: "Unknown"}}, false)
+	_, _, err := ApplyMiddlewares(context.Background(), handler, []Config{{Type: "Unknown"}}, false)
 	assert.Error(t, err)
 }
 
@@ -101,7 +102,7 @@ func TestApplyMiddlewares_EmptyChain(t *testing.T) {
 		called = true
 	})
 
-	result, err := ApplyMiddlewares(context.Background(), handler, []Config{}, false)
+	result, _, err := ApplyMiddlewares(context.Background(), handler, []Config{}, false)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 
@@ -117,7 +118,7 @@ func TestApplyMiddlewares_SingleMiddleware(t *testing.T) {
 		called = true
 	})
 
-	result, err := ApplyMiddlewares(context.Background(), handler, []Config{{Type: "RequestId"}}, false)
+	result, _, err := ApplyMiddlewares(context.Background(), handler, []Config{{Type: "RequestId"}}, false)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 
@@ -139,7 +140,7 @@ func TestApplyMiddlewares_MultipleMiddlewares(t *testing.T) {
 		{Type: "RequestLog"},
 	}
 
-	result, err := ApplyMiddlewares(context.Background(), handler, chain, false)
+	result, _, err := ApplyMiddlewares(context.Background(), handler, chain, false)
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)

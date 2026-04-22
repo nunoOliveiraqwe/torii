@@ -8,16 +8,16 @@ import (
 	"go.uber.org/zap"
 )
 
-func buildMiddlewareChain(ctx context.Context, handler http.HandlerFunc, mwConfig []middleware.Config, disableDefaults bool) (http.HandlerFunc, error) {
+func buildMiddlewareChain(ctx context.Context, handler http.HandlerFunc, mwConfig []middleware.Config, disableDefaults bool) (http.HandlerFunc, []middleware.Config, error) {
 	if len(mwConfig) == 0 && disableDefaults {
-		return handler, nil
+		return handler, mwConfig, nil
 	}
-	next, err := middleware.ApplyMiddlewares(ctx, handler, mwConfig, disableDefaults)
+	next, applied, err := middleware.ApplyMiddlewares(ctx, handler, mwConfig, disableDefaults)
 	if err != nil {
 		zap.S().Errorf("Error applying middleware chain: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
-	return next, nil
+	return next, applied, nil
 }
 
 func middlewareNames(configs []middleware.Config) []string {

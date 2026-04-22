@@ -41,13 +41,15 @@ func init() {
 		"CircuitBreaker":   {Fn: CircuitBreakerMiddleware},
 		"Cors":             {Fn: CorsMiddleware},
 		"StaticResponse":   {Fn: StaticResponseMiddleware, Terminates: true},
+		"Compression":      {Fn: CompressionMiddleware},
+		"BasicAuth":        {Fn: BasicAuthMiddleware},
 	}
 }
 
-func ApplyMiddlewares(ctx context.Context, handler http.HandlerFunc, middlewares []Config, disableDefaults bool) (http.HandlerFunc, error) {
+func ApplyMiddlewares(ctx context.Context, handler http.HandlerFunc, middlewares []Config, disableDefaults bool) (http.HandlerFunc, []Config, error) {
 	if handler == nil {
 		zap.S().Errorf("Handler cannot be nil when applying middleware chain")
-		return nil, errors.New("handler cannot be nil when applying middleware chain")
+		return nil, nil, errors.New("handler cannot be nil when applying middleware chain")
 	}
 	if !disableDefaults {
 		middlewares = applyDefaultMiddlewares(middlewares)
@@ -57,7 +59,7 @@ func ApplyMiddlewares(ctx context.Context, handler http.HandlerFunc, middlewares
 		entry, err := GetMiddleware(middlewares[i].Type)
 		if err != nil {
 			zap.S().Errorf("Error applying middleware of type %s: %v", middlewares[i].Type, err)
-			return nil, err
+			return nil, nil, err
 		}
 		if middlewares[i].Options == nil {
 			zap.S().Warnf("Middleware options for middleware of type %s is nil. Initializing it as an empty map", middlewares[i].Type)
@@ -65,7 +67,7 @@ func ApplyMiddlewares(ctx context.Context, handler http.HandlerFunc, middlewares
 		}
 		handler = entry.Fn(ctx, handler, middlewares[i])
 	}
-	return handler, nil
+	return handler, middlewares, nil
 }
 
 func MiddlewareExists(key string) bool {
