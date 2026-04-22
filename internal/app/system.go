@@ -52,6 +52,8 @@ type SystemService interface {
 	GetRecentErrors(n int) []metrics.ErrorLogEntry
 	GetRecentRequests(n int) []metrics.RequestLogEntry
 	GetRecentBlockedEntries(n int) []metrics.BlockLogEntry
+	IsReadOnly() bool
+	PersistConfig() error
 }
 
 type systemService struct {
@@ -63,9 +65,12 @@ type systemService struct {
 	globalMetricsManager *metrics.ConnectionMetricsManager
 	sseBroker            *SSEBroker
 	startTime            time.Time
+	configPath           string
+	readOnly             bool
+	appConfig            config.AppConfig
 }
 
-func NewSystemService(conf config.AppConfig) (SystemService, error) {
+func NewSystemService(conf config.AppConfig, configPath string, readOnly bool) (SystemService, error) {
 	zap.S().Info("Initializing system service")
 	mgr := metrics.NewGlobalMetricsHandler(2, context.Background())
 
@@ -101,6 +106,9 @@ func NewSystemService(conf config.AppConfig) (SystemService, error) {
 		globalMetricsManager: mgr,
 		sseBroker:            NewSSEBroker(mgr),
 		startTime:            time.Now(),
+		configPath:           configPath,
+		readOnly:             readOnly,
+		appConfig:            conf,
 	}
 	svc.serviceStore = NewServiceStore(NewDataStore(db), svc.StartStopAcme, svc.GetConfiguredProxyServers)
 	return svc, nil
@@ -312,3 +320,21 @@ func (sm *systemService) EditProxy(port int, conf config.HTTPListener) error {
 	zap.S().Infof("Proxy on port %d edited successfully", port)
 	return nil
 }
+
+func (sm *systemService) IsReadOnly() bool {
+	return sm.readOnly
+}
+
+func (sm *systemService) PersistConfig() error {
+	if sm.configPath == "" {
+		zap.S().Warn("No config file path set, skipping config persistence")
+		return nil
+	}
+	sm.appConfig.NetConfig.HTTPListeners = sm.micro.GetAllHTTPConfigs()
+	if err := config.SaveConfiguration(sm.configPath, sm.appConfig); err != nil {
+		return fmt.Errorf("failed to persist configuration: %w", err)
+	}
+	zap.S().Info("Configuration persisted to disk")
+	return nil
+}
+

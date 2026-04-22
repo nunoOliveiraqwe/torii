@@ -113,3 +113,14 @@ func LoadConfiguration(path string) (AppConfig, error) {
 	}
 	return conf, nil
 }
+
+func SaveConfiguration(path string, conf AppConfig) error {
+	data, err := yaml.Marshal(&conf)
+	if err != nil {
+		return fmt.Errorf("failed to marshal configuration: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write configuration file %q: %w", path, err)
+	}
+	return nil
+}

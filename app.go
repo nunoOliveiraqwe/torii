@@ -67,7 +67,8 @@ func (a *Application) Validate() error {
 }
 
 func (a *Application) Start() error {
-	svc, err := app.NewSystemService(a.appConfig)
+	readOnly := a.flags.ReadOnly != nil && *a.flags.ReadOnly
+	svc, err := app.NewSystemService(a.appConfig, a.flags.ConfigPath, readOnly)
 	if err != nil {
 		return fmt.Errorf("failed to create system service: %w", err)
 	}

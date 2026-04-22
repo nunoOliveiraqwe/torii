@@ -10,6 +10,7 @@ type Flags struct {
 	ConfigPath string
 	Debug      *bool
 	LogLevel   *string
+	ReadOnly   *bool
 }
 
 func RegisterFlags() *Flags {
@@ -17,6 +18,7 @@ func RegisterFlags() *Flags {
 	flag.StringVar(&f.ConfigPath, "config", "", "Path to the configuration file")
 	f.Debug = flag.Bool("debug", false, "Enable debug mode")
 	f.LogLevel = flag.String("log-level", "", "Log level (overrides config)")
+	f.ReadOnly = flag.Bool("read-only", false, "Prevent UI mutations from modifying the config file or proxy state")
 	return f
 }
 
