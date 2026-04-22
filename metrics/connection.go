@@ -82,7 +82,10 @@ func (h *ConnectionMetricsManager) TrackMetricsForConnection(serverId, connectio
 		zap.S().Infof("Connection metric for connection %s already exists, returning existing report function", connectionName)
 		return func(reqMetric *RequestMetric) { //yes, its a new func, but metrics are then routed by name, so this works
 			reqMetric.connectionName = connectionName
-			h.metricsChan <- reqMetric
+			select {
+			case h.metricsChan <- reqMetric:
+			case <-h.context.Done():
+			}
 		}
 	}
 
@@ -121,7 +124,10 @@ func (h *ConnectionMetricsManager) TrackMetricsForConnection(serverId, connectio
 
 	return func(metric *RequestMetric) {
 		metric.connectionName = connectionName
-		h.metricsChan <- metric
+		select {
+		case h.metricsChan <- metric:
+		case <-h.context.Done():
+		}
 	}
 }
 

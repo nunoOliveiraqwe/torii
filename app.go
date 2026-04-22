@@ -101,6 +101,11 @@ func (a *Application) Shutdown(ctx context.Context) error {
 
 	a.ShutdownDebug(ctx)
 
+	if a.service != nil {
+		zap.S().Info("Closing SSE broker to release streaming connections")
+		a.service.GetSSEBroker().Stop()
+	}
+
 	if a.apiServer != nil {
 		zap.S().Info("Shutting down API server")
 		if err := a.apiServer.Shutdown(ctx); err != nil {
