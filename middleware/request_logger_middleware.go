@@ -80,8 +80,10 @@ func (z *zapLogFormatter) newRequestLogger(r *http.Request) *zap.Logger {
 		zap.String("method", r.Method),
 		zap.String("host", r.Host),
 		zap.String("url", r.URL.String()),
+		zap.String("proto", r.Proto),
 		zap.String("remote_addr", r.RemoteAddr),
 		zap.String("user_agent", r.UserAgent()),
+		zap.String("referer", r.Referer()),
 	)
 }
 
