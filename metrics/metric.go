@@ -32,6 +32,7 @@ type Metric struct {
 
 type RequestMetric struct {
 	RemoteAddress              string
+	Host                       string
 	Country                    string
 	connectionName             string
 	LatencyMs                  int64

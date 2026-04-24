@@ -319,6 +319,7 @@ func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric
 	h.requestLog.Add(RequestLogEntry{
 		Timestamp:      time.Now(),
 		RemoteAddress:  metric.RemoteAddress,
+		Host:           metric.Host,
 		Country:        metric.Country,
 		ConnectionName: metric.connectionName,
 		StatusCode:     metric.StatusCode,
@@ -332,6 +333,7 @@ func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric
 	if metric.IsMiddlewareBlockedRequest {
 		h.blockedLog.Add(BlockLogEntry{
 			RemoteAddress:      metric.RemoteAddress,
+			Host:               metric.Host,
 			Timestamp:          time.Now(),
 			Method:             metric.Method,
 			Path:               metric.Path,

@@ -8,6 +8,7 @@ import (
 
 type BlockLogEntry struct {
 	RemoteAddress      string    `json:"remote_address"`
+	Host               string    `json:"host"`
 	Timestamp          time.Time `json:"timestamp"`
 	Method             string    `json:"method"`
 	Path               string    `json:"path"`

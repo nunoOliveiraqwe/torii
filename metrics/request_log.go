@@ -8,6 +8,7 @@ import (
 
 type RequestLogEntry struct {
 	RemoteAddress  string    `json:"remote_address"`
+	Host           string    `json:"host"`
 	Country        string    `json:"country"`
 	Timestamp      time.Time `json:"timestamp"`
 	ConnectionName string    `json:"connection_name"` //to be able to filter by, or else this would have to be per connection metric

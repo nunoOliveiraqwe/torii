@@ -146,6 +146,7 @@ func resolveReportFunc(ctx context.Context) metrics.MetricsReportFunc {
 func initializeRequestMetrics(r *http.Request) *metrics.RequestMetric {
 	return &metrics.RequestMetric{
 		RemoteAddress: r.RemoteAddr,
+		Host:          r.Host,
 		BytesReceived: r.ContentLength,
 		BytesSent:     0,
 		IsTimedOut:    false,
