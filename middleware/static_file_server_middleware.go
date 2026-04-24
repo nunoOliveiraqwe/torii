@@ -40,6 +40,7 @@ func (g guardedFileSystem) Open(name string) (http.File, error) {
 	if !g.allowDotFiles {
 		for _, seg := range strings.Split(name, "/") {
 			if strings.HasPrefix(seg, ".") && seg != "." && seg != ".." {
+				zap.S().Debugf("StaticFileServer: blocked dotfile access: %s", name)
 				return nil, os.ErrNotExist
 			}
 		}
@@ -47,6 +48,7 @@ func (g guardedFileSystem) Open(name string) (http.File, error) {
 
 	f, err := g.fs.Open(name)
 	if err != nil {
+		zap.S().Debugf("StaticFileServer: failed to open %s: %v", name, err)
 		return nil, err
 	}
 
@@ -55,16 +57,19 @@ func (g guardedFileSystem) Open(name string) (http.File, error) {
 	realPath, err := filepath.EvalSymlinks(fullPath)
 	if err != nil {
 		f.Close()
+		zap.S().Debugf("StaticFileServer: failed to resolve symlink for %s: %v", fullPath, err)
 		return nil, os.ErrNotExist
 	}
 	if !strings.HasPrefix(realPath, g.root+string(filepath.Separator)) && realPath != g.root {
 		f.Close()
+		zap.S().Warnf("StaticFileServer: symlink escape blocked: %s resolved to %s (outside root %s)", name, realPath, g.root)
 		return nil, os.ErrPermission
 	}
 
 	fi, err := f.Stat()
 	if err != nil {
 		f.Close()
+		zap.S().Debugf("StaticFileServer: failed to stat %s: %v", fullPath, err)
 		return nil, err
 	}
 
@@ -73,6 +78,7 @@ func (g guardedFileSystem) Open(name string) (http.File, error) {
 		indexPath := filepath.Join(fullPath, g.indexFile)
 		if _, err := os.Stat(indexPath); os.IsNotExist(err) {
 			f.Close()
+			zap.S().Debugf("StaticFileServer: directory %s has no index file (%s)", name, g.indexFile)
 			return nil, os.ErrNotExist
 		}
 	}
@@ -107,6 +113,7 @@ func StaticFileServerMiddleware(_ context.Context, _ http.HandlerFunc, conf Conf
 
 	if !opts.spa {
 		return func(w http.ResponseWriter, r *http.Request) {
+			zap.S().Debugf("StaticFileServer: serving %s from %s", r.URL.Path, absRoot)
 			fileServer.ServeHTTP(w, r)
 		}
 	}
@@ -115,6 +122,7 @@ func StaticFileServerMiddleware(_ context.Context, _ http.HandlerFunc, conf Conf
 	return func(w http.ResponseWriter, r *http.Request) {
 		f, err := gfs.Open(r.URL.Path)
 		if err != nil {
+			zap.S().Debugf("StaticFileServer: SPA fallback for %s (open error: %v)", r.URL.Path, err)
 			r.URL.Path = "/"
 		} else {
 			f.Close()
