@@ -13,25 +13,93 @@ import (
 	"go.uber.org/zap"
 )
 
+// honeypotDefaults contains paths that are unambiguously malicious — no
+// legitimate client would ever request them.  Unlike Coraza (which scores
+// each request independently), the honeypot **caches the source IP**, so a
+// false positive here blocks ALL future requests from that address.
+// Keep this list tight: high-confidence traps only.  Leave grey-area
+// detection (scanners, anomalous headers, etc.) to the WAF.
+//
+// Path syntax:
+//
+//	"/foo"   — prefix match  (strings.HasPrefix)
+//	"*/foo"  — contains match (strings.Contains) — catches /any/prefix/foo
 var honeypotDefaults = map[string][]string{
 	"php": {
+		// Environment files — should never be served through a reverse proxy
 		"/.env", "/.env.local", "/.env.production", "/.env.backup",
-		"/config.php", "/wp-config.php", "/wp-login.php", "/wp-admin",
-		"/xmlrpc.php", "/shell.php", "/cmd.php", "/eval.php", "/webshell.php",
-		"/phpmyadmin", "/pma", "/administrator",
+		"/.env.dev", "/.env.staging", "/.env.old", "/.env.save",
+		// phpinfo — wildcard catches /public/phpinfo.php, /old/phpinfo.php,
+		// /smtp/phpinfo.php, /cpanel/phpinfo.php, /mail/phpinfo.php, etc.
+		"*/phpinfo.php", "*/phpinfo", "*/php-info.php",
+		"/info.php", "/php.ini", "/test.php", "/debug.php",
+		"/server-status.php", "/server-info.php",
+		// phpinfo short-name aliases used by scanners
+		"/p.php", "/pi.php", "/i.php", "/pinfo.php", "/php.php",
+		// Symfony / Laravel profiler & environment leaks
+		"/_profiler/phpinfo", "/_environment",
+		"*/index.php/_environment",
+		// WordPress probes — only useful if you're NOT proxying WordPress
+		"/wp-config.php", "/wp-config.php.bak", "/wp-config.php.old",
+		"/wp-login.php", "/wp-admin/install.php",
+		"/wp-content/debug.log",
+		"/xmlrpc.php",
+		// Webshells — no legitimate reason for these to exist
+		"/shell.php", "/cmd.php", "/eval.php", "/webshell.php",
+		"/c99.php", "/r57.php", "/b374k.php", "/wso.php",
+		// Database admin panels
+		"/phpmyadmin", "/pma", "/myadmin", "/dbadmin",
 	},
 	"git": {
-		"/.git/config", "/.git/HEAD", "/.svn/entries",
+		"/.git/config", "/.git/HEAD", "/.git/index", "/.git/logs/HEAD",
+		"/.svn/entries", "/.svn/wc.db",
+		"/.hg/hgrc",
 	},
 	"infra": {
-		"/actuator", "/actuator/env", "/actuator/health",
-		"/metrics", "/.aws/credentials",
+		// Cloud credential files — never web-accessible
+		"/.aws/credentials", "/.aws/config",
+		"/.docker/config.json",
+		"/.kube/config",
+		// Actuator endpoints that leak secrets or memory
+		"/actuator/env", "/actuator/heapdump", "/actuator/jolokia",
+		// .NET / IIS configuration — never served intentionally
+		"/web.config", "/appsettings.json",
+	},
+	"secrets": {
+		// SSH keys
+		"/.ssh/id_rsa", "/.ssh/id_ed25519", "/.ssh/id_ecdsa", "/.ssh/authorized_keys",
+		// Apache auth files
+		"/.htpasswd", "/.htaccess",
+		// Package manager credentials
+		"/.npmrc", "/.pypirc", "/.gem/credentials",
+		"/.composer/auth.json", "/.m2/settings.xml",
+		// CI/CD tokens
+		"/.travis.yml", "/.circleci/config.yml",
+		// Private keys
+		"/server.key", "/private.key", "/ssl/private.key",
+		"/privatekey.pem", "/server.pem",
+	},
+	"iot": {
+		// D-Link / router exploitation
+		"/HNAP1/",
+		// Router/CPE config endpoints
+		"/goform/set_LimitClient_cfg", "/goform/webLogin",
+		"/setup.cgi", "/cgi-bin/luci",
+		// DVR/Camera panels
+		"/dvr/cmd", "/webcam", "/onvif/device_service",
+		"/录像机",
 	},
 	"backups": {
-		"/backup.zip", "/backup.sql", "/db.sql", "/dump.sql", "/database.sql",
+		"/backup.zip", "/backup.tar.gz", "/backup.sql", "/backup.sql.gz",
+		"/db.sql", "/dump.sql", "/database.sql", "/data.sql",
+		"/mysql.sql", "/db_backup.sql",
+		"/site.tar.gz", "/www.zip", "/htdocs.zip",
+		"/public.zip", "/html.zip",
 	},
 	"cgi": {
-		"/cgi-bin/",
+		"/cgi-bin/", "/cgi-bin/test-cgi",
+		"/cgi-bin/printenv", "/cgi-bin/php",
+		"/cgi-bin/bash", "/cgi-bin/sh",
 	},
 }
 

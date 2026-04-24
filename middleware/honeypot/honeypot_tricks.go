@@ -444,8 +444,15 @@ func (h *StaticResponseServer) IsHoneyPottedIp(ip string) bool {
 
 func isHoneyPotPath(paths []string, path string) bool {
 	for _, p := range paths {
-		if strings.HasPrefix(path, p) {
-			return true
+		if len(p) > 1 && p[0] == '*' {
+			// Wildcard: match if the request path contains the suffix anywhere
+			if strings.Contains(path, p[1:]) {
+				return true
+			}
+		} else {
+			if strings.HasPrefix(path, p) {
+				return true
+			}
 		}
 	}
 	return false
