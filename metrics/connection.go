@@ -353,6 +353,7 @@ func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric
 			Timestamp:      time.Now(),
 			ConnectionName: metric.connectionName,
 			RemoteAddress:  metric.RemoteAddress,
+			Host:           metric.Host,
 			StatusCode:     metric.StatusCode,
 			Method:         metric.Method,
 			Path:           metric.Path,

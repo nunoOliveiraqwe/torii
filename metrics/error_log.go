@@ -10,6 +10,7 @@ type ErrorLogEntry struct {
 	Timestamp      time.Time `json:"timestamp"`
 	ConnectionName string    `json:"connection_name"`
 	RemoteAddress  string    `json:"remote_address"`
+	Host           string    `json:"host"`
 	StatusCode     int       `json:"status_code"`
 	Method         string    `json:"method"`
 	Path           string    `json:"path"`
