@@ -263,7 +263,7 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 
 ### Known Bugs
 
-- [ ] With the introduction of the flag --data-dir, the default config file location is now relative to the data dir,
+- [x] With the introduction of the flag --data-dir, the default config file location is now relative to the data dir,
   however, when the config file is supplied via --config, the path is not resolved relative to the data dir, and when
   making changes via UI the persist location is the data dir. Since no conf file is the, the default file name '
   torii-conf.yaml' is created in the data dir and the changes persisted. On restart the config file flag always takes

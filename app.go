@@ -89,11 +89,10 @@ func (a *Application) loadManaged() error {
 		return fmt.Errorf("failed to create data-dir %q: %w", a.dataDir, err)
 	}
 
-	a.workingConfigPath = filepath.Join(a.dataDir, workingConfigName)
-
 	var conf config.AppConfig
 
 	if a.flags.ConfigPath == "" {
+		a.workingConfigPath = filepath.Join(a.dataDir, workingConfigName)
 		logBoot("No --config provided, looking for existing working config at %s", a.workingConfigPath)
 		_, statErr := os.Stat(a.workingConfigPath)
 		workingExists := statErr == nil
@@ -121,6 +120,7 @@ func (a *Application) loadManaged() error {
 		if err != nil {
 			return fmt.Errorf("failed to load working config from %q: %w", a.flags.ConfigPath, err)
 		}
+		a.workingConfigPath = a.flags.ConfigPath
 	}
 
 	a.appConfig = conf
