@@ -25,6 +25,7 @@ api-server:
   idle-timeout: 60                 # Idle connection timeout in seconds
   read-timeout: 60                 # Read timeout in seconds
   write-timeout: 60                # Write timeout in seconds
+  enable-metrics: true              # Collect request/response metrics for the API server (visible in dashboard)
 
 # ─────────────────────────────────────────────────────────────────
 # Session (Dashboard login sessions)
