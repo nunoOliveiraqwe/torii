@@ -12,10 +12,13 @@ import (
 	"github.com/nunoOliveiraqwe/torii/api/session"
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/app"
+	"github.com/nunoOliveiraqwe/torii/internal/bus"
 	"github.com/nunoOliveiraqwe/torii/internal/domain"
 	"github.com/nunoOliveiraqwe/torii/internal/service"
 	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
 	"github.com/nunoOliveiraqwe/torii/internal/store"
+	"github.com/nunoOliveiraqwe/torii/internal/subsystem"
+	"github.com/nunoOliveiraqwe/torii/internal/subsystem/activity"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy"
@@ -146,7 +149,7 @@ type testSystemService struct {
 func (t *testSystemService) Start() error                                      { return nil }
 func (t *testSystemService) Stop() error                                       { return nil }
 func (t *testSystemService) StartStopAcme() error                              { return nil }
-func (t *testSystemService) SessionRegistry() *session.Registry                { return t.sessions }
+func (t *testSystemService) GetSessionRegistry() *session.Registry             { return t.sessions }
 func (t *testSystemService) GetServiceStore() *service.ServiceStore            { return t.serviceStore }
 func (t *testSystemService) GetConfiguredProxyServers() []*proxy.ProxySnapshot { return t.proxies }
 func (t *testSystemService) GetGlobalMetricsManager() *metrics.ConnectionMetricsManager {
@@ -162,18 +165,22 @@ func (t *testSystemService) EditProxy(port int, conf config.HTTPListener) error 
 func (t *testSystemService) GetSystemHealth() *app.SystemHealth {
 	return &app.SystemHealth{}
 }
-func (t *testSystemService) GetRecentErrors(n int) []metrics.ErrorLogEntry {
-	return []metrics.ErrorLogEntry{}
+func (t *testSystemService) GetSubsystemManager() *subsystem.Manager {
+	return nil
 }
-func (t *testSystemService) GetRecentRequests(n int) []metrics.RequestLogEntry {
-	return []metrics.RequestLogEntry{}
+func (t *testSystemService) GetRecentErrors(n int) []activity.ErrorLogEntry {
+	return []activity.ErrorLogEntry{}
 }
-func (t *testSystemService) GetRecentBlockedEntries(n int) []metrics.BlockLogEntry {
-	return []metrics.BlockLogEntry{}
+func (t *testSystemService) GetRecentRequests(n int) []activity.RequestLogEntry {
+	return []activity.RequestLogEntry{}
+}
+func (t *testSystemService) GetRecentBlockedEntries(n int) []activity.BlockLogEntry {
+	return []activity.BlockLogEntry{}
 }
 func (t *testSystemService) PersistConfig() error                              { return nil }
 func (t *testSystemService) IsHeadless() bool                                  { return false }
 func (t *testSystemService) GetCacheInsightManager() *util.CacheInsightManager { return nil }
+func (t *testSystemService) GetEventBus() bus.Bus                              { return nil }
 
 // ---------------------------------------------------------------------------
 // Test fixture builder
@@ -273,7 +280,7 @@ func newJSONRequest(t *testing.T, method, path string, body interface{}) *http.R
 // serveWithSession wraps a handler with the session middleware and serves
 // the request, returning the recorded response.
 func serveWithSession(f *testFixture, handler http.HandlerFunc, req *http.Request) *httptest.ResponseRecorder {
-	wrapped := f.svc.SessionRegistry().WrapWithSessionMiddleware(handler)
+	wrapped := f.svc.GetSessionRegistry().WrapWithSessionMiddleware(handler)
 	rec := httptest.NewRecorder()
 	wrapped.ServeHTTP(rec, req)
 	return rec

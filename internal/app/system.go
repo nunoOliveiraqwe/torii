@@ -10,9 +10,11 @@ import (
 
 	"github.com/nunoOliveiraqwe/torii/api/session"
 	"github.com/nunoOliveiraqwe/torii/config"
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/internal/bus"
 	"github.com/nunoOliveiraqwe/torii/internal/service"
 	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
+	"github.com/nunoOliveiraqwe/torii/internal/subsystem"
+	"github.com/nunoOliveiraqwe/torii/internal/subsystem/activity"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy"
@@ -41,27 +43,33 @@ type SystemHealth struct {
 type SystemService interface {
 	Start() error
 	Stop() error
-	SessionRegistry() *session.Registry
+	StartProxy(port int) error
+	StopProxy(port int) error
+	DeleteProxy(port int) error
+
+	AddHttpListener(conf config.HTTPListener) error
+	EditProxy(port int, conf config.HTTPListener) error
+
+	GetSessionRegistry() *session.Registry
 	GetServiceStore() *service.ServiceStore
 	GetConfiguredProxyServers() []*proxy.ProxySnapshot
 	GetGlobalMetricsManager() *metrics.ConnectionMetricsManager
 	GetCacheInsightManager() *util.CacheInsightManager
 	GetSSEBroker() *SSEBroker
-	StartProxy(port int) error
-	StopProxy(port int) error
-	DeleteProxy(port int) error
-	AddHttpListener(conf config.HTTPListener) error
+	GetEventBus() bus.Bus
 	GetProxyConfig(port int) *config.HTTPListener
-	EditProxy(port int, conf config.HTTPListener) error
 	GetSystemHealth() *SystemHealth
-	GetRecentErrors(n int) []metrics.ErrorLogEntry
-	GetRecentRequests(n int) []metrics.RequestLogEntry
-	GetRecentBlockedEntries(n int) []metrics.BlockLogEntry
+
+	GetSubsystemManager() *subsystem.Manager
+	GetRecentErrors(n int) []activity.ErrorLogEntry
+	GetRecentRequests(n int) []activity.RequestLogEntry
+	GetRecentBlockedEntries(n int) []activity.BlockLogEntry
+
 	IsHeadless() bool
 	PersistConfig() error
 }
 
-func collectSystemHealth(startTime time.Time, mgr *metrics.ConnectionMetricsManager) *SystemHealth {
+func collectSystemHealth(startTime time.Time, sub *activity.Subsystem) *SystemHealth {
 	h := &SystemHealth{
 		UptimeSeconds: time.Since(startTime).Seconds(),
 		Goroutines:    runtime.NumGoroutine(),
@@ -93,7 +101,7 @@ func collectSystemHealth(startTime time.Time, mgr *metrics.ConnectionMetricsMana
 	h.HeapAllocBytes = ms.HeapAlloc
 	h.GCPauseTotalNs = ms.PauseTotalNs
 
-	errCap, reqCap, blkCap := mgr.GetLogCapacities()
+	errCap, blkCap, reqCap := sub.GetLogCapacities()
 	h.ErrorLogCapacity = errCap
 	h.RequestLogCapacity = reqCap
 	h.BlockedLogCapacity = blkCap
@@ -102,6 +110,8 @@ func collectSystemHealth(startTime time.Time, mgr *metrics.ConnectionMetricsMana
 }
 
 type managedService struct {
+	subManager           *subsystem.Manager
+	eventBus             bus.Bus
 	micro                *proxy.Torii
 	cacheInsightsManager *util.CacheInsightManager
 	db                   *sqlite.DB
@@ -127,20 +137,24 @@ func NewSystemService(conf config.AppConfig, configPath string, dataDir string) 
 	zap.S().Infof("Database opened at %s", dbPath)
 
 	serviceStore := service.NewServiceStore(service.NewDataStore(db), conf.Acme)
-
-	m, err := proxy.NewTorii(conf.NetConfig, mgr, cInMgr, serviceStore.GetAcmeService())
+	eventBus := bus.NewEventBus()
+	m, err := proxy.NewTorii(conf.NetConfig, mgr, cInMgr, serviceStore.GetAcmeService(), eventBus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create micro proxy: %w", err)
 	}
 
 	sessions := session.NewRegistry(db, conf.Session)
+	subManager := subsystem.NewSubsystemManager(eventBus)
+
 	return &managedService{
+		subManager:           subManager,
+		eventBus:             eventBus,
 		micro:                m,
 		db:                   db,
 		cacheInsightsManager: cInMgr,
 		sessions:             sessions,
 		globalMetricsManager: mgr,
-		sseBroker:            NewSSEBroker(mgr),
+		sseBroker:            NewSSEBroker(mgr, subManager.GetActivitySubsystem()),
 		startTime:            time.Now(),
 		configPath:           configPath,
 		appConfig:            conf,
@@ -154,6 +168,10 @@ func (s *managedService) IsHeadless() bool {
 
 func (s *managedService) Start() error {
 	zap.S().Info("Starting managed system service")
+	s.eventBus.Start()
+	if err := s.subManager.Initialize(); err != nil {
+		return fmt.Errorf("failed to initialize subsystems: %w", err)
+	}
 	if err := s.micro.StartAll(); err != nil {
 		return fmt.Errorf("failed to start micro proxy: %w", err)
 	}
@@ -170,8 +188,11 @@ func (s *managedService) Stop() error {
 	if err := s.micro.StopAll(); err != nil {
 		return fmt.Errorf("failed to stop micro proxy: %w", err)
 	}
+	if err := s.subManager.Shutdown(); err != nil {
+		return fmt.Errorf("failed to shutdown subsystems: %w", err)
+	}
 	s.globalMetricsManager.StopCollectingMetrics()
-
+	s.eventBus.Stop()
 	zap.S().Info("Closing database")
 	if err := s.db.Close(); err != nil {
 		zap.S().Errorf("Failed to close database: %v", err)
@@ -181,8 +202,12 @@ func (s *managedService) Stop() error {
 	return nil
 }
 
-func (s *managedService) SessionRegistry() *session.Registry {
+func (s *managedService) GetSessionRegistry() *session.Registry {
 	return s.sessions
+}
+
+func (s *managedService) GetEventBus() bus.Bus {
+	return s.eventBus
 }
 
 func (s *managedService) GetServiceStore() *service.ServiceStore {
@@ -210,19 +235,23 @@ func (s *managedService) GetProxyConfig(port int) *config.HTTPListener {
 }
 
 func (s *managedService) GetSystemHealth() *SystemHealth {
-	return collectSystemHealth(s.startTime, s.globalMetricsManager)
+	return collectSystemHealth(s.startTime, s.subManager.GetActivitySubsystem())
 }
 
-func (s *managedService) GetRecentErrors(n int) []metrics.ErrorLogEntry {
-	return s.globalMetricsManager.GetErrorLog().Recent(n)
+func (s *managedService) GetSubsystemManager() *subsystem.Manager {
+	return s.subManager
 }
 
-func (s *managedService) GetRecentRequests(n int) []metrics.RequestLogEntry {
-	return s.globalMetricsManager.GetRequestLog().Recent(n)
+func (s *managedService) GetRecentErrors(n int) []activity.ErrorLogEntry {
+	return s.subManager.GetActivitySubsystem().ErrorLog.Recent(n)
 }
 
-func (s *managedService) GetRecentBlockedEntries(n int) []metrics.BlockLogEntry {
-	return s.globalMetricsManager.GetBlockedLog().Recent(n)
+func (s *managedService) GetRecentRequests(n int) []activity.RequestLogEntry {
+	return s.subManager.GetActivitySubsystem().RequestLog.Recent(n)
+}
+
+func (s *managedService) GetRecentBlockedEntries(n int) []activity.BlockLogEntry {
+	return s.subManager.GetActivitySubsystem().BlockLog.Recent(n)
 }
 
 func (s *managedService) StartProxy(port int) error {
@@ -255,9 +284,7 @@ func (s *managedService) DeleteProxy(port int) error {
 
 func (s *managedService) AddHttpListener(conf config.HTTPListener) error {
 	zap.S().Infof("Adding HTTP listener on port %d", conf.Port)
-	ctx := context.WithValue(context.Background(), ctxkeys.MetricsMgr, s.globalMetricsManager)
-	ctx = context.WithValue(ctx, ctxkeys.CacheInsightMgr, s.cacheInsightsManager)
-	if err := s.micro.AddHttpServer(ctx, conf); err != nil {
+	if err := s.micro.AddHttpServer(context.Background(), conf); err != nil {
 		return fmt.Errorf("failed to add HTTP listener on port %d: %w", conf.Port, err)
 	}
 	s.serviceStore.GetAcmeService().NotifyDomainsChanged()
@@ -267,8 +294,7 @@ func (s *managedService) AddHttpListener(conf config.HTTPListener) error {
 
 func (s *managedService) EditProxy(port int, conf config.HTTPListener) error {
 	zap.S().Infof("Editing proxy on port %d", port)
-	ctx := context.WithValue(context.Background(), ctxkeys.MetricsMgr, s.globalMetricsManager)
-	ctx = context.WithValue(ctx, ctxkeys.CacheInsightMgr, s.cacheInsightsManager)
+	ctx := context.Background()
 
 	requiresRestart, err := s.micro.DoesConfigRequireServerRestart(port, conf)
 	zap.S().Debugf("Config change for port %d requires server restart: %v", port, requiresRestart)

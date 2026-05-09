@@ -68,10 +68,7 @@ var errorEntries = [];
 var errorLogFilter = '';
 
 function buildErrorRow(e) {
-    var ts = new Date(e.timestamp);
-    var time = ts.getHours().toString().padStart(2, '0') + ':' +
-        ts.getMinutes().toString().padStart(2, '0') + ':' +
-        ts.getSeconds().toString().padStart(2, '0');
+    var time = fmtDateTime(e.timestamp);
     var row = document.createElement('div');
     row.className = 'error-entry';
     row.innerHTML =
@@ -139,6 +136,7 @@ function loadRecentErrors() {
         .then(function (entries) {
             if (entries && entries.length) {
                 errorEntries = entries.slice(0, MAX_ERROR_ENTRIES);
+                updateLogFilterDropdowns();
                 renderErrorFeed();
             }
         })
@@ -151,10 +149,7 @@ var requestEntries = [];
 var requestLogFilter = '';
 
 function buildRequestRow(e) {
-    var ts = new Date(e.timestamp);
-    var time = ts.getHours().toString().padStart(2, '0') + ':' +
-        ts.getMinutes().toString().padStart(2, '0') + ':' +
-        ts.getSeconds().toString().padStart(2, '0');
+    var time = fmtDateTime(e.timestamp);
     var sc = e.status_code || 0;
     var blockedTag = '';
     if (e.blocked_by) {
@@ -238,6 +233,7 @@ function loadRecentRequests() {
         .then(function (entries) {
             if (entries && entries.length) {
                 requestEntries = entries.slice(0, MAX_REQUEST_ENTRIES);
+                updateLogFilterDropdowns();
                 renderRequestFeed();
             }
         })
@@ -250,10 +246,7 @@ var blockEntries = [];
 var blockLogFilter = '';
 
 function buildBlockRow(e) {
-    var ts = new Date(e.timestamp);
-    var time = ts.getHours().toString().padStart(2, '0') + ':' +
-        ts.getMinutes().toString().padStart(2, '0') + ':' +
-        ts.getSeconds().toString().padStart(2, '0');
+    var time = fmtDateTime(e.timestamp);
     var icon = blockMwIcon(e.blocking_middleware);
     var row = document.createElement('div');
     row.className = 'block-entry';
@@ -322,6 +315,7 @@ function loadRecentBlocked() {
         .then(function (entries) {
             if (entries && entries.length) {
                 blockEntries = entries.slice(0, MAX_BLOCK_ENTRIES);
+                updateLogFilterDropdowns();
                 renderBlockFeed();
             }
         })
@@ -380,10 +374,7 @@ function ensureActivityFeedHeader(el) {
 }
 
 function fmtActivityTime(ts) {
-    var d = new Date(ts);
-    return d.getHours().toString().padStart(2,'0') + ':' +
-           d.getMinutes().toString().padStart(2,'0') + ':' +
-           d.getSeconds().toString().padStart(2,'0');
+    return fmtDateTime(ts);
 }
 
 function buildActivityRow(item) {
@@ -426,7 +417,7 @@ function buildActivityRow(item) {
             '<span class="act-host" title="' + (e.host||'').replace(/"/g,'&quot;') + '">' + (e.host || '–') + '</span>' +
             '<span class="act-method">' + (e.method || '?') + '</span>' +
             '<span class="act-status" style="color:#e67e22;">' + icon + '</span>' +
-            '<span class="act-latency"></span>' +
+            '<span class="act-latency">' + (e.latency_ms || 0) + ' ms</span>' +
             '<span class="act-path" title="' + (e.path||'').replace(/"/g,'&quot;') + '">' + (e.path || '/') + '</span>' +
             '<span class="act-reason" title="' + fullDetail.replace(/"/g,'&quot;') + '">' + fullDetail + '</span>';
     }
@@ -437,6 +428,7 @@ function addToActivityFeed(type, entry) {
     var ts = new Date(entry.timestamp);
     activityEntries.unshift({type: type, ts: ts, entry: entry});
     if (activityEntries.length > MAX_ACTIVITY_ENTRIES) activityEntries.pop();
+    updateLogFilterDropdowns();
 
     if (type === 'request' && !feedShowRequests) return;
     if (type === 'error' && !feedShowErrors) return;
@@ -490,7 +482,18 @@ document.querySelectorAll('.feed-link').forEach(function(link) {
 
 // ---------- Log Filter Dropdowns ----------
 function buildLogFilterOptions() {
-    var names = Object.keys(perConnectionSnapshots).sort();
+    var nameSet = {};
+    Object.keys(perConnectionSnapshots).forEach(function (name) {
+        var normalized = normalizeConnectionKey(name);
+        if (normalized && normalized !== 'global') nameSet[normalized] = true;
+    });
+    [requestEntries, errorEntries, blockEntries].forEach(function (entries) {
+        entries.forEach(function (entry) {
+            var normalized = normalizeConnectionKey(entry.connection_name);
+            if (normalized && normalized !== 'global') nameSet[normalized] = true;
+        });
+    });
+    var names = Object.keys(nameSet).sort();
     var html = '<option value="">All connections</option>';
     var ports = {};
     names.forEach(function (name) {
@@ -504,7 +507,7 @@ function buildLogFilterOptions() {
         }
     });
     Object.keys(ports).sort().forEach(function (portKey) {
-        var portLabel = portKey.replace(/^metric-port-/, ':');
+        var portLabel = portKey.replace(/^(metric|conn)-port-/, ':');
         var children = ports[portKey];
         if (children.length > 0) {
             html += '<option value="' + portKey + '">' + portLabel + ' (all)</option>';
@@ -522,17 +525,23 @@ function buildLogFilterOptions() {
 function updateLogFilterDropdowns() {
     var html = buildLogFilterOptions();
     var sysSel = document.getElementById('system-log-filter');
+    if (!sysSel) return;
     var sysCur = sysSel.value;
     sysSel.innerHTML = html;
     if (sysCur && sysSel.querySelector('option[value="' + sysCur + '"]')) sysSel.value = sysCur;
 }
 
-document.getElementById('system-log-filter').addEventListener('change', function () {
-    var filter = this.value;
-    requestLogFilter = filter;
-    errorLogFilter = filter;
-    blockLogFilter = filter;
-    activityLogFilter = filter;
-    renderActivityFeed();
-});
-
+var systemLogFilter = document.getElementById('system-log-filter');
+if (systemLogFilter) {
+    systemLogFilter.addEventListener('change', function () {
+        var filter = this.value;
+        requestLogFilter = filter;
+        errorLogFilter = filter;
+        blockLogFilter = filter;
+        activityLogFilter = filter;
+        renderRequestFeed();
+        renderErrorFeed();
+        renderBlockFeed();
+        renderActivityFeed();
+    });
+}

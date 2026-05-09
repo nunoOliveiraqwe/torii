@@ -1,43 +1,15 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
-	"strconv"
-
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 )
 
-func buildNameForConnection(ctx context.Context, prefix string) (string, error) {
-	port := ctx.Value(ctxkeys.Port)
-	if port == nil || port == "" {
+func buildNameForConnection(ctx BuildContext, prefix string) (string, error) {
+	portStr := ctx.PortString()
+	if portStr == "" {
 		return "", fmt.Errorf("port not found in middleware options for %s resolution", prefix)
 	}
-	portStr, ok := port.(string)
-	if !ok {
-		_, isInt := port.(int)
-		if !isInt {
-			return "", fmt.Errorf("port is not of type string or int")
-		}
-		portStr = strconv.Itoa(port.(int))
-	}
-	hostStr := ""
-	host := ctx.Value(ctxkeys.Host)
-	if host != nil {
-		hostStr2, ok := host.(string)
-		if ok {
-			hostStr = hostStr2
-		}
-	}
-	pathStr := ""
-	path := ctx.Value(ctxkeys.Path)
-	if path != nil {
-		pathStr2, ok := path.(string)
-		if ok {
-			pathStr = pathStr2
-		}
-	}
-	conName := ProxyHostPathName(prefix, portStr, hostStr, pathStr)
+	conName := ctx.BuildConnectionName(prefix)
 	return conName, nil
 }
 

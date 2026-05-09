@@ -64,7 +64,7 @@ func (h *uiHandler) handleRoot(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/ui/setup", http.StatusSeeOther)
 		return
 	}
-	if !h.svc.SessionRegistry().HasValidSession(r) {
+	if !h.svc.GetSessionRegistry().HasValidSession(r) {
 		http.Redirect(w, r, "/ui/login", http.StatusSeeOther)
 		return
 	}
@@ -77,7 +77,7 @@ func (h *uiHandler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/ui/setup", http.StatusSeeOther)
 		return
 	}
-	if h.svc.SessionRegistry().HasValidSession(r) {
+	if h.svc.GetSessionRegistry().HasValidSession(r) {
 		http.Redirect(w, r, "/ui/dashboard", http.StatusSeeOther)
 		return
 	}
@@ -95,17 +95,17 @@ func (h *uiHandler) handleSetupPage(w http.ResponseWriter, r *http.Request) {
 
 // handleDashboardPage serves the main dashboard.
 func (h *uiHandler) handleDashboardPage(w http.ResponseWriter, r *http.Request) {
-	if !h.svc.SessionRegistry().HasValidSession(r) {
+	if !h.svc.GetSessionRegistry().HasValidSession(r) {
 		http.Redirect(w, r, "/ui/login", http.StatusSeeOther)
 		return
 	}
-	username := h.svc.SessionRegistry().GetValueFromSession(r, "username")
+	username := h.svc.GetSessionRegistry().GetValueFromSession(r, "username")
 	h.renderPage(w, r, "dashboard", dashboardData{Username: username})
 }
 
 // handleLogout destroys the current session (HTMX POST).
 func (h *uiHandler) handleLogout(w http.ResponseWriter, r *http.Request) {
-	h.svc.SessionRegistry().LogoutSession(w, r)
+	h.svc.GetSessionRegistry().LogoutSession(w, r)
 	w.Header().Set("HX-Redirect", "/ui/login")
 	w.WriteHeader(http.StatusOK)
 }

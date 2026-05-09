@@ -16,28 +16,32 @@ func handleGetSystemHealth(svc app.SystemService) http.HandlerFunc {
 }
 
 func handleGetRecentErrors(svc app.SystemService) http.HandlerFunc {
-	errCap, _, _ := svc.GetGlobalMetricsManager().GetLogCapacities()
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := middleware.GetRequestLoggerFromContext(r)
 		logger.Debug("Fetching recent error logs")
-		WriteResponseAsJSON(svc.GetRecentErrors(errCap), w)
+		WriteResponseAsJSON(svc.GetRecentErrors(resolveRecentLogLimit(svc.GetSystemHealth().ErrorLogCapacity)), w)
 	}
 }
 
 func handleGetRecentRequests(svc app.SystemService) http.HandlerFunc {
-	_, reqCap, _ := svc.GetGlobalMetricsManager().GetLogCapacities()
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := middleware.GetRequestLoggerFromContext(r)
 		logger.Debug("Fetching recent request logs")
-		WriteResponseAsJSON(svc.GetRecentRequests(reqCap), w)
+		WriteResponseAsJSON(svc.GetRecentRequests(resolveRecentLogLimit(svc.GetSystemHealth().RequestLogCapacity)), w)
 	}
 }
 
 func handleGetRecentBlocked(svc app.SystemService) http.HandlerFunc {
-	_, _, blkCap := svc.GetGlobalMetricsManager().GetLogCapacities()
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := middleware.GetRequestLoggerFromContext(r)
 		logger.Debug("Fetching recent blocked entries")
-		WriteResponseAsJSON(svc.GetRecentBlockedEntries(blkCap), w)
+		WriteResponseAsJSON(svc.GetRecentBlockedEntries(resolveRecentLogLimit(svc.GetSystemHealth().BlockedLogCapacity)), w)
 	}
+}
+
+func resolveRecentLogLimit(capacity int) int {
+	if capacity <= 0 {
+		return 1000
+	}
+	return capacity
 }

@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,8 +9,9 @@ import (
 	coreruleset "github.com/corazawaf/coraza-coreruleset"
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
+	"github.com/nunoOliveiraqwe/torii/internal/bus"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
-	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"go.uber.org/zap"
 )
 
@@ -68,7 +68,7 @@ type corazaConfig struct {
 	inspectResBody bool
 }
 
-func CorazaWAFMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func CorazaWAFMiddleware(_ BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	cfg, err := parseCorazaConfig(conf)
 	if err != nil {
 		zap.S().Errorf("CorazaWAFMiddleware: failed to initialize WAF: %v. Failing closed.", err)
@@ -104,8 +104,9 @@ func CorazaWAFMiddleware(_ context.Context, next http.HandlerFunc, conf Config) 
 		}
 
 		if it := tx.ProcessRequestHeaders(); it != nil {
-			ctx.CreateAndAddBlockInfo(r, "coraza-waf",
-				fmt.Sprintf("Blocked by Coraza at phase 1: rule %d, status %d", it.RuleID, it.Status))
+			requestctx.CreateAndAddBlockInfoToRequestContext(r, "coraza-waf",
+				fmt.Sprintf("Blocked by Coraza at phase 1: rule %d, status %d", it.RuleID, it.Status),
+				bus.TopicWAFBlocked)
 			w.WriteHeader(it.Status)
 			return
 		}
@@ -120,8 +121,9 @@ func CorazaWAFMiddleware(_ context.Context, next http.HandlerFunc, conf Config) 
 			}
 
 			if it, _, err := tx.ReadRequestBodyFrom(bytes.NewReader(bodyBytes)); it != nil {
-				ctx.CreateAndAddBlockInfo(r, "coraza-waf",
-					fmt.Sprintf("Blocked by Coraza at phase 2: rule %d, status %d", it.RuleID, it.Status))
+				requestctx.CreateAndAddBlockInfoToRequestContext(r, "coraza-waf",
+					fmt.Sprintf("Blocked by Coraza at phase 2: rule %d, status %d", it.RuleID, it.Status),
+					bus.TopicWAFBlocked)
 				w.WriteHeader(it.Status)
 				return
 			} else if err != nil {
@@ -131,8 +133,9 @@ func CorazaWAFMiddleware(_ context.Context, next http.HandlerFunc, conf Config) 
 			}
 
 			if it, err := tx.ProcessRequestBody(); it != nil {
-				ctx.CreateAndAddBlockInfo(r, "coraza-waf",
-					fmt.Sprintf("Blocked by Coraza at phase 3: rule %d, status %d", it.RuleID, it.Status))
+				requestctx.CreateAndAddBlockInfoToRequestContext(r, "coraza-waf",
+					fmt.Sprintf("Blocked by Coraza at phase 3: rule %d, status %d", it.RuleID, it.Status),
+					bus.TopicWAFBlocked)
 				w.WriteHeader(it.Status)
 				return
 			} else if err != nil {
@@ -150,8 +153,9 @@ func CorazaWAFMiddleware(_ context.Context, next http.HandlerFunc, conf Config) 
 
 		if cfg.inspectResBody {
 			if it, err := tx.ProcessResponseBody(); it != nil {
-				ctx.CreateAndAddBlockInfo(r, "coraza-waf",
-					fmt.Sprintf("Blocked by Coraza at phase 4: rule %d, status %d", it.RuleID, it.Status))
+				requestctx.CreateAndAddBlockInfoToRequestContext(r, "coraza-waf",
+					fmt.Sprintf("Blocked by Coraza at phase 4: rule %d, status %d", it.RuleID, it.Status),
+					bus.TopicWAFBlocked)
 			} else if err != nil {
 				logger.Warn("CorazaMiddleware: error processing response body", zap.Error(err))
 			}

@@ -680,6 +680,8 @@
     font-size: 0.7rem;
     color: var(--pico-muted-color);
     white-space: nowrap;
+    min-width: 9.25rem;
+    font-variant-numeric: tabular-nums;
 }
 .error-entry .error-remote {
     font-size: 0.7rem;
@@ -742,10 +744,11 @@
     animation: none;
 }
 .req-entry .req-time {
-    flex: 0 0 58px;
+    flex: 0 0 9.25rem;
     font-size: 0.68rem;
     color: var(--pico-muted-color);
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 .req-entry .req-remote {
     flex: 0 0 110px;
@@ -819,6 +822,8 @@
     font-size: 0.7rem;
     color: var(--pico-muted-color);
     white-space: nowrap;
+    min-width: 9.25rem;
+    font-variant-numeric: tabular-nums;
 }
 .block-entry .block-remote {
     font-size: 0.7rem;
@@ -898,7 +903,7 @@
 /* Unified activity feed — CSS grid for perfect column alignment */
 .activity-entry {
     display: grid;
-    grid-template-columns: 20px 60px 120px minmax(60px,1fr) 56px 40px 64px 3fr 2fr;
+    grid-template-columns: 20px 9.25rem minmax(7rem,9rem) minmax(8rem,1fr) 3.5rem 3rem 4.5rem minmax(10rem,2fr) minmax(7rem,1fr);
     align-items: baseline;
     column-gap: 0.75rem;
     padding: 0.35rem 0.75rem;
@@ -930,6 +935,9 @@
     font-size: 0.68rem;
     color: var(--pico-muted-color);
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .activity-entry .act-remote {
     font-size: 0.68rem;

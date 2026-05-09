@@ -220,7 +220,7 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 
 ### Up next
 
-- [ ] The rolling logs needs to be decoupled from metrics. Right now the metrics middleware is used to track them, but
+- [x] The rolling logs needs to be decoupled from metrics. Right now the metrics middleware is used to track them, but
   this feels wrong, it's just not elegant, and is leading to ~~issues~~ quirks when using global middlewares.
 - [ ] Enabled API server midlewares to be fully configurable through the config file
 - [ ] TCP proxying: config schema is there, implementation is not
@@ -254,7 +254,7 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
   per-backend: health check path, interval, timeout, and consecutive failure/success thresholds to transition between
   healthy/unhealthy. Unhealthy backends should be shown in the dashboard. Health check state and circuit breaker state
   should share the same backend status so they don't contradict each other.
-- [ ] Internal event bus, a lightweight pub/sub backbone so middlewares and subsystems can emit and react to events (
+- [x] Internal event bus, a lightweight pub/sub backbone so middlewares and subsystems can emit and react to events (
   request blocked, honeypot triggered, backend went down, suspicious IP flagged, etc.) without direct coupling. This
   seems unavoidable as I keep seeing the need for it emerging everywhere. is the prerequisite that makes CrowdSec sensor
   mode, suspicious activity scoring, bait domain blocking, where the IP is shared across middleware's, UA rotation

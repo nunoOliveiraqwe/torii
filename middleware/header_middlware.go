@@ -1,13 +1,13 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/nunoOliveiraqwe/torii/internal/bus"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"github.com/nunoOliveiraqwe/torii/internal/resolve"
-	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
 	"go.uber.org/zap"
 )
 
@@ -104,7 +104,8 @@ func (rul *compareRequestHeaderRule) applyRequest(r *http.Request) bool {
 			zap.String("header", rul.header),
 		)
 
-		ctx.CreateAndAddBlockInfo(r, "headers", fmt.Sprintf("header-%s-mismatch-value", rul.header))
+		requestctx.CreateAndAddBlockInfoToRequestContext(r, "headers",
+			fmt.Sprintf("header-%s-mismatch-value", rul.header), bus.TopicHeaderPolicyBlocked)
 		return false
 	}
 
@@ -202,7 +203,7 @@ func compileStaticValueResolver(raw string) (func(r *http.Request) string, error
 	}, nil
 }
 
-func HeadersMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func HeadersMiddleware(buildCtx BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	h := parseConfiguration(conf)
 	if h == nil {
 		zap.S().Error("HeadersMiddleware: failed to initialize header middleware. Failing closed.")

@@ -33,7 +33,7 @@ func isAuthenticatedRequest(next http.HandlerFunc, systemService app.SystemServi
 	return func(writer http.ResponseWriter, request *http.Request) {
 		logger := middleware.GetRequestLoggerFromContext(request)
 		logger.Debug("Checking if request is authenticated")
-		isValid := systemService.SessionRegistry().HasValidSession(request)
+		isValid := systemService.GetSessionRegistry().HasValidSession(request)
 		if !isValid {
 			logger.Debug("Request is not authenticated")
 			http.Error(writer, "Unauthorized", http.StatusUnauthorized)
@@ -50,7 +50,7 @@ func isAuthenticatedBySessionOrApiKey(next http.HandlerFunc, requiredScopes []do
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := middleware.GetRequestLoggerFromContext(r)
 
-		if svc.SessionRegistry().HasValidSession(r) {
+		if svc.GetSessionRegistry().HasValidSession(r) {
 			next(w, r)
 			return
 		}

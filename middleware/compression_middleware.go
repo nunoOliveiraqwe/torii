@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -115,7 +114,7 @@ func (lw *lazyCompressionWriter) Unwrap() http.ResponseWriter {
 	return lw.w
 }
 
-func CompressionMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func CompressionMiddleware(_ BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	cType, initFunc, err := parseCompressionsOptions(conf)
 	if err != nil {
 		zap.S().Errorf("CompressionMiddleware failed to parse configuration: %v. Failing closed.", err)

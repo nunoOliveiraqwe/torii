@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/domain"
 	"github.com/nunoOliveiraqwe/torii/proxy"
 	"github.com/stretchr/testify/assert"
@@ -20,8 +21,8 @@ func TestBuildMux_RegistersAllRoutes(t *testing.T) {
 	f.userStore.On("GetUserByUsername", mock.Anything, mock.Anything).
 		Return(nil, assert.AnError).Maybe()
 
-	mux := buildMux(true, 0, "", f.svc)
-	wrapped := f.svc.SessionRegistry().WrapWithSessionMiddleware(mux)
+	mux := buildMux(config.APIServerConfig{EnableMetrics: true}, f.svc)
+	wrapped := f.svc.GetSessionRegistry().WrapWithSessionMiddleware(mux)
 
 	// Verify that each registered route responds (not 404).
 	tests := []struct {
@@ -52,8 +53,8 @@ func TestBuildMux_RegistersUIRoutes(t *testing.T) {
 	f.sysConfigStore.On("GetSystemConfiguration").
 		Return(&domain.SystemConfiguration{ID: 1, IsFirstTimeSetupConcluded: true}, nil).Maybe()
 
-	mux := buildMux(true, 0, "", f.svc)
-	wrapped := f.svc.SessionRegistry().WrapWithSessionMiddleware(mux)
+	mux := buildMux(config.APIServerConfig{EnableMetrics: true}, f.svc)
+	wrapped := f.svc.GetSessionRegistry().WrapWithSessionMiddleware(mux)
 
 	uiPaths := []struct {
 		method string
@@ -81,8 +82,8 @@ func TestFullRequest_HealthCheck_ThroughMux(t *testing.T) {
 	f.sysConfigStore.On("GetSystemConfiguration").
 		Return(&domain.SystemConfiguration{ID: 1, IsFirstTimeSetupConcluded: true}, nil).Maybe()
 
-	mux := buildMux(true, 0, "", f.svc)
-	wrapped := f.svc.SessionRegistry().WrapWithSessionMiddleware(mux)
+	mux := buildMux(config.APIServerConfig{EnableMetrics: true}, f.svc)
+	wrapped := f.svc.GetSessionRegistry().WrapWithSessionMiddleware(mux)
 
 	req := httptest.NewRequest(http.MethodGet, APPLICATION_ROUTE_BASE_PATH+"/healthcheck", nil)
 	rec := httptest.NewRecorder()
@@ -98,8 +99,8 @@ func TestFullRequest_SecureRoute_WithoutAuth_Returns401(t *testing.T) {
 		Return(&domain.SystemConfiguration{ID: 1, IsFirstTimeSetupConcluded: true}, nil).Maybe()
 	f.svc.proxies = []*proxy.ProxySnapshot{}
 
-	mux := buildMux(true, 0, "", f.svc)
-	wrapped := f.svc.SessionRegistry().WrapWithSessionMiddleware(mux)
+	mux := buildMux(config.APIServerConfig{EnableMetrics: true}, f.svc)
+	wrapped := f.svc.GetSessionRegistry().WrapWithSessionMiddleware(mux)
 
 	req := httptest.NewRequest(http.MethodGet, APPLICATION_ROUTE_BASE_PATH+"/proxy/routes", nil)
 	rec := httptest.NewRecorder()
@@ -114,8 +115,8 @@ func TestFullRequest_FtsEndpoint_Forbidden_AfterFts(t *testing.T) {
 	f.sysConfigStore.On("GetSystemConfiguration").
 		Return(&domain.SystemConfiguration{ID: 1, IsFirstTimeSetupConcluded: true}, nil).Maybe()
 
-	mux := buildMux(true, 0, "", f.svc)
-	wrapped := f.svc.SessionRegistry().WrapWithSessionMiddleware(mux)
+	mux := buildMux(config.APIServerConfig{EnableMetrics: true}, f.svc)
+	wrapped := f.svc.GetSessionRegistry().WrapWithSessionMiddleware(mux)
 
 	// POST /fts is only allowed BEFORE FTS. Since FTS is done, it should be forbidden.
 	req := newJSONRequest(t, http.MethodPost, APPLICATION_ROUTE_BASE_PATH+"/fts", CompleteFtsRequest{Password: "Whatever1!"})

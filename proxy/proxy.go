@@ -9,10 +9,12 @@ import (
 	"sync"
 
 	"github.com/nunoOliveiraqwe/torii/config"
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/internal/bus"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"github.com/nunoOliveiraqwe/torii/internal/service"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/nunoOliveiraqwe/torii/metrics"
+	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
 
@@ -35,14 +37,16 @@ type Torii struct {
 	lock               sync.Mutex
 	gDispatcher        *GlobalDispatcher
 	acmeService        *service.AcmeService
+	eventBus           bus.Bus
 	metricsManager     *metrics.ConnectionMetricsManager
 	cacheManager       *util.CacheInsightManager
 }
 
 func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager,
-	cacheMgr *util.CacheInsightManager, acmeService *service.AcmeService) (*Torii, error) {
+	cacheMgr *util.CacheInsightManager, acmeService *service.AcmeService, eventBus bus.Bus) (*Torii, error) {
 	zap.S().Info("Initializing torii with configuration: ", conf)
 	m := Torii{
+		eventBus:           eventBus,
 		stoppedHttpServers: make(map[int]MicroHttpServer),
 		startedHttpServers: make(map[int]MicroHttpServer),
 		lock:               sync.Mutex{},
@@ -50,8 +54,7 @@ func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager,
 		acmeService:        acmeService,
 		cacheManager:       cacheMgr,
 	}
-	ctx := context.WithValue(context.Background(), ctxkeys.MetricsMgr, mgr)
-	ctx = context.WithValue(ctx, ctxkeys.CacheInsightMgr, cacheMgr)
+	ctx := m.buildMiddlewareContext(context.Background())
 	err := m.initializeHttpNetworkStackFromConf(ctx, conf)
 	if err != nil {
 		return nil, err
@@ -65,6 +68,19 @@ func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager,
 		zap.S().Info("No ACME service provided, skipping ACME proxy registration")
 	}
 	return &m, nil
+}
+
+func (m *Torii) buildMiddlewareContext(ctx context.Context) middleware.BuildContext {
+	return requestctx.NewBuildContext(
+		m.metricsManager,
+		m.cacheManager,
+		m.eventBus,
+		0,
+		"",
+		"",
+		"",
+		"",
+	).WithRuntimeContext(ctx)
 }
 
 func (m *Torii) StartAll() error {
@@ -187,7 +203,7 @@ func (m *Torii) AddHttpServer(ctx context.Context, conf config.HTTPListener) err
 	zap.S().Debugf("Adding HTTP server for listener configuration: %+v", conf)
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	httpServer, err := buildHttpServer(ctx, conf, m.gDispatcher)
+	httpServer, err := buildHttpServer(m.buildMiddlewareContext(ctx), conf, m.gDispatcher)
 	if err != nil {
 		zap.S().Errorf("Failed to build HTTP server: %v", err)
 		return fmt.Errorf("failed to build HTTP server: %w", err)
@@ -215,12 +231,9 @@ func (m *Torii) HotSwapHandler(ctx context.Context, port int, conf config.HTTPLi
 		return nil
 	}
 
-	ctx = context.WithValue(ctx, ctxkeys.MetricsMgr, m.metricsManager)
-	ctx = context.WithValue(ctx, ctxkeys.CacheInsightMgr, m.cacheManager)
-
 	//TODO -> optimize by only rebuilding the affected route's handler's instead of the whole handler chain.
 	//only swap what's changed
-	handler, cancel, backends, routeSnapshots, err := buildHandlerChain(ctx, server.GetServerId(), conf, m.gDispatcher)
+	handler, cancel, backends, routeSnapshots, err := buildHandlerChain(m.buildMiddlewareContext(ctx), server.GetServerId(), conf, m.gDispatcher)
 	if err != nil {
 		return fmt.Errorf("failed to build handler chain: %w", err)
 	}
@@ -308,7 +321,7 @@ func (m *Torii) DoesConfigRequireServerRestart(oldPort int, newConf config.HTTPL
 	return server.DoesConfigChangeRequireServerRestart(newConf), nil
 }
 
-func (m *Torii) initializeHttpNetworkStackFromConf(ctx context.Context, conf config.NetworkConfig) error {
+func (m *Torii) initializeHttpNetworkStackFromConf(ctx middleware.BuildContext, conf config.NetworkConfig) error {
 	zap.S().Debugf("Initializing HTTP network stack with configuration: %+v", conf)
 
 	zap.S().Debugf("Initializing global dispatcher with configuration: %+v", conf.Global)
@@ -327,7 +340,7 @@ func (m *Torii) initializeHttpNetworkStackFromConf(ctx context.Context, conf con
 	}
 	for _, ln := range conf.HTTPListeners {
 		zap.S().Debugf("Initializing HTTP server with configuration: %+v", ln)
-		if err := m.AddHttpServer(ctx, ln); err != nil {
+		if err := m.AddHttpServer(ctx.Context(), ln); err != nil {
 			return err
 		}
 	}

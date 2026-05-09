@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -10,12 +9,12 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 )
 
 var requestIDCounter uint64
 
-func RequestIDMiddleware(_ context.Context, next http.HandlerFunc, middlewareConf Config) http.HandlerFunc {
+func RequestIDMiddleware(_ BuildContext, next http.HandlerFunc, middlewareConf Config) http.HandlerFunc {
 	prefix := ""
 	if middlewareConf.Options != nil {
 		requestIdPrefix := middlewareConf.Options["prefix"]
@@ -30,7 +29,7 @@ func RequestIDMiddleware(_ context.Context, next http.HandlerFunc, middlewareCon
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		localPrefix := prefix
-		ctxStruct := ctx.GetContextStruct(r)
+		ctxStruct := requestctx.GetContextStruct(r)
 		reqId := ctxStruct.RequestId
 		if reqId != "" {
 			if !strings.HasPrefix(reqId, localPrefix) { //double injection, for example coming from global or default and this is applying at path levle
@@ -64,7 +63,7 @@ func generateRequestPrefix() string {
 }
 
 func GetRequestIDFromRequest(r *http.Request) string {
-	ctxStruct := ctx.GetContextStruct(r)
+	ctxStruct := requestctx.GetContextStruct(r)
 	return ctxStruct.RequestId
 }
 

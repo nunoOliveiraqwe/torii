@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
-	ctx2 "github.com/nunoOliveiraqwe/torii/middleware/ctx"
+	ctx2 "github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,7 +24,7 @@ func TestRequestIDMiddleware_GeneratesID(t *testing.T) {
 		assert.NotEmpty(t, reqID)
 	})
 
-	mw := ctx2.InjectContextStruct(RequestIDMiddleware(context.Background(), next, Config{}))
+	mw := ctx2.InjectContextStruct(BuildContext{RuntimeContext: context.Background()}, RequestIDMiddleware(BuildContext{RuntimeContext: context.Background()}, next, Config{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -44,12 +44,12 @@ func TestRequestIDMiddleware_UsesExistingID(t *testing.T) {
 	})
 
 	conf := Config{Options: map[string]interface{}{"prefix": prefix}}
-	mw := ctx2.InjectContextStruct(RequestIDMiddleware(context.Background(), next, conf))
+	mw := ctx2.InjectContextStruct(BuildContext{RuntimeContext: context.Background()}, RequestIDMiddleware(BuildContext{RuntimeContext: context.Background()}, next, conf))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
 	existingID := prefix + "-42"
-	ctxStruct := ctx2.ContextStruct{RequestId: existingID}
+	ctxStruct := ctx2.RequestContextStruct{RequestId: existingID}
 
 	ctx := context.WithValue(req.Context(), ctxkeys.ContextStruct, &ctxStruct)
 	req = req.WithContext(ctx)
@@ -67,10 +67,10 @@ func TestRequestIDMiddleware_CompositeID_DifferentPrefix(t *testing.T) {
 		assert.Contains(t, reqID, "existing-request-id")
 	})
 
-	mw := ctx2.InjectContextStruct(RequestIDMiddleware(context.Background(), next, Config{}))
+	mw := ctx2.InjectContextStruct(BuildContext{RuntimeContext: context.Background()}, RequestIDMiddleware(BuildContext{RuntimeContext: context.Background()}, next, Config{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	ctxStruct := ctx2.ContextStruct{RequestId: "existing-request-id"}
+	ctxStruct := ctx2.RequestContextStruct{RequestId: "existing-request-id"}
 	ctx := context.WithValue(req.Context(), ctxkeys.ContextStruct, &ctxStruct)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
@@ -92,7 +92,7 @@ func TestRequestIDMiddleware_WithPrefix(t *testing.T) {
 			"prefix": "testprefix",
 		},
 	}
-	mw := ctx2.InjectContextStruct(RequestIDMiddleware(context.Background(), next, conf))
+	mw := ctx2.InjectContextStruct(BuildContext{RuntimeContext: context.Background()}, RequestIDMiddleware(BuildContext{RuntimeContext: context.Background()}, next, conf))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()

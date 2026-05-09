@@ -46,7 +46,7 @@ func (cbw *circuitBreakerResponseWriter) Unwrap() http.ResponseWriter {
 	return cbw.ResponseWriter
 }
 
-func CircuitBreakerMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func CircuitBreakerMiddleware(_ BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	opts, err := parseCircuitBreakerConfig(conf)
 	if err != nil {
 		zap.S().Errorf("CircuitBreakerMiddleware failed to parse configuration: %v. Failing closed.", err)

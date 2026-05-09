@@ -42,6 +42,22 @@ function timeLabel() {
         d.getSeconds().toString().padStart(2, '0');
 }
 
+var dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'short',
+    timeStyle: 'short'
+});
+
+function fmtDateTime(value) {
+    if (!value) return '–';
+    var d = new Date(value);
+    if (isNaN(d.getTime())) return '–';
+    return dateTimeFormatter.format(d);
+}
+
+function normalizeConnectionKey(name) {
+    return (name || '').replace(/^metric-/, 'conn-');
+}
+
 function statusClass(code) {
     if (code >= 500) return 's5xx';
     if (code >= 400) return 's4xx';
@@ -56,11 +72,13 @@ function parsePort(connectionName) {
 }
 
 function matchesConnectionFilter(connName, filter) {
-    if (!filter) return true;
-    if (!connName) return false;
-    if (connName === filter) return true;
-    return connName.indexOf(filter + '-host-') === 0 ||
-           connName.indexOf(filter + '-path-') === 0;
+    var normalizedConn = normalizeConnectionKey(connName);
+    var normalizedFilter = normalizeConnectionKey(filter);
+    if (!normalizedFilter) return true;
+    if (!normalizedConn) return false;
+    if (normalizedConn === normalizedFilter) return true;
+    return normalizedConn.indexOf(normalizedFilter + '-host-') === 0 ||
+           normalizedConn.indexOf(normalizedFilter + '-path-') === 0;
 }
 
 function blockIcon(mw) {
@@ -90,4 +108,3 @@ function blockMwIcon(mw) {
 function badge(val) {
     return val ? '<span class="badge badge-success">Yes</span>' : '<span class="badge badge-muted">No</span>';
 }
-

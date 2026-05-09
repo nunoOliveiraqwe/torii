@@ -4,9 +4,7 @@ import (
 	"context"
 	"strings"
 	"sync"
-	"time"
 
-	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"go.uber.org/zap"
 )
 
@@ -28,10 +26,6 @@ type ConnectionMetricsManager struct {
 	listenersMu  sync.RWMutex
 	listeners    map[int]*metricListener
 	nextListenID int
-
-	errorLog   *util.RingBuffer[ErrorLogEntry]
-	requestLog *util.RingBuffer[RequestLogEntry]
-	blockedLog *util.RingBuffer[BlockLogEntry]
 }
 
 type ConnectionMetric struct {
@@ -56,9 +50,6 @@ func NewGlobalMetricsHandler(numberOfWorkers int, ctx context.Context) *Connecti
 		context:              ctx,
 		cancel:               cancel,
 		listeners:            make(map[int]*metricListener),
-		errorLog:             NewErrorLog(200), //maybe add a conf flag
-		requestLog:           NewRequestLog(500),
-		blockedLog:           NewBlockLog(500),
 	}
 	zap.S().Info("Creating a new global connection metric")
 	h.TrackMetricsForConnection(globalMetricsConName, globalMetricsConName)
@@ -129,22 +120,6 @@ func (h *ConnectionMetricsManager) TrackMetricsForConnection(serverId, connectio
 		case <-h.context.Done():
 		}
 	}
-}
-
-func (h *ConnectionMetricsManager) GetErrorLog() *util.RingBuffer[ErrorLogEntry] {
-	return h.errorLog
-}
-
-func (h *ConnectionMetricsManager) GetRequestLog() *util.RingBuffer[RequestLogEntry] {
-	return h.requestLog
-}
-
-func (h *ConnectionMetricsManager) GetBlockedLog() *util.RingBuffer[BlockLogEntry] {
-	return h.blockedLog
-}
-
-func (h *ConnectionMetricsManager) GetLogCapacities() (errorCap, requestCap, blockedCap int) {
-	return h.errorLog.Capacity(), h.requestLog.Capacity(), h.blockedLog.Capacity()
 }
 
 func (h *ConnectionMetricsManager) GetMetricForConnection(connectionName string) *Metric {
@@ -341,44 +316,5 @@ func (h *ConnectionMetricsManager) updateConnectionMetrics(metric *RequestMetric
 		parentSnapshot := cur.accumulatedMetrics.Copy()
 		cur.metricsLock.Unlock()
 		h.notifyListeners(cur.connectionName, parentSnapshot)
-	}
-
-	if metric.IsMiddlewareBlockedRequest {
-		h.blockedLog.Add(BlockLogEntry{
-			RemoteAddress:      metric.RemoteAddress,
-			Host:               metric.Host,
-			Timestamp:          time.Now(),
-			Method:             metric.Method,
-			Path:               metric.Path,
-			Status:             metric.StatusCode,
-			ConnectionName:     metric.connectionName,
-			BlockReason:        metric.BlockReason,
-			BlockingMiddleware: metric.BlockingMiddleware,
-		})
-	} else if metric.Is5xxResponse {
-		h.errorLog.Add(ErrorLogEntry{
-			Timestamp:      time.Now(),
-			ConnectionName: metric.connectionName,
-			RemoteAddress:  metric.RemoteAddress,
-			Host:           metric.Host,
-			StatusCode:     metric.StatusCode,
-			Method:         metric.Method,
-			Path:           metric.Path,
-			LatencyMs:      metric.LatencyMs,
-		})
-	} else {
-		h.requestLog.Add(RequestLogEntry{
-			Timestamp:      time.Now(),
-			RemoteAddress:  metric.RemoteAddress,
-			Host:           metric.Host,
-			Country:        metric.Country,
-			ConnectionName: metric.connectionName,
-			StatusCode:     metric.StatusCode,
-			Method:         metric.Method,
-			Path:           metric.Path,
-			LatencyMs:      metric.LatencyMs,
-			BytesSent:      metric.BytesSent,
-			BytesReceived:  metric.BytesReceived,
-		})
 	}
 }

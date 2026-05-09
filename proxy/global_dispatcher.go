@@ -5,9 +5,11 @@ import (
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/config"
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
+
+type globalDispatcherPortKey struct{}
 
 type GlobalDispatcher struct {
 	globalConfig       *config.GlobalConfig
@@ -27,21 +29,22 @@ func (d *GlobalDispatcher) registerHandler(port int, next http.HandlerFunc) http
 	}
 	d.registeredHandlers[port] = next
 	return func(w http.ResponseWriter, r *http.Request) {
-		r = r.WithContext(context.WithValue(r.Context(), ctxkeys.Port, port))
+		r = r.WithContext(context.WithValue(r.Context(), globalDispatcherPortKey{}, port))
 		d.globalChain(w, r)
 	}
 }
 
 func (d *GlobalDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if handler, exists := d.registeredHandlers[r.Context().Value(ctxkeys.Port).(int)]; exists {
+	port, _ := r.Context().Value(globalDispatcherPortKey{}).(int)
+	if handler, exists := d.registeredHandlers[port]; exists {
 		handler(w, r)
 	} else {
-		zap.S().Errorf("No handler registered for port %d", r.Context().Value(ctxkeys.Port).(int))
+		zap.S().Errorf("No handler registered for port %d", port)
 		http.Error(w, "", http.StatusNotFound)
 	}
 }
 
-func initGlobalDispatcher(ctx context.Context, global *config.GlobalConfig) (*GlobalDispatcher, error) {
+func initGlobalDispatcher(ctx middleware.BuildContext, global *config.GlobalConfig) (*GlobalDispatcher, error) {
 	if global == nil {
 		zap.S().Infof("No global dispatcher configuration provided. Skipping")
 		return &GlobalDispatcher{}, nil
@@ -60,8 +63,7 @@ func initGlobalDispatcher(ctx context.Context, global *config.GlobalConfig) (*Gl
 	handler := d.ServeHTTP
 
 	if len(global.Middlewares) > 0 {
-		ctx = context.WithValue(ctx, ctxkeys.ServerID, "global")
-		ctx = context.WithValue(ctx, ctxkeys.OverrideMetricsName, "global")
+		ctx = ctx.WithServerID("global").WithOverrideMetricsName("global")
 
 		wrapped, appliedMw, err := buildMiddlewareChain(ctx, handler, global.Middlewares, global.DisableDefaults)
 		if err != nil {
@@ -71,7 +73,7 @@ func initGlobalDispatcher(ctx context.Context, global *config.GlobalConfig) (*Gl
 		d.globalMwNames = middlewareNames(appliedMw)
 	}
 
-	handler = wrapTrustedProxies(ctx, handler, global.TrustedProxies)
+	handler = wrapTrustedProxies(ctx.Context(), handler, global.TrustedProxies)
 	d.globalChain = handler
 	return d, nil
 }

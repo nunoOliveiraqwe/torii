@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/nunoOliveiraqwe/torii/internal/subsystem/activity"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"go.uber.org/zap"
 )
@@ -26,7 +27,8 @@ type SSEBroker struct {
 	nextID      int
 	clientCount atomic.Int64
 
-	mgr *metrics.ConnectionMetricsManager
+	mgr      *metrics.ConnectionMetricsManager
+	activity *activity.Subsystem
 
 	listenersMu       sync.Mutex
 	listeners         map[string]int
@@ -36,25 +38,28 @@ type SSEBroker struct {
 	blockedListenerID int
 }
 
-func NewSSEBroker(mgr *metrics.ConnectionMetricsManager) *SSEBroker {
+func NewSSEBroker(mgr *metrics.ConnectionMetricsManager, activitySubsystem *activity.Subsystem) *SSEBroker {
 	b := &SSEBroker{
 		clients:   make(map[string]*SSEClient),
 		mgr:       mgr,
+		activity:  activitySubsystem,
 		listeners: make(map[string]int),
 	}
 	// Wildcard metric listener — fires for every connection's metric updates.
 	b.metricsListenerID = mgr.AddWildcardListener(func(_ string, snapshot *metrics.Metric) {
 		b.broadcastJSON("metrics", snapshot)
 	})
-	b.errorListenerID = mgr.GetErrorLog().AddListener(func(entry *metrics.ErrorLogEntry) {
-		b.broadcastJSON("proxy_error", entry)
-	})
-	b.requestListenerID = mgr.GetRequestLog().AddListener(func(entry *metrics.RequestLogEntry) {
-		b.broadcastJSON("proxy_request", entry)
-	})
-	b.blockedListenerID = mgr.GetBlockedLog().AddListener(func(entry *metrics.BlockLogEntry) {
-		b.broadcastJSON("proxy_blocked", entry)
-	})
+	if activitySubsystem != nil {
+		b.errorListenerID = activitySubsystem.ErrorLog.AddListener(func(entry *activity.ErrorLogEntry) {
+			b.broadcastJSON("proxy_error", entry)
+		})
+		b.requestListenerID = activitySubsystem.RequestLog.AddListener(func(entry *activity.RequestLogEntry) {
+			b.broadcastJSON("proxy_request", entry)
+		})
+		b.blockedListenerID = activitySubsystem.BlockLog.AddListener(func(entry *activity.BlockLogEntry) {
+			b.broadcastJSON("proxy_blocked", entry)
+		})
+	}
 	return b
 }
 
@@ -122,9 +127,11 @@ func (b *SSEBroker) broadcastAll(event SSEEvent) {
 
 func (b *SSEBroker) Stop() {
 	b.mgr.RemoveListener(b.metricsListenerID)
-	b.mgr.GetErrorLog().RemoveListener(b.errorListenerID)
-	b.mgr.GetRequestLog().RemoveListener(b.requestListenerID)
-	b.mgr.GetBlockedLog().RemoveListener(b.blockedListenerID)
+	if b.activity != nil {
+		b.activity.ErrorLog.RemoveListener(b.errorListenerID)
+		b.activity.RequestLog.RemoveListener(b.requestListenerID)
+		b.activity.BlockLog.RemoveListener(b.blockedListenerID)
+	}
 
 	b.mu.Lock()
 	for _, c := range b.clients {

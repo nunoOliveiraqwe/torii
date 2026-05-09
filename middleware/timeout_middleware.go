@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -9,7 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func TimeoutMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func TimeoutMiddleware(_ BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	timeout, err := parseTimeoutConfig(conf)
 	if err != nil {
 		zap.S().Errorf("TimeoutMiddleware failed to parse configuration: %v. Failing closed.", err)

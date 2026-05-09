@@ -1,14 +1,13 @@
 package proxy
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
 
-func buildMiddlewareChain(ctx context.Context, handler http.HandlerFunc, mwConfig []middleware.Config, disableDefaults bool) (http.HandlerFunc, []middleware.Config, error) {
+func buildMiddlewareChain(ctx middleware.BuildContext, handler http.HandlerFunc, mwConfig []middleware.Config, disableDefaults bool) (http.HandlerFunc, []middleware.Config, error) {
 	if len(mwConfig) == 0 && disableDefaults {
 		return handler, mwConfig, nil
 	}

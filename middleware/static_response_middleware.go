@@ -1,14 +1,13 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
 	"go.uber.org/zap"
 )
 
-func StaticResponseMiddleware(_ context.Context, _ http.HandlerFunc, conf Config) http.HandlerFunc {
+func StaticResponseMiddleware(_ BuildContext, _ http.HandlerFunc, conf Config) http.HandlerFunc {
 	statusCode, body, contentType, headers, err := parseStaticResponseConfig(conf)
 	if err != nil {
 		zap.S().Errorf("StaticResponseMiddleware failed to parse configuration: %v. Failing closed.", err)

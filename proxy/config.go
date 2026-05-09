@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/config"
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
-	ctx2 "github.com/nunoOliveiraqwe/torii/middleware/ctx"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
+	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
 
@@ -36,10 +36,9 @@ func applyDefaultTimeouts(conf *config.HTTPListener) {
 	}
 }
 
-func buildHandlerChain(ctx context.Context, serverId string, conf config.HTTPListener, dGlobal *GlobalDispatcher) (http.Handler, context.CancelFunc, []string, []RouteSnapshot, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	ctx = context.WithValue(ctx, ctxkeys.Port, conf.Port)
-	ctx = context.WithValue(ctx, ctxkeys.ServerID, serverId)
+func buildHandlerChain(ctx middleware.BuildContext, serverId string, conf config.HTTPListener, dGlobal *GlobalDispatcher) (http.Handler, context.CancelFunc, []string, []RouteSnapshot, error) {
+	runtimeCtx, cancel := context.WithCancel(ctx.Context())
+	ctx = ctx.WithRuntimeContext(runtimeCtx).WithPort(conf.Port).WithServerID(serverId)
 
 	hostHandler, backends, routeSnapshots, err := buildHostDispatcher(ctx, conf.Default, conf.Routes)
 	if err != nil {
@@ -55,11 +54,12 @@ func buildHandlerChain(ctx context.Context, serverId string, conf config.HTTPLis
 			routeSnapshots[i].GlobalMiddlewares = append([]string(nil), dGlobal.globalMwNames...)
 		}
 	}
-	hostHandler = ctx2.InjectContextStruct(hostHandler.ServeHTTP)
+
+	hostHandler = requestctx.InjectContextStruct(ctx, hostHandler.ServeHTTP)
 	return hostHandler, cancel, backends, routeSnapshots, nil
 }
 
-func buildHttpServer(ctx context.Context, conf config.HTTPListener, dGlobal *GlobalDispatcher) (MicroHttpServer, error) {
+func buildHttpServer(ctx middleware.BuildContext, conf config.HTTPListener, dGlobal *GlobalDispatcher) (MicroHttpServer, error) {
 	applyDefaultTimeouts(&conf)
 	zap.S().Infof("Building HTTP server on port %d", conf.Port)
 	zap.S().Info("Middleware order apply is global mw → route mw → path mw → proxy")

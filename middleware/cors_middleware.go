@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,7 +18,7 @@ type corsConfig struct {
 	maxAge           string
 }
 
-func CorsMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func CorsMiddleware(_ BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	c, err := parseCorsConfig(conf)
 	if err != nil {
 		zap.S().Errorf("CorsMiddleware: failed to parse configuration: %v. Failing closed.", err)

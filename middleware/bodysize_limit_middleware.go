@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
@@ -9,7 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func BodySizeLimitMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func BodySizeLimitMiddleware(_ BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	maxSize, err := parseBodySizeLimitConfig(conf)
 	if err != nil {
 		zap.S().Errorf("BodySizeLimitMiddleware failed to parse configuration: %v. Failing closed.", err)

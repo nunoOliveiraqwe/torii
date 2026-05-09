@@ -25,7 +25,7 @@ func handleLogin(systemService app.SystemService) http.HandlerFunc {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		err = systemService.SessionRegistry().NewSession(r, w, l.Username)
+		err = systemService.GetSessionRegistry().NewSession(r, w, l.Username)
 		if err != nil {
 			logger.Error("Failed to create session", zap.String("username", l.Username), zap.Error(err))
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -39,7 +39,7 @@ func handleLogout(systemService app.SystemService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := middleware.GetRequestLoggerFromContext(r)
 		logger.Debug("Handling logout request")
-		systemService.SessionRegistry().LogoutSession(w, r)
+		systemService.GetSessionRegistry().LogoutSession(w, r)
 		logger.Info("Logout successful")
 	}
 }
@@ -54,7 +54,7 @@ func handleChangePassword(service app.SystemService) http.HandlerFunc {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
-		username := service.SessionRegistry().GetValueFromSession(r, "username")
+		username := service.GetSessionRegistry().GetValueFromSession(r, "username")
 		if username == "" {
 			logger.Error("No valid session found for change password request")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -79,7 +79,7 @@ func handleIdentity(service app.SystemService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := middleware.GetRequestLoggerFromContext(r)
 		logger.Debug("Handling identity request")
-		username := service.SessionRegistry().GetValueFromSession(r, "username")
+		username := service.GetSessionRegistry().GetValueFromSession(r, "username")
 		if username == "" {
 			logger.Error("No valid session found for identity request")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)

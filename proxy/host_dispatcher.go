@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -9,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/nunoOliveiraqwe/torii/config"
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/proxyutil"
 	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
@@ -51,7 +49,7 @@ func (d *VirtualHostDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request
 	http.Error(w, "Bad Gateway", http.StatusBadGateway)
 }
 
-func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget, routes []config.Route) (http.Handler, []string, []RouteSnapshot, error) {
+func buildHostDispatcher(ctx middleware.BuildContext, defaultTarget *config.RouteTarget, routes []config.Route) (http.Handler, []string, []RouteSnapshot, error) {
 	zap.S().Infof("Building host dispatcher with %d routes, default: %v", len(routes), defaultTarget != nil)
 
 	d := &VirtualHostDispatcher{
@@ -65,7 +63,7 @@ func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget,
 			zap.S().Errorf("Route host cannot be empty, skipping")
 			continue
 		}
-		routeCtx := context.WithValue(ctx, ctxkeys.Host, route.Host)
+		routeCtx := ctx.WithHost(route.Host)
 		handler, pathBackends, snapshot, err := buildRouteHandler(routeCtx, route.Target)
 		if err != nil {
 			zap.S().Errorf("Failed to build handler for host %s: %v", route.Host, err)
@@ -80,7 +78,7 @@ func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget,
 	}
 
 	if defaultTarget != nil {
-		defaultCtx := context.WithValue(ctx, ctxkeys.Host, "_default")
+		defaultCtx := ctx.WithHost("_default")
 		handler, pathBackends, snapshot, err := buildRouteHandler(defaultCtx, *defaultTarget)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to build default route handler: %w", err)
@@ -99,7 +97,7 @@ func buildHostDispatcher(ctx context.Context, defaultTarget *config.RouteTarget,
 	return d, backends, routeSnapshots, nil
 }
 
-func buildRouteHandler(ctx context.Context, target config.RouteTarget) (http.Handler, []string, RouteSnapshot, error) {
+func buildRouteHandler(ctx middleware.BuildContext, target config.RouteTarget) (http.Handler, []string, RouteSnapshot, error) {
 	var baseHandler http.HandlerFunc
 	if target.Backend.Address != "" {
 		proxy, err := buildHttpRevProxy(target.Backend.Address, proxyutil.ProxyOptions{
@@ -136,7 +134,7 @@ func buildRouteHandler(ctx context.Context, target config.RouteTarget) (http.Han
 		return nil, nil, RouteSnapshot{}, fmt.Errorf("failed to build middleware chain for backend %s: %w", target.Backend.Address, err)
 	}
 
-	defaultHandler = wrapTrustedProxies(ctx, defaultHandler, target.TrustedProxies)
+	defaultHandler = wrapTrustedProxies(ctx.Context(), defaultHandler, target.TrustedProxies)
 
 	snapshot := RouteSnapshot{
 		Backend:     target.Backend.Address,

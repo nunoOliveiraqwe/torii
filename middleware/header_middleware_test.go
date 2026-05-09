@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
-	ctx2 "github.com/nunoOliveiraqwe/torii/middleware/ctx"
+	ctx2 "github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -21,7 +21,7 @@ func TestHeadersMiddleware_NoRulesReturnsNext(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	mw := HeadersMiddleware(context.Background(), next, Config{Options: map[string]interface{}{}})
+	mw := HeadersMiddleware(BuildContext{RuntimeContext: context.Background()}, next, Config{Options: map[string]interface{}{}})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -46,7 +46,7 @@ func TestHeadersMiddleware_SetRequestHeaderFromRequestResolver(t *testing.T) {
 			"X-Client-Addr": "$remote_addr",
 		},
 	}}
-	mw := ctx2.InjectContextStruct(HeadersMiddleware(context.Background(), next, conf))
+	mw := ctx2.InjectContextStruct(BuildContext{RuntimeContext: context.Background()}, HeadersMiddleware(BuildContext{RuntimeContext: context.Background()}, next, conf))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.RemoteAddr = remoteAddr
@@ -75,7 +75,7 @@ func TestHeadersMiddleware_SetRequestHeaderFromRequestResolverWithEnvVar(t *test
 			header: "$env:" + envVarName,
 		},
 	}}
-	mw := ctx2.InjectContextStruct(HeadersMiddleware(context.Background(), next, conf))
+	mw := ctx2.InjectContextStruct(BuildContext{RuntimeContext: context.Background()}, HeadersMiddleware(BuildContext{RuntimeContext: context.Background()}, next, conf))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -95,7 +95,7 @@ func TestHeadersMiddleware_CompareRequestHeaderRejectsMismatch(t *testing.T) {
 			"X-Token": "expected",
 		},
 	}}
-	mw := ctx2.InjectContextStruct(HeadersMiddleware(context.Background(), next, conf))
+	mw := ctx2.InjectContextStruct(BuildContext{RuntimeContext: context.Background()}, HeadersMiddleware(BuildContext{RuntimeContext: context.Background()}, next, conf))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("X-Token", "actual")
@@ -118,11 +118,11 @@ func TestHeadersMiddleware_CompareRequestHeaderDoesNotLogSecretValues(t *testing
 			"X-Token": "expected-secret",
 		},
 	}}
-	mw := HeadersMiddleware(context.Background(), next, conf)
+	mw := HeadersMiddleware(BuildContext{RuntimeContext: context.Background()}, next, conf)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("X-Token", "actual-secret")
-	ctxStruct := ctx2.ContextStruct{Logger: logger}
+	ctxStruct := ctx2.RequestContextStruct{Logger: logger}
 	req = req.WithContext(context.WithValue(req.Context(), ctxkeys.ContextStruct, &ctxStruct))
 
 	rec := httptest.NewRecorder()
@@ -154,7 +154,7 @@ func TestHeadersMiddleware_SetAndStripResponseHeadersWhenHandlerDoesNotWrite(t *
 		},
 		"strip-headers-res": []interface{}{"X-Remove-Me"},
 	}}
-	mw := HeadersMiddleware(context.Background(), next, conf)
+	mw := HeadersMiddleware(BuildContext{RuntimeContext: context.Background()}, next, conf)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -177,7 +177,7 @@ func TestHeadersMiddleware_InvalidConfigurationFailsClosed(t *testing.T) {
 			"X-Token": "$unknown_request_var",
 		},
 	}}
-	mw := HeadersMiddleware(context.Background(), next, conf)
+	mw := HeadersMiddleware(BuildContext{RuntimeContext: context.Background()}, next, conf)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -195,7 +195,7 @@ func TestHeadersMiddleware_InvalidOptionTypeFailsClosed(t *testing.T) {
 	conf := Config{Options: map[string]interface{}{
 		"set-headers-req": []interface{}{"X-Header"},
 	}}
-	mw := HeadersMiddleware(context.Background(), next, conf)
+	mw := HeadersMiddleware(BuildContext{RuntimeContext: context.Background()}, next, conf)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()

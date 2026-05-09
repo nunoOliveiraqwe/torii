@@ -1,14 +1,13 @@
 package proxy
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/nunoOliveiraqwe/torii/config"
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
 	"github.com/nunoOliveiraqwe/torii/internal/proxyutil"
+	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
 
@@ -20,7 +19,7 @@ func (d *PathDispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.mux.ServeHTTP(w, r)
 }
 
-func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, pathRules []config.PathRule) (http.Handler, []string, []PathSnapshot, error) {
+func buildPathDispatcher(ctx middleware.BuildContext, defaultHandler http.HandlerFunc, pathRules []config.PathRule) (http.Handler, []string, []PathSnapshot, error) {
 	mux := http.NewServeMux()
 
 	backends := make([]string, 0)
@@ -54,14 +53,14 @@ func buildPathDispatcher(ctx context.Context, defaultHandler http.HandlerFunc, p
 			backends = append(backends, rule.Backend.Address)
 		}
 
-		ctx2 := context.WithValue(ctx, ctxkeys.Path, rule.Pattern)
+		ctx2 := ctx.WithPath(rule.Pattern)
 
 		handler, appliedMw, err := buildMiddlewareChain(ctx2, pathBaseHandler, rule.Middlewares, rule.DisableDefaults)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 
-		handler = wrapTrustedProxies(ctx, handler, rule.TrustedProxies)
+		handler = wrapTrustedProxies(ctx.Context(), handler, rule.TrustedProxies)
 
 		// When the rule has its own backend, ensure the pattern covers
 		// sub-paths too (e.g. "/jellyfino" → "/jellyfino/{path...}").

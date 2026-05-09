@@ -1,14 +1,16 @@
 package middleware
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"go.uber.org/zap"
 )
 
-type Func func(ctx context.Context, next http.HandlerFunc, middlewareConf Config) http.HandlerFunc
+type BuildContext = requestctx.BuildContext
+
+type Func func(ctx BuildContext, next http.HandlerFunc, middlewareConf Config) http.HandlerFunc
 
 type RegistryEntry struct {
 	Fn         Func
@@ -48,7 +50,7 @@ func init() {
 	}
 }
 
-func ApplyMiddlewares(ctx context.Context, handler http.HandlerFunc, middlewares []Config, disableDefaults bool) (http.HandlerFunc, []Config, error) {
+func ApplyMiddlewares(ctx BuildContext, handler http.HandlerFunc, middlewares []Config, disableDefaults bool) (http.HandlerFunc, []Config, error) {
 	if handler == nil {
 		zap.S().Errorf("Handler cannot be nil when applying middleware chain")
 		return nil, nil, errors.New("handler cannot be nil when applying middleware chain")

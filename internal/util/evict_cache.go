@@ -153,10 +153,10 @@ func (c *Cache[T]) CacheValue(ip string, value T) {
 	c.tracker.Mark(1)
 }
 
-func (c *Cache[T]) GetValue(ip string) (T, error) {
+func (c *Cache[T]) GetValue(key string) (T, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	entry, ok := c.cache[ip]
+	entry, ok := c.cache[key]
 	if !ok {
 		c.tracker.MarkMiss()
 		var zero T

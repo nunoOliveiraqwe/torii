@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/config"
 	"github.com/nunoOliveiraqwe/torii/internal/app"
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
 )
@@ -29,31 +28,40 @@ func StartServer(conf config.APIServerConfig, systemService app.SystemService) *
 	httpServer.ReadTimeout = time.Duration(conf.ReadTimeoutSecs) * time.Second
 	httpServer.WriteTimeout = time.Duration(conf.WriteTimeoutSecs) * time.Second
 
-	mux := buildMux(conf.EnableMetrics, conf.Port, conf.AccessLogPath, systemService)
-	httpServer.Handler = systemService.SessionRegistry().WrapWithSessionMiddleware(mux)
+	mux := buildMux(conf, systemService)
+	httpServer.Handler = systemService.GetSessionRegistry().WrapWithSessionMiddleware(mux)
 	return httpServer
 
 }
 
-func buildMux(enabledMetrics bool, port int, logPath string, svc app.SystemService) *http.ServeMux {
+func buildMux(conf config.APIServerConfig, svc app.SystemService) *http.ServeMux {
 	zap.S().Debugf("Building http mux for proxy API")
 	mux := http.NewServeMux()
 
-	ctx := context.WithValue(context.Background(), ctxkeys.Port, strconv.Itoa(port))
-	ctx = context.WithValue(ctx, ctxkeys.MetricsMgr, svc.GetGlobalMetricsManager())
-	ctx = context.WithValue(ctx, ctxkeys.ServerID, fmt.Sprintf("http-%d", port))
-	ctx = context.WithValue(ctx, ctxkeys.CacheInsightMgr, svc.GetCacheInsightManager())
+	ctx := requestctx.NewBuildContext(
+		svc.GetGlobalMetricsManager(),
+		svc.GetCacheInsightManager(),
+		svc.GetEventBus(),
+		conf.Port,
+		fmt.Sprintf("http-%d", conf.Port),
+		"",
+		"",
+		"",
+	).WithRuntimeContext(context.Background())
 
 	globalHandler := mux.ServeHTTP
 
-	if enabledMetrics {
+	if conf.EnableMetrics {
 		globalHandler = middleware.MetricsMiddleware(ctx, globalHandler, middleware.Config{})
+	}
+	if conf.EnableActivityLog {
+		globalHandler = requestctx.InjectContextStruct(ctx, globalHandler)
 	}
 	globalHandler = middleware.BodySizeLimitMiddleware(ctx, globalHandler, middleware.Config{
 		Options: map[string]interface{}{"max-size": "20m"},
 	})
 	globalHandler = middleware.RequestLoggerMiddleware(ctx, globalHandler, middleware.Config{
-		Options: map[string]interface{}{"request-log-path": logPath}})
+		Options: map[string]interface{}{"request-log-path": conf.AccessLogPath}})
 	globalHandler = middleware.RequestIDMiddleware(ctx, globalHandler, middleware.Config{})
 
 	for _, route := range routes {

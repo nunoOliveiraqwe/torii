@@ -1,17 +1,17 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
+	"github.com/nunoOliveiraqwe/torii/internal/bus"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
-	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"github.com/nunoOliveiraqwe/torii/middleware/ip_filter"
 	"go.uber.org/zap"
 )
 
-func IpFilterMiddleware(context context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func IpFilterMiddleware(context BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	filter, err := initIpFilter(context, conf)
 	if err != nil {
 		zap.S().Errorf("IpFilterMiddleware: failed to initialize: %v. Failing closed.", err)
@@ -32,16 +32,18 @@ func IpFilterMiddleware(context context.Context, next http.HandlerFunc, conf Con
 		blocked, err := filter.IsBlocked(clientIP)
 		if err != nil {
 			logger.Error("IpFilterMiddleware: error checking IP", zap.String("clientIp", clientIP), zap.Error(err))
-			ctx.CreateAndAddBlockInfo(r, "ip-filter", fmt.Sprintf("An error occurred check if IP %s is blocked. err = %s",
-				clientIP,
-				err.Error()))
+			requestctx.CreateAndAddBlockInfoToRequestContext(r, "ip-filter",
+				fmt.Sprintf("An error occurred check if IP %s is blocked. err = %s",
+					clientIP,
+					err.Error()), bus.TopicIPFilterMatched)
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
 
 		if blocked {
 			logger.Warn("IpFilterMiddleware: blocked request", zap.String("clientIp", clientIP))
-			ctx.CreateAndAddBlockInfo(r, "ip-filter", fmt.Sprintf("Blocked IP: %s", clientIP))
+			requestctx.CreateAndAddBlockInfoToRequestContext(r, "ip-filter",
+				fmt.Sprintf("Blocked IP: %s", clientIP), bus.TopicIPFilterMatched)
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
@@ -50,7 +52,7 @@ func IpFilterMiddleware(context context.Context, next http.HandlerFunc, conf Con
 	}
 }
 
-func initIpFilter(ctx context.Context, conf Config) (*ip_filter.IpFilter, error) {
+func initIpFilter(ctx BuildContext, conf Config) (*ip_filter.IpFilter, error) {
 	opts := conf.Options
 
 	allowList, err := ParseStringSliceOpt(opts, "allow", nil)
@@ -76,9 +78,9 @@ func initIpFilter(ctx context.Context, conf Config) (*ip_filter.IpFilter, error)
 		if err != nil {
 			return nil, err
 		}
-		return ip_filter.NewIpFilter(ctx, loader)
+		return ip_filter.NewIpFilter(ctx.Context(), loader)
 	}
 
 	loader := ip_filter.NewStaticLoader(allowList, blockList)
-	return ip_filter.NewIpFilter(ctx, loader)
+	return ip_filter.NewIpFilter(ctx.Context(), loader)
 }

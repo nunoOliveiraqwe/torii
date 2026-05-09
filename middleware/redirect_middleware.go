@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -110,7 +109,7 @@ func (e *internalRedirecter) redirect(w http.ResponseWriter, r *http.Request) {
 	e.proxy.ServeHTTP(w, r)
 }
 
-func RedirectMiddleware(_ context.Context, _ http.HandlerFunc, conf Config) http.HandlerFunc {
+func RedirectMiddleware(_ BuildContext, _ http.HandlerFunc, conf Config) http.HandlerFunc {
 	opts, err := parseRedirectConf(conf)
 	if err != nil {
 		zap.S().Errorf("RedirectMiddleware: failed to parse configuration: %v. Failing closed.", err)

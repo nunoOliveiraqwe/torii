@@ -1,20 +1,19 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/netip"
 
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/internal/bus"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
-	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
 	"github.com/nunoOliveiraqwe/torii/middleware/ua"
 	"go.uber.org/zap"
 )
 
-func UserAgentBlockMiddleware(context context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func UserAgentBlockMiddleware(context BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	cfg, err := parseUaConfig(context, conf)
 	if err != nil {
 		zap.S().Errorf("UserAgentBlockMiddleware: failed to parse configuration: %v. Failing closed.", err)
@@ -56,7 +55,8 @@ func UserAgentBlockMiddleware(context context.Context, next http.HandlerFunc, co
 
 		if uaBlocker.IsBlockedIP(addr.String()) {
 			logger.Warn("UserAgentBlockMiddleware: blocked request from cached IP", zap.String("clientIp", clientIP))
-			ctx.CreateAndAddBlockInfo(r, "ua-block", "cached blocked IP")
+			requestctx.CreateAndAddBlockInfoToRequestContext(r, "ua-block", "cached blocked IP",
+				bus.TopicUserAgentBlocked)
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
@@ -67,7 +67,8 @@ func UserAgentBlockMiddleware(context context.Context, next http.HandlerFunc, co
 		if uaBlocker.IsBlockedUA(userAgent) {
 			uaBlocker.CacheBlockedIP(addr.String())
 			logger.Warn("UserAgentBlockMiddleware: blocked request", zap.String("clientIp", clientIP), zap.String("user_agent", userAgent))
-			ctx.CreateAndAddBlockInfo(r, "ua-block", fmt.Sprintf("blocked user agent %s", userAgent))
+			requestctx.CreateAndAddBlockInfoToRequestContext(r, "ua-block",
+				fmt.Sprintf("blocked user agent %s", userAgent), bus.TopicUserAgentBlocked)
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
@@ -76,13 +77,13 @@ func UserAgentBlockMiddleware(context context.Context, next http.HandlerFunc, co
 	}
 }
 
-func parseUaConfig(ctx context.Context, conf Config) (*ua.UaBlockerConfig, error) {
+func parseUaConfig(ctx BuildContext, conf Config) (*ua.UaBlockerConfig, error) {
 	if conf.Options == nil {
 		return nil, fmt.Errorf("UserAgentBlockMiddleware: missing required options")
 	}
 
 	//i want to register this cache
-	conf.Options[util.CacheInsightKey] = ctx.Value(ctxkeys.CacheInsightMgr)
+	conf.Options[util.CacheInsightKey] = ctx.CacheInsights
 	cacheOpts, err := util.ParseCacheOptions(conf.Options)
 	if err != nil {
 		return nil, err
@@ -97,7 +98,7 @@ func parseUaConfig(ctx context.Context, conf Config) (*ua.UaBlockerConfig, error
 		}
 	}
 	cacheOpts.TrackRate = true
-	cacheOpts.Ctx = ctx
+	cacheOpts.Ctx = ctx.Context()
 
 	zap.S().Debug("UserAgentBlockMiddleware: parsed cache options", zap.Any("cacheOpts", cacheOpts))
 

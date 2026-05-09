@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -86,7 +85,7 @@ func (g guardedFileSystem) Open(name string) (http.File, error) {
 	return f, nil
 }
 
-func StaticFileServerMiddleware(_ context.Context, _ http.HandlerFunc, conf Config) http.HandlerFunc {
+func StaticFileServerMiddleware(_ BuildContext, _ http.HandlerFunc, conf Config) http.HandlerFunc {
 	opts, err := parseStaticFileServerConfig(conf)
 	if err != nil {
 		zap.S().Errorf("StaticFileServerMiddleware: failed to parse config: %v. Failing closed.", err)

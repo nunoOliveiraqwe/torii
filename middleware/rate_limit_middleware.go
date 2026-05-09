@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -10,9 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nunoOliveiraqwe/torii/internal/bus"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
-	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )
@@ -58,7 +58,9 @@ func (g *globalLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
 		return true
 	}
 	w.Header().Set("Retry-After", g.retryAfter)
-	ctx.CreateAndAddBlockInfo(r, "rate-limit", fmt.Sprintf("global rate limit of %f req/s exceeded", g.internalLimiter.Limit()))
+	requestctx.CreateAndAddBlockInfoToRequestContext(r,
+		"rate-limit",
+		fmt.Sprintf("global rate limit of %f req/s exceeded", g.internalLimiter.Limit()), bus.TopicRateLimitTriggered)
 	http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 	return false
 }
@@ -68,7 +70,7 @@ func (l *perClientLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
 	ipAddr, err := netutil.GetClientIP(r)
 	if err != nil {
 		logger.Warn("RateLimitMiddleware: failed to extract client IP", zap.Error(err))
-		ctx.CreateAndAddBlockInfo(r, "rate-limit", "failed to extract client IP")
+		requestctx.CreateAndAddBlockInfoToRequestContext(r, "rate-limit", "failed to extract client IP", bus.TopicRateLimitTriggered)
 		w.Header().Set("Retry-After", l.retryAfter)
 		http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 		return false
@@ -81,7 +83,7 @@ func (l *perClientLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
 		l.clientCache.CacheValue(ipAddr, entry)
 	} else if err != nil {
 		logger.Warn("RateLimitMiddleware: failed to get client entry from cache for IP", zap.String("Ip", ipAddr), zap.Error(err))
-		ctx.CreateAndAddBlockInfo(r, "rate-limit", "cache error on get")
+		requestctx.CreateAndAddBlockInfoToRequestContext(r, "rate-limit", "cache error on get", bus.TopicRateLimitTriggered)
 		w.Header().Set("Retry-After", l.retryAfter)
 		http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 		return false
@@ -90,13 +92,14 @@ func (l *perClientLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
 		return true
 	}
 	logger.Warn("RateLimitMiddleware: rate limit exceeded for client IP", zap.String("Ip", ipAddr))
-	ctx.CreateAndAddBlockInfo(r, "rate-limit", fmt.Sprintf("rate limit of %f req/s exceeded", entry.limiter.Limit()))
+	requestctx.CreateAndAddBlockInfoToRequestContext(r, "rate-limit",
+		fmt.Sprintf("rate limit of %f req/s exceeded", entry.limiter.Limit()), bus.TopicRateLimitTriggered)
 	w.Header().Set("Retry-After", l.retryAfter)
 	http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 	return false
 }
 
-func RateLimitMiddleware(ctx context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func RateLimitMiddleware(ctx BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	limitConf, err := parseRateLimitConfig(ctx, conf)
 	if err != nil {
 		zap.S().Errorf("Failed to parse rate limit middleware configuration: %v. Failing closed.", err)
@@ -151,7 +154,7 @@ func newLimiter(c *rateLimitConf) (limiter, error) {
 	}, nil
 }
 
-func parseRateLimitConfig(ctx context.Context, conf Config) (*rateLimitConf, error) {
+func parseRateLimitConfig(ctx BuildContext, conf Config) (*rateLimitConf, error) {
 	zap.S().Debug("Parsing rate limit middleware configuration")
 	reqLimit, ok := conf.Options["limiter-req"]
 	if !ok {
@@ -197,7 +200,7 @@ func parseRateLimitConfig(ctx context.Context, conf Config) (*rateLimitConf, err
 			zap.S().Errorf("Failed to parse cache options for per-client rate limiter: %v. Failing closed.", err)
 			return nil, fmt.Errorf("failed to parse cache options: %w", err)
 		}
-		cacheOpts.Ctx = ctx
+		cacheOpts.Ctx = ctx.Context()
 	}
 	return &rateLimitConf{
 		CacheOpt:      cacheOpts,

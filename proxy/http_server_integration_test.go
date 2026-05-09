@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/config"
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/middleware"
 	"github.com/stretchr/testify/assert"
@@ -115,10 +115,11 @@ func newEchoBackend(t *testing.T) *httptest.Server {
 }
 
 // createTestContext builds a context suitable for buildHttpServer.
-func createTestContext() context.Context {
+func createTestContext() middleware.BuildContext {
 	mgr := metrics.NewGlobalMetricsHandler(1, context.Background())
 	mgr.StartCollectingMetrics()
-	return context.WithValue(context.Background(), ctxkeys.MetricsMgr, mgr)
+	return requestctx.NewBuildContext(mgr, nil, nil, 0, "", "", "", "").
+		WithRuntimeContext(context.Background())
 }
 
 // buildAndStart builds a proxy server, starts it, waits for readiness,
@@ -3861,7 +3862,7 @@ func TestEdge_NewToriiWithoutGlobalConfigCanAddHttpServerLater(t *testing.T) {
 	mgr.StartCollectingMetrics()
 	t.Cleanup(mgr.StopCollectingMetrics)
 
-	torii, err := NewTorii(config.NetworkConfig{}, mgr, nil, nil)
+	torii, err := NewTorii(config.NetworkConfig{}, mgr, nil, nil, nil)
 	require.NoError(t, err)
 
 	err = torii.AddHttpServer(context.Background(), simpleListener(port, backend.URL, nil))

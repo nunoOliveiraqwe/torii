@@ -78,13 +78,14 @@ func (c LogConfig) IsColorEnabled() bool {
 }
 
 type APIServerConfig struct {
-	Port             int    `yaml:"port" json:"port"`
-	Host             string `yaml:"host" json:"host"`
-	EnableMetrics    bool   `yaml:"enable-metrics" json:"enable-metrics"`
-	AccessLogPath    string `yaml:"access-log-path" json:"access-log-path"`
-	IdleTimeoutSecs  int    `yaml:"idle-timeout" json:"idle-timeout"`
-	ReadTimeoutSecs  int    `yaml:"read-timeout" json:"read-timeout"`
-	WriteTimeoutSecs int    `yaml:"write-timeout" json:"write-timeout"`
+	Port              int    `yaml:"port" json:"port"`
+	Host              string `yaml:"host" json:"host"`
+	EnableMetrics     bool   `yaml:"enable-metrics" json:"enable-metrics"`
+	EnableActivityLog bool   `yaml:"enable-activity-log" json:"enable-activity-log"`
+	AccessLogPath     string `yaml:"access-log-path" json:"access-log-path"`
+	IdleTimeoutSecs   int    `yaml:"idle-timeout" json:"idle-timeout"`
+	ReadTimeoutSecs   int    `yaml:"read-timeout" json:"read-timeout"`
+	WriteTimeoutSecs  int    `yaml:"write-timeout" json:"write-timeout"`
 }
 
 func DefaultConfiguration() AppConfig {
@@ -93,12 +94,13 @@ func DefaultConfiguration() AppConfig {
 			LogLevel: "INFO",
 		},
 		APIServer: APIServerConfig{
-			Host:             "127.0.0.1",
-			Port:             27000,
-			IdleTimeoutSecs:  60,
-			ReadTimeoutSecs:  60,
-			WriteTimeoutSecs: 60,
-			EnableMetrics:    true,
+			Host:              "127.0.0.1",
+			Port:              27000,
+			IdleTimeoutSecs:   60,
+			ReadTimeoutSecs:   60,
+			WriteTimeoutSecs:  60,
+			EnableMetrics:     true,
+			EnableActivityLog: true,
 		},
 		Session: SessionConfig{
 			Lifetime:        16 * time.Hour,

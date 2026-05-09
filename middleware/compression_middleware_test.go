@@ -70,7 +70,7 @@ func TestCompressionMiddleware_Gzip(t *testing.T) {
 		Type:    "gzip",
 		Options: map[string]interface{}{"type": "gzip", "level": float64(gzip.BestSpeed)},
 	}
-	handler := CompressionMiddleware(context.Background(), compressedHandler(t), conf)
+	handler := CompressionMiddleware(BuildContext{RuntimeContext: context.Background()}, compressedHandler(t), conf)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -95,7 +95,7 @@ func TestCompressionMiddleware_Zlib(t *testing.T) {
 		Type:    "zlib",
 		Options: map[string]interface{}{"type": "zlib", "level": float64(flate.BestSpeed)},
 	}
-	handler := CompressionMiddleware(context.Background(), compressedHandler(t), conf)
+	handler := CompressionMiddleware(BuildContext{RuntimeContext: context.Background()}, compressedHandler(t), conf)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "zlib")
@@ -120,7 +120,7 @@ func TestCompressionMiddleware_NoAcceptEncoding(t *testing.T) {
 		Type:    "gzip",
 		Options: map[string]interface{}{"type": "gzip"},
 	}
-	handler := CompressionMiddleware(context.Background(), compressedHandler(t), conf)
+	handler := CompressionMiddleware(BuildContext{RuntimeContext: context.Background()}, compressedHandler(t), conf)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	// No Accept-Encoding header

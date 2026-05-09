@@ -1,4 +1,4 @@
-package metrics
+package activity
 
 import (
 	"time"
@@ -16,6 +16,7 @@ type BlockLogEntry struct {
 	ConnectionName     string    `json:"connection_name"`
 	BlockingMiddleware string    `json:"blocking_middleware"`
 	BlockReason        string    `json:"block_reason"`
+	LatencyMs          int64     `json:"latency_ms"`
 }
 
 func NewBlockLog(capacity int) *util.RingBuffer[BlockLogEntry] {

@@ -1,18 +1,22 @@
-package ctx
+package requestctx
 
 import (
 	"net/http"
+
+	"github.com/nunoOliveiraqwe/torii/internal/bus"
 )
 
 type BlockInfo struct {
 	Middleware string
 	Reason     string
+	Topic      bus.Topic
 }
 
-func CreateAndAddBlockInfo(r *http.Request, middleware, reason string) {
+func CreateAndAddBlockInfoToRequestContext(r *http.Request, middleware, reason string, topic bus.Topic) {
 	b := &BlockInfo{
 		Middleware: middleware,
 		Reason:     reason,
+		Topic:      topic,
 	}
 	SetBlockInfo(r, b)
 }

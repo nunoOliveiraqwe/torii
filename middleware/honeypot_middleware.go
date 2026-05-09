@@ -1,15 +1,14 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/netip"
 
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/internal/bus"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
-	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
 	"github.com/nunoOliveiraqwe/torii/middleware/honeypot"
 	"go.uber.org/zap"
 )
@@ -104,7 +103,7 @@ var honeypotDefaults = map[string][]string{
 	},
 }
 
-func HoneyPotMiddleware(context context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func HoneyPotMiddleware(context BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	h, err := parseHoneyPotConfig(context, conf)
 	if err != nil {
 		zap.S().Errorf("HoneyPotMiddleware failed to parse configuration: %v. Failing closed.", err)
@@ -143,7 +142,8 @@ func HoneyPotMiddleware(context context.Context, next http.HandlerFunc, conf Con
 
 		if isHoneyPotted {
 			logger.Warn("HoneyPotMiddleware: blocked request from cached IP", zap.String("clientIp", clientIP))
-			ctx.CreateAndAddBlockInfo(r, "honeypot", "cached honeypot IP")
+			requestctx.CreateAndAddBlockInfoToRequestContext(r, "honeypot", "cached honeypot IP",
+				bus.TopicHoneypotTriggered)
 			honeyServer.Serve(w, r, logger)
 			return
 		}
@@ -156,7 +156,8 @@ func HoneyPotMiddleware(context context.Context, next http.HandlerFunc, conf Con
 				zap.String("clientIp", clientIP), zap.String("path", r.URL.Path))
 
 			honeyServer.AddIpToHoneyPot(addr.String())
-			ctx.CreateAndAddBlockInfo(r, "honeypot", fmt.Sprintf("honeypot path: %s", r.URL.Path))
+			requestctx.CreateAndAddBlockInfoToRequestContext(r, "honeypot",
+				fmt.Sprintf("honeypot path: %s", r.URL.Path), bus.TopicHoneypotTriggered)
 			honeyServer.Serve(w, r, logger)
 			return
 		}
@@ -165,20 +166,20 @@ func HoneyPotMiddleware(context context.Context, next http.HandlerFunc, conf Con
 	}
 }
 
-func parseHoneyPotConfig(ctx context.Context, conf Config) (*honeypot.HoneyPotConfig, error) {
+func parseHoneyPotConfig(ctx BuildContext, conf Config) (*honeypot.HoneyPotConfig, error) {
 	zap.S().Info("HoneyPotMiddleware: parsing configuration")
 	if conf.Options == nil {
 		return nil, fmt.Errorf("HoneyPotMiddleware: missing required options")
 	}
 	//i want to register this cache
-	conf.Options[util.CacheInsightKey] = ctx.Value(ctxkeys.CacheInsightMgr)
+	conf.Options[util.CacheInsightKey] = ctx.CacheInsights
 	cacheOpts, err := util.ParseCacheOptions(conf.Options)
 	if err != nil {
 		return nil, err
 	}
 
 	cacheOpts.TrackRate = true
-	cacheOpts.Ctx = ctx
+	cacheOpts.Ctx = ctx.Context()
 
 	if cacheOpts.IsUsingDefaultCacheName {
 		cacheName, err2 := buildNameForConnection(ctx, "honeypot")

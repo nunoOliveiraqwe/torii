@@ -1,11 +1,10 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"time"
 
-	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -86,21 +85,21 @@ func (z *zapLogFormatter) newRequestLogger(r *http.Request) *zap.Logger {
 }
 
 func GetRequestLoggerFromContext(r *http.Request) *zap.Logger {
-	ctxStruct := ctx.GetContextStruct(r)
+	ctxStruct := requestctx.GetContextStruct(r)
 	if ctxStruct.Logger == nil {
 		return zap.L()
 	}
 	return ctxStruct.Logger
 }
 
-func RequestLoggerMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func RequestLoggerMiddleware(_ BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	formatterPath := parseConfig(conf)
 	formatter := newZapLogFormatter(formatterPath)
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		log := formatter.newRequestLogger(r)
 
-		ctxStruct := ctx.GetContextStruct(r)
+		ctxStruct := requestctx.GetContextStruct(r)
 		ctxStruct.Logger = log
 
 		aw := &accessLogResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}

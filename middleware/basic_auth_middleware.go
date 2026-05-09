@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
@@ -15,7 +14,7 @@ type basicAuth struct {
 	encoder     auth.Encoder
 }
 
-func BasicAuthMiddleware(_ context.Context, next http.HandlerFunc, conf Config) http.HandlerFunc {
+func BasicAuthMiddleware(_ BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
 	b, err := parseBasicAuthOptions(conf)
 	if err != nil {
 		zap.S().Errorf("BasicAuthMiddleware: failed to parse configuration: %v. Failing closed.", err)

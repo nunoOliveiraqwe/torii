@@ -6,9 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nunoOliveiraqwe/torii/internal/ctxkeys"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"github.com/nunoOliveiraqwe/torii/metrics"
-	"github.com/nunoOliveiraqwe/torii/middleware/ctx"
 	"go.uber.org/zap"
 )
 
@@ -56,7 +55,7 @@ func (w *responseWriterWithMetrics) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
 }
 
-func MetricsMiddleware(contx context.Context, next http.HandlerFunc, _ Config) http.HandlerFunc {
+func MetricsMiddleware(contx BuildContext, next http.HandlerFunc, _ Config) http.HandlerFunc {
 	reportFunc := resolveReportFunc(contx)
 	return func(w http.ResponseWriter, r *http.Request) {
 		if reportFunc == nil {
@@ -73,7 +72,7 @@ func MetricsMiddleware(contx context.Context, next http.HandlerFunc, _ Config) h
 			metric.IsTimedOut = true
 		}
 		metric.LatencyMs = elapsedTime.Milliseconds()
-		ctxStruct := ctx.GetContextStruct(r)
+		ctxStruct := requestctx.GetContextStruct(r)
 		metric.Country = ctxStruct.CountryCode
 		if ctxStruct.BlockInfo != nil {
 			metric.IsMiddlewareBlockedRequest = true
@@ -84,18 +83,8 @@ func MetricsMiddleware(contx context.Context, next http.HandlerFunc, _ Config) h
 	}
 }
 
-func resolveReportFunc(ctx context.Context) metrics.MetricsReportFunc {
-	var conName string
-	name := ctx.Value(ctxkeys.OverrideMetricsName) //Todo: this is a hack
-	//I need to think about metrics and the global dispatcher a bit more and see if there is a better way to do this,
-	//but for now this is the only way I can think of to allow middlewares to override the connection name used for metrics reporting
-	//i might just end up refactoring all of this, expecially the rolling log
-	if name != nil {
-		if nameStr, ok := name.(string); ok {
-			conName = nameStr
-		}
-		zap.S().Warnf("Override metrics name in context is not a string. Ignoring it and resolving connection name as normal")
-	}
+func resolveReportFunc(ctx BuildContext) metrics.MetricsReportFunc {
+	conName := ctx.OverrideMetricsName
 
 	if conName == "" {
 		var err error
@@ -106,24 +95,15 @@ func resolveReportFunc(ctx context.Context) metrics.MetricsReportFunc {
 		}
 	}
 
-	mgrManager := ctx.Value(ctxkeys.MetricsMgr)
-	if mgrManager == nil {
+	if ctx.MetricsManager == nil {
 		zap.S().Warnf("Mgr not found in middleware options for metrics resolution")
 		return nil
 	}
-	mgrManagerCasted, ok := mgrManager.(*metrics.ConnectionMetricsManager)
-	if !ok {
-		zap.S().Warnf("Mgr is not of type SystemService")
-		return nil
-	}
-	serverIdStr := ""
-	serverId := ctx.Value(ctxkeys.ServerID)
-	if serverId == nil {
+	if ctx.ServerID == "" {
 		zap.S().Warnf("ServerId not found in middleware options for metrics resolution")
 		return nil
 	}
-	serverIdStr = serverId.(string)
-	return mgrManagerCasted.TrackMetricsForConnection(serverIdStr, conName)
+	return ctx.MetricsManager.TrackMetricsForConnection(ctx.ServerID, conName)
 }
 
 func initializeRequestMetrics(r *http.Request) *metrics.RequestMetric {
