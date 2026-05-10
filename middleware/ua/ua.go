@@ -8,6 +8,7 @@ import (
 
 	"github.com/cloudflare/ahocorasick"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
+	cacheSub "github.com/nunoOliveiraqwe/torii/internal/subsystem/cache"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"go.uber.org/zap"
 )
@@ -19,6 +20,17 @@ type uaCacheEntry struct {
 
 func (b *uaCacheEntry) Touch()                   { b.lastSeen = time.Now() }
 func (b *uaCacheEntry) GetLastReadAt() time.Time { return b.lastSeen }
+
+func (b *uaCacheEntry) CacheEntryDescriptor() cacheSub.EntryDescriptor {
+	return cacheSub.EntryDescriptor{
+		Disposition: cacheSub.EntryDispositionBlocked,
+		Summary:     "blocked by user-agent policy",
+		Fields: map[string]string{
+			"ip": b.ip,
+		},
+		UpdatedAt: b.lastSeen,
+	}
+}
 
 type UaBlockerConfig struct {
 	BlockEmptyUA          bool

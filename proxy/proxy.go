@@ -12,7 +12,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/internal/bus"
 	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"github.com/nunoOliveiraqwe/torii/internal/service"
-	"github.com/nunoOliveiraqwe/torii/internal/util"
+	cacheSub "github.com/nunoOliveiraqwe/torii/internal/subsystem/cache"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/middleware"
 	"go.uber.org/zap"
@@ -39,11 +39,11 @@ type Torii struct {
 	acmeService        *service.AcmeService
 	eventBus           bus.Bus
 	metricsManager     *metrics.ConnectionMetricsManager
-	cacheManager       *util.CacheInsightManager
+	cacheSubsystem     *cacheSub.Subsystem
 }
 
 func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager,
-	cacheMgr *util.CacheInsightManager, acmeService *service.AcmeService, eventBus bus.Bus) (*Torii, error) {
+	cacheSubsystem *cacheSub.Subsystem, acmeService *service.AcmeService, eventBus bus.Bus) (*Torii, error) {
 	zap.S().Info("Initializing torii with configuration: ", conf)
 	m := Torii{
 		eventBus:           eventBus,
@@ -52,7 +52,7 @@ func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager,
 		lock:               sync.Mutex{},
 		metricsManager:     mgr,
 		acmeService:        acmeService,
-		cacheManager:       cacheMgr,
+		cacheSubsystem:     cacheSubsystem,
 	}
 	ctx := m.buildMiddlewareContext(context.Background())
 	err := m.initializeHttpNetworkStackFromConf(ctx, conf)
@@ -73,7 +73,7 @@ func NewTorii(conf config.NetworkConfig, mgr *metrics.ConnectionMetricsManager,
 func (m *Torii) buildMiddlewareContext(ctx context.Context) middleware.BuildContext {
 	return requestctx.NewBuildContext(
 		m.metricsManager,
-		m.cacheManager,
+		m.cacheSubsystem,
 		m.eventBus,
 		0,
 		"",

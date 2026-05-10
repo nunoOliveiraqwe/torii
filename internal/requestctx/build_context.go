@@ -7,14 +7,14 @@ import (
 	"strings"
 
 	"github.com/nunoOliveiraqwe/torii/internal/bus"
-	"github.com/nunoOliveiraqwe/torii/internal/util"
+	cacheSub "github.com/nunoOliveiraqwe/torii/internal/subsystem/cache"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 )
 
 type BuildContext struct {
 	RuntimeContext      context.Context
 	MetricsManager      *metrics.ConnectionMetricsManager
-	CacheInsights       *util.CacheInsightManager
+	CacheSubsystem      *cacheSub.Subsystem
 	EventBus            bus.Bus
 	Port                int
 	ServerID            string
@@ -23,12 +23,12 @@ type BuildContext struct {
 	OverrideMetricsName string
 }
 
-func NewBuildContext(metricsManager *metrics.ConnectionMetricsManager, cacheInsights *util.CacheInsightManager,
+func NewBuildContext(metricsManager *metrics.ConnectionMetricsManager, cacheSubsystem *cacheSub.Subsystem,
 	eventBus bus.Bus, port int, serverID, host, path, overrideMetricsName string) BuildContext {
 	return BuildContext{
 		RuntimeContext:      context.Background(),
 		MetricsManager:      metricsManager,
-		CacheInsights:       cacheInsights,
+		CacheSubsystem:      cacheSubsystem,
 		EventBus:            eventBus,
 		Port:                port,
 		ServerID:            serverID,
@@ -94,6 +94,13 @@ func (c BuildContext) ConnectionName() string {
 
 func (c BuildContext) BuildConnectionName(prefix string) string {
 	return BuildConnectionName(prefix, c.PortString(), c.Host, c.Path)
+}
+
+func (c BuildContext) ScopedName(prefix string) (string, error) {
+	if c.PortString() == "" {
+		return "", fmt.Errorf("port not found in build context for %s name", prefix)
+	}
+	return c.BuildConnectionName(prefix), nil
 }
 
 func BuildConnectionName(prefix, port, host, path string) string {

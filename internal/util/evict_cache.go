@@ -3,9 +3,11 @@ package util
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
+	cacheSub "github.com/nunoOliveiraqwe/torii/internal/subsystem/cache"
 	"go.uber.org/zap"
 )
 
@@ -24,10 +26,15 @@ type EvictableEntry interface {
 
 type CacheOptions struct {
 	Ctx                     context.Context
-	manager                 *CacheInsightManager //if defined cache is registered with manager
+	Subsystem               *cacheSub.Subsystem // if defined cache is registered with subsystem
 	IsUsingDefaultCacheName bool
 	TrackRate               bool
 	CacheName               string
+	Owner                   string
+	Purpose                 string
+	Scope                   string
+	KeyKind                 string
+	ValueKind               string
 	MaxEntries              int
 	TTL                     time.Duration
 	CleanupInterval         time.Duration
@@ -35,6 +42,11 @@ type CacheOptions struct {
 
 type Cache[T EvictableEntry] struct {
 	cacheName       string
+	owner           string
+	purpose         string
+	scope           string
+	keyKind         string
+	valueKind       string
 	ctx             context.Context
 	maxEntries      int
 	ttl             time.Duration
@@ -42,6 +54,8 @@ type Cache[T EvictableEntry] struct {
 	mu              sync.RWMutex
 	cache           map[string]T
 	tracker         Tracker
+	unregister      func()
+	closeOnce       sync.Once
 }
 
 func ParseCacheOptions(configMap map[string]interface{}) (*CacheOptions, error) {
@@ -75,7 +89,7 @@ func ParseCacheOptions(configMap map[string]interface{}) (*CacheOptions, error) 
 	maxCacheSize := defaultMaxEntries
 	maxCache, ok := configMap["max-cache-size"]
 	if !ok {
-		zap.S().Warnf("RateLimitMiddleware: 'max-cache-size' option not specified, defaulting to %d", maxCacheSize)
+		zap.S().Warnf("'max-cache-size' option not specified, defaulting to %d", maxCacheSize)
 	} else if m, ok := maxCache.(int); ok {
 		maxCacheSize = m
 	}
@@ -85,30 +99,12 @@ func ParseCacheOptions(configMap map[string]interface{}) (*CacheOptions, error) 
 	cacheName, ok := configMap["cache-name"]
 	if ok {
 		if m, ok := cacheName.(string); ok {
-			cacheTtlStr = m
+			cacheNameStr = m
 			isUsingDefaultCacheName = false
 		}
 	}
-	trackRateBool := false
-	trackRate, ok := configMap["track-rate"]
-	if !ok {
-		zap.S().Warnf("'track-rate' option not specified, defaulting to false")
-	} else if m, ok := trackRate.(bool); ok {
-		trackRateBool = m
-	}
-
-	var mgrManagerCasted *CacheInsightManager
-	mgr, ok := configMap[CacheInsightKey]
-	if ok {
-		if m, ok := mgr.(*CacheInsightManager); ok {
-			mgrManagerCasted = m
-		}
-	}
-
 	return &CacheOptions{
-		manager:                 mgrManagerCasted,
 		IsUsingDefaultCacheName: isUsingDefaultCacheName,
-		TrackRate:               trackRateBool,
 		CacheName:               cacheNameStr,
 		MaxEntries:              maxCacheSize,
 		TTL:                     ttl,
@@ -127,6 +123,11 @@ func NewCache[T EvictableEntry](options *CacheOptions) (*Cache[T], error) {
 	}
 	c := &Cache[T]{
 		cacheName:       options.CacheName,
+		owner:           options.Owner,
+		purpose:         options.Purpose,
+		scope:           options.Scope,
+		keyKind:         options.KeyKind,
+		valueKind:       options.ValueKind,
 		ctx:             cacheCtx,
 		cleanupInterval: options.CleanupInterval,
 		maxEntries:      options.MaxEntries,
@@ -135,8 +136,8 @@ func NewCache[T EvictableEntry](options *CacheOptions) (*Cache[T], error) {
 		cache:           make(map[string]T),
 		tracker:         rateTracker,
 	}
-	if options.manager != nil {
-		options.manager.RegisterCache(c)
+	if options.Subsystem != nil {
+		c.unregister = options.Subsystem.RegisterCache(c)
 	}
 	c.startCleanup()
 	return c, nil
@@ -154,8 +155,8 @@ func (c *Cache[T]) CacheValue(ip string, value T) {
 }
 
 func (c *Cache[T]) GetValue(key string) (T, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	entry, ok := c.cache[key]
 	if !ok {
 		c.tracker.MarkMiss()
@@ -163,6 +164,7 @@ func (c *Cache[T]) GetValue(key string) (T, error) {
 		return zero, ErrCacheMiss
 	}
 	if time.Since(entry.GetLastReadAt()) > c.ttl {
+		delete(c.cache, key)
 		c.tracker.MarkMiss()
 		var zero T
 		return zero, ErrCacheMiss
@@ -201,6 +203,7 @@ func (c *Cache[T]) startCleanup() {
 	ticker := time.NewTicker(c.cleanupInterval)
 	go func() {
 		defer ticker.Stop()
+		defer c.close()
 		for {
 			select {
 			case <-c.ctx.Done():
@@ -211,6 +214,15 @@ func (c *Cache[T]) startCleanup() {
 			}
 		}
 	}()
+}
+
+func (c *Cache[T]) close() {
+	c.closeOnce.Do(func() {
+		c.tracker.Stop()
+		if c.unregister != nil {
+			c.unregister()
+		}
+	})
 }
 
 func (c *Cache[T]) sweep() {
@@ -233,6 +245,8 @@ func (c *Cache[T]) GetMaxLen() int {
 }
 
 func (c *Cache[T]) GetCurrentNumberOfElements() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return len(c.cache)
 }
 
@@ -268,4 +282,66 @@ func (c *Cache[T]) CacheHits() int64 {
 
 func (c *Cache[T]) CacheMisses() int64 {
 	return c.tracker.Misses()
+}
+
+func (c *Cache[T]) Snapshot() cacheSub.SourceSnapshot {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	keys := make([]string, 0, len(c.cache))
+	for key := range c.cache {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	entries := make([]cacheSub.EntrySnapshot, 0, len(keys))
+	for _, key := range keys {
+		entry := c.cache[key]
+		entrySnapshot := cacheSub.EntrySnapshot{
+			Key:         key,
+			Disposition: cacheSub.EntryDispositionUnknown,
+			LastSeenAt:  entry.GetLastReadAt(),
+		}
+		if describer, ok := any(entry).(cacheSub.EntryDescriber); ok {
+			descriptor := describer.CacheEntryDescriptor()
+			entrySnapshot.Disposition = descriptor.Disposition
+			entrySnapshot.Summary = descriptor.Summary
+			entrySnapshot.Fields = descriptor.Fields
+			entrySnapshot.Tags = descriptor.Tags
+			entrySnapshot.UpdatedAt = descriptor.UpdatedAt
+		}
+		if entrySnapshot.Disposition == "" {
+			entrySnapshot.Disposition = cacheSub.EntryDispositionUnknown
+		}
+		entries = append(entries, entrySnapshot)
+	}
+
+	rates := cacheSub.RateSnapshot{
+		M1Rate:         c.tracker.M1Rate(),
+		M5Rate:         c.tracker.M5Rate(),
+		M15Rate:        c.tracker.M15Rate(),
+		InsertionTotal: c.tracker.Total(),
+		Hits:           c.tracker.Hits(),
+		Misses:         c.tracker.Misses(),
+	}
+
+	return cacheSub.SourceSnapshot{
+		Name:            c.cacheName,
+		Owner:           c.owner,
+		Purpose:         c.purpose,
+		Scope:           c.scope,
+		KeyKind:         c.keyKind,
+		ValueKind:       c.valueKind,
+		MaxEntries:      c.maxEntries,
+		CurrentEntries:  len(c.cache),
+		TTL:             c.ttl.String(),
+		CleanupInterval: c.cleanupInterval.String(),
+		Keys:            keys,
+		Entries:         entries,
+		Rates:           rates,
+		M1Rate:          rates.M1Rate,
+		Hits:            rates.Hits,
+		Misses:          rates.Misses,
+		InsertionTotal:  rates.InsertionTotal,
+	}
 }

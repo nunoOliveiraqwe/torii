@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	cacheSub "github.com/nunoOliveiraqwe/torii/internal/subsystem/cache"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"go.uber.org/zap"
 )
@@ -346,6 +347,17 @@ func (h *honeyPotCacheEntry) Touch() {
 
 func (h *honeyPotCacheEntry) GetLastReadAt() time.Time {
 	return h.lastSeen
+}
+
+func (h *honeyPotCacheEntry) CacheEntryDescriptor() cacheSub.EntryDescriptor {
+	return cacheSub.EntryDescriptor{
+		Disposition: cacheSub.EntryDispositionBlocked,
+		Summary:     "blocked by honeypot trap",
+		Fields: map[string]string{
+			"ip": h.ip,
+		},
+		UpdatedAt: h.lastSeen,
+	}
 }
 
 type HoneyPotServer interface {

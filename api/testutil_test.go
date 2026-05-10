@@ -19,7 +19,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/internal/store"
 	"github.com/nunoOliveiraqwe/torii/internal/subsystem"
 	"github.com/nunoOliveiraqwe/torii/internal/subsystem/activity"
-	"github.com/nunoOliveiraqwe/torii/internal/util"
+	cacheSub "github.com/nunoOliveiraqwe/torii/internal/subsystem/cache"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy"
 	"github.com/stretchr/testify/mock"
@@ -177,10 +177,10 @@ func (t *testSystemService) GetRecentRequests(n int) []activity.RequestLogEntry 
 func (t *testSystemService) GetRecentBlockedEntries(n int) []activity.BlockLogEntry {
 	return []activity.BlockLogEntry{}
 }
-func (t *testSystemService) PersistConfig() error                              { return nil }
-func (t *testSystemService) IsHeadless() bool                                  { return false }
-func (t *testSystemService) GetCacheInsightManager() *util.CacheInsightManager { return nil }
-func (t *testSystemService) GetEventBus() bus.Bus                              { return nil }
+func (t *testSystemService) PersistConfig() error                   { return nil }
+func (t *testSystemService) IsHeadless() bool                       { return false }
+func (t *testSystemService) GetCacheSubsystem() *cacheSub.Subsystem { return nil }
+func (t *testSystemService) GetEventBus() bus.Bus                   { return nil }
 
 // ---------------------------------------------------------------------------
 // Test fixture builder

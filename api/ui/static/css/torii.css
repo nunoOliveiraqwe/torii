@@ -316,16 +316,23 @@
     color: #fff;
 }
 .sidebar-collapse-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     margin-left: auto;
     background: none;
     border: none;
     color: rgba(255,255,255,0.35);
     cursor: pointer;
-    font-size: 0.75rem;
     padding: 0.25rem 0.35rem;
     border-radius: 0.25rem;
     transition: color 0.15s, background 0.15s;
     line-height: 1;
+}
+.sidebar-collapse-btn svg {
+    width: 1rem;
+    height: 1rem;
+    stroke-width: 2;
 }
 .sidebar-collapse-btn:hover {
     color: rgba(255,255,255,0.8);
@@ -407,10 +414,10 @@
     padding-left: calc(1.25rem - 3px);
 }
 .sidebar-nav .nav-icon {
-    width: 1.2em;
-    text-align: center;
+    width: 1.05rem;
+    height: 1.05rem;
     flex-shrink: 0;
-    font-size: 1.05em;
+    stroke-width: 2;
 }
 
 /* Inner page tabs (used on ACME page) */
@@ -474,11 +481,18 @@
     text-overflow: ellipsis;
 }
 .sidebar-footer a {
-    display: block;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
     font-size: 0.8rem;
     color: rgba(255,255,255,0.4);
     text-decoration: none;
     padding: 0.3rem 0;
+}
+.sidebar-footer a svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    stroke-width: 2;
 }
 .sidebar-footer a:hover { color: #e74c3c; }
 
@@ -1384,12 +1398,42 @@
     background: var(--torii-review-tab-hover-bg);
 }
 
-/* ---------- Cache Insights ---------- */
+/* ---------- Cache Subsystem ---------- */
+.cache-panel {
+    background: var(--pico-card-background-color);
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+.cache-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.85rem;
+}
+.cache-panel-header h4 {
+    margin: 0;
+    font-size: 1rem;
+}
+.cache-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+}
+.cache-meta-row span,
+.cache-entry-count {
+    color: var(--pico-muted-color);
+    font-size: 0.75rem;
+}
 .cache-capacity-bar {
     height: 6px;
     border-radius: 3px;
     background: var(--torii-gauge-bar-bg, rgba(255,255,255,0.06));
     overflow: hidden;
+    margin-bottom: 1rem;
 }
 .cache-capacity-fill {
     height: 100%;
@@ -1397,14 +1441,53 @@
     background: var(--torii-accent, #7c6ef0);
     transition: width 0.4s ease;
 }
-.cache-keys-list {
+.cache-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 0.65rem;
+    margin-bottom: 1rem;
+}
+.cache-metric {
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: 0.35rem;
+    padding: 0.65rem;
+}
+.cache-metric strong {
+    display: block;
+    font-size: 1.1rem;
+    line-height: 1.2;
+}
+.cache-metric span,
+.cache-entry-summary,
+.cache-empty {
+    color: var(--pico-muted-color);
+    font-size: 0.78rem;
+}
+.cache-entry-details summary {
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+.cache-entry-list {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    margin-top: 0.5rem;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.65rem;
     max-height: 200px;
     overflow-y: auto;
-    padding: 0.25rem 0;
+    padding-right: 0.25rem;
+}
+.cache-entry {
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: 0.35rem;
+    padding: 0.65rem;
+}
+.cache-entry-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
 }
 .cache-key-tag {
     display: inline-block;
@@ -1415,4 +1498,44 @@
     color: var(--pico-code-color);
     border: 1px solid var(--pico-muted-border-color);
     word-break: break-all;
+}
+.cache-disposition {
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    text-transform: uppercase;
+}
+.cache-disposition-allowed {
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+}
+.cache-disposition-blocked {
+    background: rgba(231, 76, 60, 0.15);
+    color: #e74c3c;
+}
+.cache-disposition-neutral,
+.cache-disposition-unknown {
+    background: rgba(127, 140, 141, 0.16);
+    color: var(--pico-muted-color);
+}
+.cache-entry-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 0.35rem 0.75rem;
+    margin: 0.55rem 0 0;
+}
+.cache-entry-fields div {
+    min-width: 0;
+}
+.cache-entry-fields dt {
+    color: var(--pico-muted-color);
+    font-size: 0.68rem;
+    margin: 0;
+    text-transform: uppercase;
+}
+.cache-entry-fields dd {
+    font-size: 0.8rem;
+    margin: 0;
+    overflow-wrap: anywhere;
 }

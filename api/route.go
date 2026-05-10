@@ -263,14 +263,14 @@ var routes = []ApplicationRoute{
 		HandlerFunc:        handleGetRecentBlocked,
 	},
 	{
-		Name:               "Cache Insights",
-		Description:        "Returns insights about the cache performance, including hit/miss ratio and cached keys(Ips). ",
+		Name:               "Cache Snapshots",
+		Description:        "Returns cache(s) snapshots, including source metadata, rates, and cached entries.",
 		Method:             "GET",
-		Pattern:            "/cache/insights",
+		Pattern:            "/cache/snapshots",
 		IsAllowedBeforeFts: false,
 		IsAllowedAfterFts:  true,
 		IsSecure:           true,
-		HandlerFunc:        handleGetCacheInsights,
+		HandlerFunc:        handleGetCacheSubsystem,
 	},
 	{
 		Name:               "Get ACME Configuration",

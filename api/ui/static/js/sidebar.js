@@ -5,8 +5,11 @@ var sidebarCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
 
 function applySidebarState() {
     sidebarEl.classList.toggle('collapsed', sidebarCollapsed);
-    sidebarToggle.textContent = sidebarCollapsed ? '▶' : '◀';
     sidebarToggle.title = sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+    sidebarToggle.innerHTML = sidebarCollapsed
+        ? '<i data-lucide="panel-left-open"></i>'
+        : '<i data-lucide="panel-left-close"></i>';
+    if (window.lucide) lucide.createIcons();
     if (typeof chart !== 'undefined' && chart) {
         setTimeout(function() { chart.resize(); }, 200);
     }
@@ -95,32 +98,6 @@ document.querySelectorAll('#api-keys-tabs .inner-tab').forEach(function (tab) {
     });
 });
 
-// Proxy inner tabs (Routes / Cache)
-document.querySelectorAll('#proxy-tabs .inner-tab').forEach(function (tab) {
-    tab.addEventListener('click', function () {
-        var targetId = this.getAttribute('data-proxy-tab');
-        document.querySelectorAll('#proxy-tabs .inner-tab').forEach(function (t) {
-            t.classList.remove('active');
-        });
-        this.classList.add('active');
-        document.querySelectorAll('.inner-tab-panel[id^="proxy-tab-"]').forEach(function (panel) {
-            panel.style.display = panel.id === targetId ? '' : 'none';
-        });
-        // Show Create Proxy button only on Routes tab
-        document.getElementById('toggle-create-proxy').style.display =
-            targetId === 'proxy-tab-routes' ? '' : 'none';
-        if (targetId === 'proxy-tab-cache') {
-            loadCacheInsights();
-            if (!cacheInsightsInterval) cacheInsightsInterval = setInterval(loadCacheInsights, 5000);
-        } else {
-            if (cacheInsightsInterval) {
-                clearInterval(cacheInsightsInterval);
-                cacheInsightsInterval = null;
-            }
-        }
-    });
-});
-
 function showPage(pageId) {
     currentPage = pageId;
     pages.forEach(function (p) {
@@ -173,17 +150,16 @@ function showPage(pageId) {
     if (pageId === 'proxy-routes') {
         initListenerWizard();
         lastRouteFingerprint = '';
-        // Reset to Routes tab
-        document.querySelectorAll('#proxy-tabs .inner-tab').forEach(function (t) {
-            t.classList.toggle('active', t.getAttribute('data-proxy-tab') === 'proxy-tab-routes');
-        });
-        document.getElementById('proxy-tab-routes').style.display = '';
-        document.getElementById('proxy-tab-cache').style.display = 'none';
         document.getElementById('toggle-create-proxy').style.display = '';
+    }
+
+    if (pageId === 'http-caches') {
+        loadCacheSubsystem();
+        if (!cacheSubsystemInterval) cacheSubsystemInterval = setInterval(loadCacheSubsystem, 5000);
     } else {
-        if (cacheInsightsInterval) {
-            clearInterval(cacheInsightsInterval);
-            cacheInsightsInterval = null;
+        if (cacheSubsystemInterval) {
+            clearInterval(cacheSubsystemInterval);
+            cacheSubsystemInterval = null;
         }
     }
 
@@ -202,4 +178,3 @@ navLinks.forEach(function (link) {
         showPage(this.getAttribute('data-page'));
     });
 });
-

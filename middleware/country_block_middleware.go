@@ -2,14 +2,15 @@ package middleware
 
 import (
 	"fmt"
-	"github.com/nunoOliveiraqwe/torii/internal/netutil"
-	"github.com/nunoOliveiraqwe/torii/internal/util"
-	"github.com/nunoOliveiraqwe/torii/middleware/country"
-	"go.uber.org/zap"
 	"net/http"
 	"net/netip"
 	"strings"
 	"time"
+
+	"github.com/nunoOliveiraqwe/torii/internal/netutil"
+	"github.com/nunoOliveiraqwe/torii/internal/util"
+	"github.com/nunoOliveiraqwe/torii/middleware/country"
+	"go.uber.org/zap"
 )
 
 func CountryBlockMiddleware(ctx BuildContext, next http.HandlerFunc, middlewareConf Config) http.HandlerFunc {
@@ -54,23 +55,18 @@ func initCountryFilter(ctx BuildContext, middlewareConf Config) (*country.Filter
 	//I may want to refactor this at some point to be more consistent with the other middleware,
 	//but for now it works and I don't want to risk breaking anything by changing it.
 
-	middlewareConf.Options[util.CacheInsightKey] = ctx.CacheInsights
-	cacheOpts, err := util.ParseCacheOptions(middlewareConf.Options)
+	cacheOpts, err := ParseMiddlewareCacheOptions(ctx, middlewareConf, cacheRuntimeOptions{
+		Owner:      "CountryBlock",
+		Purpose:    "geoip-decision",
+		NamePrefix: "country-block",
+		KeyKind:    "client-ip",
+		ValueKind:  "country-decision",
+		TrackRate:  true,
+	})
 	if err != nil {
 		zap.S().Errorf("Failed to parse cache options: %v", err)
 		return nil, err
 	}
-
-	if cacheOpts.IsUsingDefaultCacheName {
-		cacheName, err2 := buildNameForConnection(ctx, "country-block")
-		if err2 != nil {
-			zap.S().Warnf("UserAgentBlockMiddleware: failed to build connection name for cache options: %v. Using default cache name.", err2)
-		} else {
-			cacheOpts.CacheName = cacheName
-		}
-	}
-	cacheOpts.TrackRate = true
-	cacheOpts.Ctx = ctx.Context()
 
 	// Parse source options
 	sourceRaw, ok := middlewareConf.Options["source"]

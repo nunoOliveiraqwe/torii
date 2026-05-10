@@ -40,7 +40,7 @@ func buildMux(conf config.APIServerConfig, svc app.SystemService) *http.ServeMux
 
 	ctx := requestctx.NewBuildContext(
 		svc.GetGlobalMetricsManager(),
-		svc.GetCacheInsightManager(),
+		svc.GetCacheSubsystem(),
 		svc.GetEventBus(),
 		conf.Port,
 		fmt.Sprintf("http-%d", conf.Port),

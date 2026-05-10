@@ -13,6 +13,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/internal/bus"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
+	cacheSub "github.com/nunoOliveiraqwe/torii/internal/subsystem/cache"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/oschwald/maxminddb-golang/v2"
 	"go.uber.org/zap"
@@ -44,6 +45,49 @@ func (c *clientEntry) Touch() {
 
 func (c *clientEntry) GetLastReadAt() time.Time {
 	return c.lastSeen
+}
+
+func (c *clientEntry) CacheEntryDescriptor() cacheSub.EntryDescriptor {
+	disposition := cacheSub.EntryDispositionBlocked
+	if c.IsAllowed {
+		disposition = cacheSub.EntryDispositionAllowed
+	}
+
+	fields := map[string]string{
+		"ip":      c.ip,
+		"allowed": fmt.Sprintf("%t", c.IsAllowed),
+	}
+	if c.countryCode != "" {
+		fields["country"] = c.countryCode
+	}
+	if c.continentCode != "" {
+		fields["continent"] = c.continentCode
+	}
+
+	return cacheSub.EntryDescriptor{
+		Disposition: disposition,
+		Summary:     countryDecisionSummary(c.countryCode, c.continentCode, c.IsAllowed),
+		Fields:      fields,
+		UpdatedAt:   c.lastSeen,
+	}
+}
+
+func countryDecisionSummary(countryCode, continentCode string, allowed bool) string {
+	decision := "blocked"
+	if allowed {
+		decision = "allowed"
+	}
+	location := countryCode
+	if continentCode != "" {
+		if location != "" {
+			location += "/"
+		}
+		location += continentCode
+	}
+	if location == "" {
+		location = "unknown location"
+	}
+	return fmt.Sprintf("%s %s", decision, location)
 }
 
 type Filter struct {
@@ -368,8 +412,20 @@ func (c *Filter) lookupIPAndCacheValue(logger *zap.Logger, r *http.Request, ip n
 		}
 		c.clientCache.CacheValue(ip.String(), entry)
 		return entry
+	} else {
+		logger.Info("IP not found in country database", zap.String("IP", ip.String()))
+		entry := &clientEntry{
+			logger:        logger,
+			ip:            ip.String(),
+			IsAllowed:     c.onUnknown,
+			lastSeen:      time.Now(),
+			countryCode:   "unknown",
+			continentCode: "unknown",
+		}
+		c.clientCache.CacheValue(ip.String(), entry)
+		return entry
+
 	}
-	return nil
 }
 
 // extractFieldByPath traverses a nested map using a pre-split field path

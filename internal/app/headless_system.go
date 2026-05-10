@@ -13,7 +13,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
 	"github.com/nunoOliveiraqwe/torii/internal/subsystem"
 	"github.com/nunoOliveiraqwe/torii/internal/subsystem/activity"
-	"github.com/nunoOliveiraqwe/torii/internal/util"
+	cacheSub "github.com/nunoOliveiraqwe/torii/internal/subsystem/cache"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy"
 	"go.uber.org/zap"
@@ -21,7 +21,7 @@ import (
 
 type headlessService struct {
 	micro                *proxy.Torii
-	cacheInsightsManager *util.CacheInsightManager
+	cacheSubsystem       *cacheSub.Subsystem
 	globalMetricsManager *metrics.ConnectionMetricsManager
 	startTime            time.Time
 	db                   *sqlite.DB
@@ -33,7 +33,7 @@ type headlessService struct {
 func NewHeadlessService(conf config.AppConfig, dataDir string) (SystemService, error) {
 	zap.S().Info("Initializing headless service (proxy only)")
 	mgr := metrics.NewGlobalMetricsHandler(2, context.Background())
-	cInMgr := util.NewCacheInsightManager()
+	cacheSubsystem := cacheSub.NewSubsystem()
 
 	var db *sqlite.DB
 	var svcStore *service.ServiceStore
@@ -51,17 +51,17 @@ func NewHeadlessService(conf config.AppConfig, dataDir string) (SystemService, e
 	}
 	eventBus := bus.NewEventBus()
 
-	m, err := proxy.NewTorii(conf.NetConfig, mgr, cInMgr, acmeSvc, eventBus)
+	m, err := proxy.NewTorii(conf.NetConfig, mgr, cacheSubsystem, acmeSvc, eventBus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create micro proxy: %w", err)
 	}
-	subManager := subsystem.NewSubsystemManager(eventBus)
+	subManager := subsystem.NewSubsystemManager(eventBus, cacheSubsystem)
 
 	return &headlessService{
 		eventBus:             eventBus,
 		subManager:           subManager,
 		micro:                m,
-		cacheInsightsManager: cInMgr,
+		cacheSubsystem:       cacheSubsystem,
 		globalMetricsManager: mgr,
 		startTime:            time.Now(),
 		db:                   db,
@@ -131,8 +131,8 @@ func (s *headlessService) GetGlobalMetricsManager() *metrics.ConnectionMetricsMa
 	return s.globalMetricsManager
 }
 
-func (s *headlessService) GetCacheInsightManager() *util.CacheInsightManager {
-	return s.cacheInsightsManager
+func (s *headlessService) GetCacheSubsystem() *cacheSub.Subsystem {
+	return s.cacheSubsystem
 }
 
 func (s *headlessService) GetConfiguredProxyServers() []*proxy.ProxySnapshot {

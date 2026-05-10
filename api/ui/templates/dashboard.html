@@ -2,6 +2,7 @@
 {{ define "head"}}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
 {{ end }}
 {{ define "body"}}
 <div id="toast-container" class="toast-container"></div>
@@ -10,28 +11,33 @@
     <aside class="sidebar" id="app-sidebar">
         <div class="sidebar-brand">
             <strong>⛩️ torii</strong>
-            <button type="button" id="sidebar-toggle" class="sidebar-collapse-btn" title="Collapse sidebar">◀</button>
+            <button type="button" id="sidebar-toggle" class="sidebar-collapse-btn" title="Collapse sidebar">
+                <i data-lucide="panel-left-close"></i>
+            </button>
         </div>
         <ul class="sidebar-nav">
             <li class="sidebar-section">Main</li>
-            <li><a href="#" class="nav-link active" data-page="dashboard">
-                <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
+            <li><a href="#" class="nav-link active" data-page="dashboard" title="Dashboard">
+                <i data-lucide="layout-dashboard" class="nav-icon"></i><span class="nav-label">Dashboard</span>
             </a></li>
-            <li><a href="#" class="nav-link" data-page="proxy-routes">
-                <span class="nav-icon">🔌</span><span class="nav-label">HTTP Routes</span>
+            <li><a href="#" class="nav-link" data-page="proxy-routes" title="HTTP Routes">
+                <i data-lucide="route" class="nav-icon"></i><span class="nav-label">HTTP Routes</span>
             </a></li>
-            <li><a href="#" class="nav-link" data-page="system">
-                <span class="nav-icon">📡</span><span class="nav-label">Activity</span>
+            <li><a href="#" class="nav-link" data-page="http-caches" title="HTTP Caches">
+                <i data-lucide="database-zap" class="nav-icon"></i><span class="nav-label">HTTP Caches</span>
             </a></li>
-            <li><a href="#" class="nav-link" data-page="acme">
-                <span class="nav-icon">🔒</span><span class="nav-label">ACME / TLS</span>
+            <li><a href="#" class="nav-link" data-page="system" title="Activity">
+                <i data-lucide="activity" class="nav-icon"></i><span class="nav-label">Activity</span>
             </a></li>
-            <li><a href="#" class="nav-link" data-page="api-keys">
-                <span class="nav-icon">🗝️</span><span class="nav-label">API Keys</span>
+            <li><a href="#" class="nav-link" data-page="acme" title="ACME / TLS">
+                <i data-lucide="shield-check" class="nav-icon"></i><span class="nav-label">ACME / TLS</span>
+            </a></li>
+            <li><a href="#" class="nav-link" data-page="api-keys" title="API Keys">
+                <i data-lucide="key-round" class="nav-icon"></i><span class="nav-label">API Keys</span>
             </a></li>
             <li class="sidebar-section">Account</li>
-            <li><a href="#" class="nav-link" data-page="account">
-                <span class="nav-icon">🔑</span><span class="nav-label">Account</span>
+            <li><a href="#" class="nav-link" data-page="account" title="Account">
+                <i data-lucide="user-round" class="nav-icon"></i><span class="nav-label">Account</span>
             </a></li>
         </ul>
         <div class="sidebar-footer">
@@ -44,7 +50,7 @@
                 <div class="sidebar-user-avatar" id="sidebar-avatar">{{ slice .Username 0 1}}</div>
                 <span class="sidebar-user-name" id="sidebar-username">{{.Username}}</span>
             </div>
-            <a href="#" id="btn-logout">⎋ Sign out</a>
+            <a href="#" id="btn-logout"><i data-lucide="log-out"></i><span>Sign out</span></a>
         </div>
     </aside>
 
@@ -186,19 +192,10 @@
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
                 <hgroup style="margin:0;">
                     <h2>HTTP Routes</h2>
-                    <p>Configured proxy server routes and cache insights</p>
+                    <p>Configured proxy server routes</p>
                 </hgroup>
                 <button type="button" class="create-proxy-toggle" id="toggle-create-proxy" style="display:none;">+ Create Proxy</button>
             </div>
-
-            <!-- Inner tab bar -->
-            <div class="inner-tabs" id="proxy-tabs">
-                <button class="inner-tab active" data-proxy-tab="proxy-tab-routes">Routes</button>
-                <button class="inner-tab" data-proxy-tab="proxy-tab-cache">Cache</button>
-            </div>
-
-            <!-- Tab: Routes -->
-            <div class="inner-tab-panel" id="proxy-tab-routes">
 
             <!-- Inline Create Proxy Wizard (collapsed by default) -->
             <div id="create-proxy-panel" style="display:none;margin-bottom:2rem;">
@@ -391,15 +388,18 @@
             <div id="proxy-routes">
                 <p aria-busy="true">Loading HTTP routes…</p>
             </div>
-            </div><!-- /proxy-tab-routes -->
 
-            <!-- Tab: Cache -->
-            <div class="inner-tab-panel" id="proxy-tab-cache" style="display:none;">
-                <div id="cache-insights-container">
-                    <p aria-busy="true">Loading cache data…</p>
-                </div>
+        </section>
+
+        <!-- PAGE: HTTP Caches -->
+        <section class="page" data-page="http-caches" style="display:none;">
+            <hgroup style="margin-bottom:1.5rem;">
+                <h2>HTTP Caches</h2>
+                <p>Cache snapshots for HTTP middleware and request handling</p>
+            </hgroup>
+            <div id="cache-subsystem-container">
+                <p aria-busy="true">Loading cache data…</p>
             </div>
-
         </section>
 
         <!-- PAGE: System -->
@@ -701,7 +701,7 @@
 <script src="/static/js/account.js"></script>
 <script src="/static/js/acme.js"></script>
 <script src="/static/js/api-keys.js"></script>
-<script src="/static/js/cache-insights.js"></script>
+<script src="/static/js/cache-subsystem.js"></script>
 <script src="/static/js/wizard.js"></script>
 <script src="/static/js/bootstrap.js"></script>
 {{ end }}

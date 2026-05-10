@@ -15,7 +15,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/internal/sqlite"
 	"github.com/nunoOliveiraqwe/torii/internal/subsystem"
 	"github.com/nunoOliveiraqwe/torii/internal/subsystem/activity"
-	"github.com/nunoOliveiraqwe/torii/internal/util"
+	cacheSub "github.com/nunoOliveiraqwe/torii/internal/subsystem/cache"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"github.com/nunoOliveiraqwe/torii/proxy"
 	"github.com/shirou/gopsutil/v4/cpu"
@@ -54,7 +54,7 @@ type SystemService interface {
 	GetServiceStore() *service.ServiceStore
 	GetConfiguredProxyServers() []*proxy.ProxySnapshot
 	GetGlobalMetricsManager() *metrics.ConnectionMetricsManager
-	GetCacheInsightManager() *util.CacheInsightManager
+	GetCacheSubsystem() *cacheSub.Subsystem
 	GetSSEBroker() *SSEBroker
 	GetEventBus() bus.Bus
 	GetProxyConfig(port int) *config.HTTPListener
@@ -113,7 +113,7 @@ type managedService struct {
 	subManager           *subsystem.Manager
 	eventBus             bus.Bus
 	micro                *proxy.Torii
-	cacheInsightsManager *util.CacheInsightManager
+	cacheSubsystem       *cacheSub.Subsystem
 	db                   *sqlite.DB
 	sessions             *session.Registry
 	serviceStore         *service.ServiceStore
@@ -127,7 +127,7 @@ type managedService struct {
 func NewSystemService(conf config.AppConfig, configPath string, dataDir string) (SystemService, error) {
 	zap.S().Info("Initializing managed system service")
 	mgr := metrics.NewGlobalMetricsHandler(2, context.Background())
-	cInMgr := util.NewCacheInsightManager()
+	cacheSubsystem := cacheSub.NewSubsystem()
 
 	dbPath := filepath.Join(dataDir, "torii.db")
 	db := sqlite.NewDB(dbPath)
@@ -138,20 +138,20 @@ func NewSystemService(conf config.AppConfig, configPath string, dataDir string) 
 
 	serviceStore := service.NewServiceStore(service.NewDataStore(db), conf.Acme)
 	eventBus := bus.NewEventBus()
-	m, err := proxy.NewTorii(conf.NetConfig, mgr, cInMgr, serviceStore.GetAcmeService(), eventBus)
+	m, err := proxy.NewTorii(conf.NetConfig, mgr, cacheSubsystem, serviceStore.GetAcmeService(), eventBus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create micro proxy: %w", err)
 	}
 
 	sessions := session.NewRegistry(db, conf.Session)
-	subManager := subsystem.NewSubsystemManager(eventBus)
+	subManager := subsystem.NewSubsystemManager(eventBus, cacheSubsystem)
 
 	return &managedService{
 		subManager:           subManager,
 		eventBus:             eventBus,
 		micro:                m,
 		db:                   db,
-		cacheInsightsManager: cInMgr,
+		cacheSubsystem:       cacheSubsystem,
 		sessions:             sessions,
 		globalMetricsManager: mgr,
 		sseBroker:            NewSSEBroker(mgr, subManager.GetActivitySubsystem()),
@@ -218,8 +218,8 @@ func (s *managedService) GetGlobalMetricsManager() *metrics.ConnectionMetricsMan
 	return s.globalMetricsManager
 }
 
-func (s *managedService) GetCacheInsightManager() *util.CacheInsightManager {
-	return s.cacheInsightsManager
+func (s *managedService) GetCacheSubsystem() *cacheSub.Subsystem {
+	return s.cacheSubsystem
 }
 
 func (s *managedService) GetSSEBroker() *SSEBroker {

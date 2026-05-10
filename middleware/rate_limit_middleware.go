@@ -12,6 +12,7 @@ import (
 	"github.com/nunoOliveiraqwe/torii/internal/bus"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
+	cacheSub "github.com/nunoOliveiraqwe/torii/internal/subsystem/cache"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
@@ -51,6 +52,22 @@ func (e *clientEntry) Touch() {
 
 func (e *clientEntry) GetLastReadAt() time.Time {
 	return e.lastSeen
+}
+
+func (e *clientEntry) CacheEntryDescriptor() cacheSub.EntryDescriptor {
+	fields := map[string]string{}
+	summary := "per-client limiter"
+	if e.limiter != nil {
+		fields["rate_per_second"] = fmt.Sprintf("%g", float64(e.limiter.Limit()))
+		fields["burst"] = strconv.Itoa(e.limiter.Burst())
+		summary = fmt.Sprintf("%g req/s, burst %d", float64(e.limiter.Limit()), e.limiter.Burst())
+	}
+	return cacheSub.EntryDescriptor{
+		Disposition: cacheSub.EntryDispositionNeutral,
+		Summary:     summary,
+		Fields:      fields,
+		UpdatedAt:   e.lastSeen,
+	}
 }
 
 func (g *globalLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
@@ -195,12 +212,18 @@ func parseRateLimitConfig(ctx BuildContext, conf Config) (*rateLimitConf, error)
 
 	var cacheOpts *util.CacheOptions
 	if strings.EqualFold(modeStr, "per-client") {
-		cacheOpts, err = util.ParseCacheOptions(conf.Options)
+		cacheOpts, err = ParseMiddlewareCacheOptions(ctx, conf, cacheRuntimeOptions{
+			Owner:      "RateLimiter",
+			Purpose:    "rate-limit",
+			NamePrefix: "rate-limit",
+			KeyKind:    "client-ip",
+			ValueKind:  "token-bucket",
+			TrackRate:  true,
+		})
 		if err != nil {
 			zap.S().Errorf("Failed to parse cache options for per-client rate limiter: %v. Failing closed.", err)
 			return nil, fmt.Errorf("failed to parse cache options: %w", err)
 		}
-		cacheOpts.Ctx = ctx.Context()
 	}
 	return &rateLimitConf{
 		CacheOpt:      cacheOpts,

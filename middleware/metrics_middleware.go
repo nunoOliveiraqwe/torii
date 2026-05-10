@@ -88,7 +88,7 @@ func resolveReportFunc(ctx BuildContext) metrics.MetricsReportFunc {
 
 	if conName == "" {
 		var err error
-		conName, err = buildNameForConnection(ctx, "metric")
+		conName, err = ctx.ScopedName("metric")
 		if err != nil {
 			zap.S().Warnf("Failed to build connection name for metrics resolution: %v", err)
 			return nil

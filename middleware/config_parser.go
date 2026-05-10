@@ -4,8 +4,18 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"go.uber.org/zap"
 )
+
+type cacheRuntimeOptions struct {
+	Owner      string
+	Purpose    string
+	NamePrefix string
+	KeyKind    string
+	ValueKind  string
+	TrackRate  bool
+}
 
 func ParseStringOpt(opts map[string]interface{}, key string, defaultVal string) (string, error) {
 	raw, ok := opts[key]
@@ -131,4 +141,31 @@ func ParseRawSliceRequired(opts map[string]interface{}, key string) ([]interface
 		return nil, fmt.Errorf("'%s' option must be an array of interface, got %T", key, raw)
 	}
 	return slice, nil
+}
+
+func ParseMiddlewareCacheOptions(ctx BuildContext, conf Config, runtime cacheRuntimeOptions) (*util.CacheOptions, error) {
+	cacheOpts, err := util.ParseCacheOptions(conf.Options)
+	if err != nil {
+		return nil, err
+	}
+
+	cacheOpts.Ctx = ctx.Context()
+	cacheOpts.Subsystem = ctx.CacheSubsystem
+	cacheOpts.TrackRate = runtime.TrackRate
+	cacheOpts.Owner = runtime.Owner
+	cacheOpts.Purpose = runtime.Purpose
+	cacheOpts.Scope = ctx.ConnectionName()
+	cacheOpts.KeyKind = runtime.KeyKind
+	cacheOpts.ValueKind = runtime.ValueKind
+
+	if cacheOpts.IsUsingDefaultCacheName {
+		cacheName, err := ctx.ScopedName(runtime.NamePrefix)
+		if err != nil {
+			zap.S().Warnf("%s: failed to build cache name: %v. Using default cache name.", runtime.Owner, err)
+		} else {
+			cacheOpts.CacheName = cacheName
+		}
+	}
+
+	return cacheOpts, nil
 }

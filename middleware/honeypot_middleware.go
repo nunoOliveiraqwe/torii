@@ -8,7 +8,6 @@ import (
 	"github.com/nunoOliveiraqwe/torii/internal/bus"
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
 	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
-	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/nunoOliveiraqwe/torii/middleware/honeypot"
 	"go.uber.org/zap"
 )
@@ -171,23 +170,16 @@ func parseHoneyPotConfig(ctx BuildContext, conf Config) (*honeypot.HoneyPotConfi
 	if conf.Options == nil {
 		return nil, fmt.Errorf("HoneyPotMiddleware: missing required options")
 	}
-	//i want to register this cache
-	conf.Options[util.CacheInsightKey] = ctx.CacheInsights
-	cacheOpts, err := util.ParseCacheOptions(conf.Options)
+	cacheOpts, err := ParseMiddlewareCacheOptions(ctx, conf, cacheRuntimeOptions{
+		Owner:      "HoneyPot",
+		Purpose:    "security-block",
+		NamePrefix: "honeypot",
+		KeyKind:    "client-ip",
+		ValueKind:  "honeypotted-client",
+		TrackRate:  true,
+	})
 	if err != nil {
 		return nil, err
-	}
-
-	cacheOpts.TrackRate = true
-	cacheOpts.Ctx = ctx.Context()
-
-	if cacheOpts.IsUsingDefaultCacheName {
-		cacheName, err2 := buildNameForConnection(ctx, "honeypot")
-		if err2 != nil {
-			zap.S().Warnf("HoneyPotMiddleware: failed to build connection name for cache options: %v. Using default cache name.", err2)
-		} else {
-			cacheOpts.CacheName = cacheName
-		}
 	}
 
 	zap.S().Debug("HoneyPotMiddleware: parsed cache options", zap.Any("cacheOpts", cacheOpts))
