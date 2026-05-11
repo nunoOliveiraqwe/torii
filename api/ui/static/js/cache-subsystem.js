@@ -50,6 +50,7 @@ function renderCacheSubsystem(caches) {
     var html = '';
     for (var i = 0; i < caches.length; i++) {
         var c = caches[i];
+        var cacheId = c.cache_id || c.cacheId || '';
         var usagePct = c.max_entries > 0 ? ((c.current_entries / c.max_entries) * 100).toFixed(1) : '0.0';
         var rates = c.rates || {};
         var hits = numValue(rates.hits, c.hits);
@@ -90,7 +91,7 @@ function renderCacheSubsystem(caches) {
         if (entries.length > 0) {
             html += '<div class="cache-entry-list">';
             for (var j = 0; j < entries.length; j++) {
-                html += renderCacheEntry(entries[j]);
+                html += renderCacheEntry(cacheId, entries[j]);
             }
             html += '</div>';
         } else {
@@ -102,15 +103,27 @@ function renderCacheSubsystem(caches) {
     }
 
     container.innerHTML = html;
+    if (window.lucide) lucide.createIcons();
 }
 
-function renderCacheEntry(entry) {
+function renderCacheEntry(cacheId, entry) {
     var disposition = entry.disposition || 'unknown';
     var dispositionClass = disposition.replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 'unknown';
+    var entryKey = entry.key || '';
+    var canDelete = cacheId && entryKey;
     var html = '<article class="cache-entry">';
     html += '<div class="cache-entry-main">';
-    html += '<code class="cache-key-tag">' + escapeHtml(entry.key || '') + '</code>';
+    html += '<code class="cache-key-tag">' + escapeHtml(entryKey) + '</code>';
+    html += '<div class="cache-entry-actions">';
     html += '<span class="cache-disposition cache-disposition-' + dispositionClass + '">' + escapeHtml(disposition) + '</span>';
+    html += '<button type="button" class="cache-entry-delete-btn" title="Delete cache entry" aria-label="Delete cache entry"';
+    if (canDelete) {
+        html += ' data-cache-id="' + escapeAttr(cacheId) + '" data-entry-key="' + escapeAttr(entryKey) + '"';
+    } else {
+        html += ' disabled';
+    }
+    html += '><i data-lucide="trash-2"></i></button>';
+    html += '</div>';
     html += '</div>';
     if (entry.summary) {
         html += '<div class="cache-entry-summary">' + escapeHtml(entry.summary) + '</div>';
@@ -119,6 +132,36 @@ function renderCacheEntry(entry) {
     html += '</article>';
     return html;
 }
+
+function deleteCacheEntry(cacheId, entryKey, button) {
+    if (!cacheId || !entryKey) return;
+    if (!confirm('Delete cache entry "' + entryKey + '"?')) return;
+
+    if (button) button.disabled = true;
+    fetch('/api/v1/cache/snapshots/' + encodeURIComponent(cacheId) + '/entries/' + encodeURIComponent(entryKey), {
+        method: 'DELETE',
+        credentials: 'same-origin'
+    })
+        .then(function (r) {
+            if (!r.ok) {
+                return r.text().then(function (t) {
+                    throw new Error(t || ('HTTP ' + r.status));
+                });
+            }
+            showToast('Cache entry deleted.', 'success');
+            loadCacheSubsystem();
+        })
+        .catch(function (err) {
+            if (button) button.disabled = false;
+            showToast('Failed to delete cache entry: ' + err.message, 'error');
+        });
+}
+
+document.addEventListener('click', function (e) {
+    var button = e.target.closest ? e.target.closest('.cache-entry-delete-btn') : null;
+    if (!button || button.disabled) return;
+    deleteCacheEntry(button.getAttribute('data-cache-id'), button.getAttribute('data-entry-key'), button);
+});
 
 function renderEntryFields(fields) {
     if (!fields) return '';
@@ -146,4 +189,12 @@ function escapeHtml(str) {
     var div = document.createElement('div');
     div.appendChild(document.createTextNode(str));
     return div.innerHTML;
+}
+
+function escapeAttr(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }

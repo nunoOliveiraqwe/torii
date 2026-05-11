@@ -273,6 +273,16 @@ var routes = []ApplicationRoute{
 		HandlerFunc:        handleGetCacheSubsystem,
 	},
 	{
+		Name:               "Delete Cache Snapshots Entry",
+		Description:        "Deletes the specified cache entry from the specified cache",
+		Method:             "DELETE",
+		Pattern:            "/cache/snapshots/{cacheID}/entries/{entryKey}",
+		IsAllowedBeforeFts: false,
+		IsAllowedAfterFts:  true,
+		IsSecure:           true,
+		HandlerFunc:        handleDeleteCacheSubsystemEntry,
+	},
+	{
 		Name:               "Get ACME Configuration",
 		Description:        "Returns the current ACME / TLS configuration",
 		Method:             "GET",

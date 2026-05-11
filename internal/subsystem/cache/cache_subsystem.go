@@ -48,19 +48,21 @@ type RateSnapshot struct {
 }
 
 type SourceSnapshot struct {
-	Name            string          `json:"name"`
-	Owner           string          `json:"owner,omitempty"`
-	Purpose         string          `json:"purpose,omitempty"`
-	Scope           string          `json:"scope,omitempty"`
-	KeyKind         string          `json:"key_kind,omitempty"`
-	ValueKind       string          `json:"value_kind,omitempty"`
-	MaxEntries      int             `json:"max_entries"`
-	CurrentEntries  int             `json:"current_entries"`
-	TTL             string          `json:"ttl,omitempty"`
-	CleanupInterval string          `json:"cleanup_interval,omitempty"`
-	Keys            []string        `json:"keys"`
-	Entries         []EntrySnapshot `json:"entries"`
-	Rates           RateSnapshot    `json:"rates"`
+	Name            string `json:"name"`
+	CacheId         string `json:"cache_id"`
+	Owner           string `json:"owner,omitempty"`
+	Purpose         string `json:"purpose,omitempty"`
+	Scope           string `json:"scope,omitempty"`
+	KeyKind         string `json:"key_kind,omitempty"`
+	ValueKind       string `json:"value_kind,omitempty"`
+	MaxEntries      int    `json:"max_entries"`
+	CurrentEntries  int    `json:"current_entries"`
+	TTL             string `json:"ttl,omitempty"`
+	CleanupInterval string `json:"cleanup_interval,omitempty"`
+
+	Keys    []string        `json:"keys"`
+	Entries []EntrySnapshot `json:"entries"`
+	Rates   RateSnapshot    `json:"rates"`
 
 	M1Rate         float64 `json:"m1_rate"`
 	Hits           int64   `json:"hits"`
@@ -71,6 +73,7 @@ type SourceSnapshot struct {
 type Source interface {
 	CacheName() string
 	Snapshot() SourceSnapshot
+	DeleteEntry(key string) error
 }
 
 type ChangeListener func()
@@ -153,27 +156,31 @@ func (s *Subsystem) unregister(id string) {
 	s.NotifyChanged()
 }
 
-func (s *Subsystem) GetCaches() []Source {
-	if s == nil {
-		return nil
-	}
+func (s *Subsystem) DeleteEntryFromCache(cacheId string, key string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	sources := make([]Source, 0, len(s.order))
-	for _, id := range s.order {
-		if source, ok := s.caches[id]; ok {
-			sources = append(sources, source)
-		}
+	cache, ok := s.caches[cacheId]
+	if !ok {
+		return false
 	}
-	return sources
+	err := cache.DeleteEntry(key)
+	return err == nil
 }
 
 func (s *Subsystem) Snapshots() []SourceSnapshot {
-	sources := s.GetCaches()
-	snapshots := make([]SourceSnapshot, 0, len(sources))
-	for _, source := range sources {
-		snapshots = append(snapshots, source.Snapshot())
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	snapshots := make([]SourceSnapshot, 0, len(s.order))
+
+	for _, id := range s.order {
+		if source, ok := s.caches[id]; ok {
+			snap := source.Snapshot()
+			snap.CacheId = id // Ensure CacheId is set to the unique identifier, and i have to return it to the callee so that a future delete op can be done in O(1) time
+			snapshots = append(snapshots, snap)
+		}
 	}
 	sort.SliceStable(snapshots, func(i, j int) bool {
 		return snapshots[i].Name < snapshots[j].Name

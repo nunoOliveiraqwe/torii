@@ -1489,6 +1489,12 @@
     gap: 0.5rem;
     margin-bottom: 0.35rem;
 }
+.cache-entry-actions {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 0.35rem;
+}
 .cache-key-tag {
     display: inline-block;
     padding: 0.15rem 0.5rem;
@@ -1518,6 +1524,28 @@
 .cache-disposition-unknown {
     background: rgba(127, 140, 141, 0.16);
     color: var(--pico-muted-color);
+}
+.cache-entry-delete-btn {
+    align-items: center;
+    background: transparent;
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: 0.25rem;
+    color: var(--pico-muted-color);
+    display: inline-flex;
+    height: 1.65rem;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    width: 1.65rem;
+}
+.cache-entry-delete-btn:hover:not(:disabled),
+.cache-entry-delete-btn:focus-visible:not(:disabled) {
+    border-color: #e74c3c;
+    color: #e74c3c;
+}
+.cache-entry-delete-btn svg {
+    height: 0.9rem;
+    width: 0.9rem;
 }
 .cache-entry-fields {
     display: grid;

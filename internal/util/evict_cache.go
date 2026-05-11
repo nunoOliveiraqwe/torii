@@ -255,6 +255,18 @@ func (c *Cache[T]) sweep() {
 	}
 }
 
+func (c *Cache[T]) DeleteEntry(key string) error {
+	c.mu.Lock()
+	if _, ok := c.cache[key]; ok {
+		delete(c.cache, key)
+		c.mu.Unlock()
+		c.notifyCacheChanged()
+		return nil
+	}
+	c.mu.Unlock()
+	return fmt.Errorf("key %s not found in cache", key)
+}
+
 func (c *Cache[T]) notifyCacheChanged() {
 	if c.notifyChanged != nil {
 		c.notifyChanged()
