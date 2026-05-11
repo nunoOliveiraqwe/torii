@@ -73,17 +73,24 @@ type Source interface {
 	Snapshot() SourceSnapshot
 }
 
+type ChangeListener func()
+
+type UnsubscribeFunc func()
+
 type Subsystem struct {
-	mu      sync.RWMutex
-	nextID  uint64
-	caches  map[string]Source
-	order   []string
-	started bool
+	mu             sync.RWMutex
+	nextID         uint64
+	nextListenerID uint64
+	caches         map[string]Source
+	order          []string
+	listeners      map[uint64]ChangeListener
+	started        bool
 }
 
 func NewSubsystem() *Subsystem {
 	return &Subsystem{
-		caches: make(map[string]Source),
+		caches:    make(map[string]Source),
+		listeners: make(map[uint64]ChangeListener),
 	}
 }
 
@@ -100,6 +107,7 @@ func (s *Subsystem) Shutdown() error {
 	s.started = false
 	s.caches = make(map[string]Source)
 	s.order = nil
+	s.listeners = make(map[uint64]ChangeListener)
 	return nil
 }
 
@@ -109,12 +117,13 @@ func (s *Subsystem) RegisterCache(source Source) func() {
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	s.nextID++
 	id := fmt.Sprintf("%s#%d", source.CacheName(), s.nextID)
 	s.caches[id] = source
 	s.order = append(s.order, id)
+	s.mu.Unlock()
+
+	s.NotifyChanged()
 
 	return func() {
 		s.unregister(id)
@@ -127,18 +136,21 @@ func (s *Subsystem) RegisterCacheSource(source Source) func() {
 
 func (s *Subsystem) unregister(id string) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	if _, ok := s.caches[id]; !ok {
+		s.mu.Unlock()
 		return
 	}
 	delete(s.caches, id)
 	for i, existingID := range s.order {
 		if existingID == id {
 			s.order = append(s.order[:i], s.order[i+1:]...)
-			return
+			break
 		}
 	}
+	s.mu.Unlock()
+
+	s.NotifyChanged()
 }
 
 func (s *Subsystem) GetCaches() []Source {
@@ -167,4 +179,47 @@ func (s *Subsystem) Snapshots() []SourceSnapshot {
 		return snapshots[i].Name < snapshots[j].Name
 	})
 	return snapshots
+}
+
+func (s *Subsystem) AddChangeListener(fn ChangeListener) UnsubscribeFunc {
+	if s == nil || fn == nil {
+		return func() {}
+	}
+
+	s.mu.Lock()
+	s.nextListenerID++
+	id := s.nextListenerID
+	s.listeners[id] = fn
+	s.mu.Unlock()
+
+	return func() {
+		s.removeChangeListener(id)
+	}
+}
+
+func (s *Subsystem) removeChangeListener(id uint64) {
+	if s == nil {
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.listeners, id)
+}
+
+func (s *Subsystem) NotifyChanged() {
+	if s == nil {
+		return
+	}
+
+	s.mu.RLock()
+	listeners := make([]ChangeListener, 0, len(s.listeners))
+	for _, fn := range s.listeners {
+		listeners = append(listeners, fn)
+	}
+	s.mu.RUnlock()
+
+	for _, fn := range listeners {
+		fn()
+	}
 }

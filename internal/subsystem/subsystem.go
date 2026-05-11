@@ -43,7 +43,7 @@ func (m *Manager) Initialize() error {
 }
 
 func (m *Manager) Shutdown() error {
-	zap.S().Debug("Shutting down SubsystemManager")
+	zap.S().Info("Shutting down SubsystemManager")
 	if err := m.activitySubsystem.Shutdown(); err != nil {
 		return err
 	}

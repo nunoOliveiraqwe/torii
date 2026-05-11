@@ -164,6 +164,10 @@ function connectMetricsSSE() {
         addToActivityFeed('blocked', entry);
         incrementRouteSparkline(entry);
     });
+    metricsEventSource.addEventListener('cache_snapshots', function (e) {
+        if (typeof handleCacheSnapshots !== 'function') return;
+        handleCacheSnapshots(JSON.parse(e.data));
+    });
     metricsEventSource.onopen = function () {
         setSseStatus('connected');
     };

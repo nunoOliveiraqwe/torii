@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/nunoOliveiraqwe/torii/internal/subsystem/activity"
+	cacheSub "github.com/nunoOliveiraqwe/torii/internal/subsystem/cache"
 	"github.com/nunoOliveiraqwe/torii/metrics"
 	"go.uber.org/zap"
 )
@@ -29,6 +30,7 @@ type SSEBroker struct {
 
 	mgr      *metrics.ConnectionMetricsManager
 	activity *activity.Subsystem
+	cache    *cacheSub.Subsystem
 
 	listenersMu       sync.Mutex
 	listeners         map[string]int
@@ -36,13 +38,16 @@ type SSEBroker struct {
 	errorListenerID   int
 	requestListenerID int
 	blockedListenerID int
+
+	cacheUnsubscribe cacheSub.UnsubscribeFunc
 }
 
-func NewSSEBroker(mgr *metrics.ConnectionMetricsManager, activitySubsystem *activity.Subsystem) *SSEBroker {
+func NewSSEBroker(mgr *metrics.ConnectionMetricsManager, activitySubsystem *activity.Subsystem, cacheSubsystem *cacheSub.Subsystem) *SSEBroker {
 	b := &SSEBroker{
 		clients:   make(map[string]*SSEClient),
 		mgr:       mgr,
 		activity:  activitySubsystem,
+		cache:     cacheSubsystem,
 		listeners: make(map[string]int),
 	}
 	// Wildcard metric listener — fires for every connection's metric updates.
@@ -59,6 +64,9 @@ func NewSSEBroker(mgr *metrics.ConnectionMetricsManager, activitySubsystem *acti
 		b.blockedListenerID = activitySubsystem.BlockLog.AddListener(func(entry *activity.BlockLogEntry) {
 			b.broadcastJSON("proxy_blocked", entry)
 		})
+	}
+	if cacheSubsystem != nil {
+		b.cacheUnsubscribe = cacheSubsystem.AddChangeListener(b.signalCacheUpdate)
 	}
 	return b
 }
@@ -83,6 +91,14 @@ func (b *SSEBroker) Subscribe() *SSEClient {
 				case client.Events <- SSEEvent{Type: "metrics", Data: data}:
 				default:
 				}
+			}
+		}
+	}
+	if b.cache != nil {
+		if data, err := json.Marshal(b.cache.Snapshots()); err == nil {
+			select {
+			case client.Events <- SSEEvent{Type: "cache_snapshots", Data: data}:
+			default:
 			}
 		}
 	}
@@ -125,14 +141,30 @@ func (b *SSEBroker) broadcastAll(event SSEEvent) {
 	}
 }
 
+func (b *SSEBroker) signalCacheUpdate() {
+	b.broadcastCacheSnapshots()
+}
+
+func (b *SSEBroker) broadcastCacheSnapshots() {
+	if b.cache == nil || b.clientCount.Load() == 0 {
+		return
+	}
+	b.broadcastJSON("cache_snapshots", b.cache.Snapshots())
+}
+
 func (b *SSEBroker) Stop() {
+
+	if b.cacheUnsubscribe != nil {
+		b.cacheUnsubscribe()
+		b.cacheUnsubscribe = nil
+	}
+
 	b.mgr.RemoveListener(b.metricsListenerID)
 	if b.activity != nil {
 		b.activity.ErrorLog.RemoveListener(b.errorListenerID)
 		b.activity.RequestLog.RemoveListener(b.requestListenerID)
 		b.activity.BlockLog.RemoveListener(b.blockedListenerID)
 	}
-
 	b.mu.Lock()
 	for _, c := range b.clients {
 		close(c.Events)

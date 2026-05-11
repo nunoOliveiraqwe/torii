@@ -154,8 +154,7 @@ function showPage(pageId) {
     }
 
     if (pageId === 'http-caches') {
-        loadCacheSubsystem();
-        if (!cacheSubsystemInterval) cacheSubsystemInterval = setInterval(loadCacheSubsystem, 5000);
+        renderLatestCacheSubsystem();
     } else {
         if (cacheSubsystemInterval) {
             clearInterval(cacheSubsystemInterval);

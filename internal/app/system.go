@@ -154,7 +154,7 @@ func NewSystemService(conf config.AppConfig, configPath string, dataDir string) 
 		cacheSubsystem:       cacheSubsystem,
 		sessions:             sessions,
 		globalMetricsManager: mgr,
-		sseBroker:            NewSSEBroker(mgr, subManager.GetActivitySubsystem()),
+		sseBroker:            NewSSEBroker(mgr, subManager.GetActivitySubsystem(), cacheSubsystem),
 		startTime:            time.Now(),
 		configPath:           configPath,
 		appConfig:            conf,

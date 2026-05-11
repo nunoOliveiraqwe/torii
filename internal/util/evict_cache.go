@@ -55,6 +55,7 @@ type Cache[T EvictableEntry] struct {
 	cache           map[string]T
 	tracker         Tracker
 	unregister      func()
+	notifyChanged   func()
 	closeOnce       sync.Once
 }
 
@@ -138,6 +139,7 @@ func NewCache[T EvictableEntry](options *CacheOptions) (*Cache[T], error) {
 	}
 	if options.Subsystem != nil {
 		c.unregister = options.Subsystem.RegisterCache(c)
+		c.notifyChanged = options.Subsystem.NotifyChanged
 	}
 	c.startCleanup()
 	return c, nil
@@ -145,39 +147,51 @@ func NewCache[T EvictableEntry](options *CacheOptions) (*Cache[T], error) {
 
 func (c *Cache[T]) CacheValue(ip string, value T) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if len(c.cache) >= c.maxEntries {
 		c.evictOldest()
 	}
 	value.Touch()
 	c.cache[ip] = value
 	c.tracker.Mark(1)
+	c.mu.Unlock()
+	c.notifyCacheChanged()
 }
 
 func (c *Cache[T]) GetValue(key string) (T, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	entry, ok := c.cache[key]
 	if !ok {
 		c.tracker.MarkMiss()
+		c.mu.Unlock()
+		c.notifyCacheChanged()
 		var zero T
 		return zero, ErrCacheMiss
 	}
 	if time.Since(entry.GetLastReadAt()) > c.ttl {
 		delete(c.cache, key)
 		c.tracker.MarkMiss()
+		c.mu.Unlock()
+		c.notifyCacheChanged()
 		var zero T
 		return zero, ErrCacheMiss
 	}
 	c.tracker.MarkHit()
 	entry.Touch()
+	c.mu.Unlock()
+	c.notifyCacheChanged()
 	return entry, nil
 }
 
 func (c *Cache[T]) Evict(key string) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	delete(c.cache, key)
+	_, existed := c.cache[key]
+	if existed {
+		delete(c.cache, key)
+	}
+	c.mu.Unlock()
+	if existed {
+		c.notifyCacheChanged()
+	}
 }
 
 // only supposed to be called after a lock is held
@@ -227,12 +241,23 @@ func (c *Cache[T]) close() {
 
 func (c *Cache[T]) sweep() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	cutoff := time.Now().Add(-c.ttl)
+	removed := false
 	for ip, entry := range c.cache {
 		if entry.GetLastReadAt().Before(cutoff) {
 			delete(c.cache, ip)
+			removed = true
 		}
+	}
+	c.mu.Unlock()
+	if removed {
+		c.notifyCacheChanged()
+	}
+}
+
+func (c *Cache[T]) notifyCacheChanged() {
+	if c.notifyChanged != nil {
+		c.notifyChanged()
 	}
 }
 

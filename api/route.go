@@ -214,7 +214,7 @@ var routes = []ApplicationRoute{
 	},
 	{
 		Name:               "SSE",
-		Description:        "Subscribe to all metrics pertaining to the proxy",
+		Description:        "Subscribe to proxy metrics, activity, and cache subsystem updates",
 		Method:             "GET",
 		Pattern:            "/proxy/metrics/stream",
 		IsAllowedBeforeFts: false,

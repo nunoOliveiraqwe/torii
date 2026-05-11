@@ -28,7 +28,8 @@ Most endpoints require a valid session. Log in via `POST /api/v1/auth/login` to 
 | `/proxy/routes/{serverId}` | `DELETE` | Yes | Delete a proxy |
 | `/proxy/metrics` | `GET` | Yes | Global aggregated metrics |
 | `/proxy/metrics/{serverId}` | `GET` | Yes | Per-server metrics |
-| `/proxy/metrics/stream` | `GET` | Yes | Real-time metrics (SSE) |
+| `/proxy/metrics/stream` | `GET` | Yes | Real-time metrics, activity, and cache snapshots (SSE) |
+| `/cache/snapshots` | `GET` | Yes | Current cache subsystem snapshots |
 | `/proxy/middlewares/schema` | `GET` | Yes | Middleware field schemas |
 | `/proxy/requests` | `GET` | Yes | Recent proxied request log |
 | `/proxy/errors` | `GET` | Yes | Recent 5xx error log |
