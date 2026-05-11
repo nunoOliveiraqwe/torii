@@ -97,6 +97,30 @@ var chartTickInterval = null;
 var CHART_TICK_MS = 1000;
 var lastSnapshotTime = null;
 
+function metricConnectionName(connectionName) {
+    if (!connectionName) return '';
+    if (connectionName.indexOf('conn-port-') === 0) {
+        return 'metric-port-' + connectionName.substring('conn-port-'.length);
+    }
+    return connectionName;
+}
+
+function incrementRouteSparkline(entry) {
+    if (typeof sparklineBuffers === 'undefined') return;
+
+    var connKey = metricConnectionName(entry.connection_name || entry.connectionName || '');
+    if (!connKey) return;
+
+    if (sparklineBuffers[connKey]) {
+        sparklineBuffers[connKey].count++;
+    }
+
+    var portKey = typeof extractPortKey === 'function' ? extractPortKey(connKey) : connKey;
+    if (portKey !== connKey && sparklineBuffers[portKey]) {
+        sparklineBuffers[portKey].count++;
+    }
+}
+
 function connectMetricsSSE() {
     if (metricsEventSource) metricsEventSource.close();
     setSseStatus('connecting');
@@ -126,24 +150,19 @@ function connectMetricsSSE() {
         var entry = JSON.parse(e.data);
         addErrorToFeed(entry);
         addToActivityFeed('error', entry);
+        incrementRouteSparkline(entry);
     });
     metricsEventSource.addEventListener('proxy_request', function (e) {
         var entry = JSON.parse(e.data);
         addRequestToFeed(entry);
         addToActivityFeed('request', entry);
-        var connKey = entry.connection_name || '';
-        if (sparklineBuffers[connKey]) {
-            sparklineBuffers[connKey].count++;
-        }
-        var portKey = extractPortKey(connKey);
-        if (portKey !== connKey && sparklineBuffers[portKey]) {
-            sparklineBuffers[portKey].count++;
-        }
+        incrementRouteSparkline(entry);
     });
     metricsEventSource.addEventListener('proxy_blocked', function (e) {
         var entry = JSON.parse(e.data);
         addBlockToFeed(entry);
         addToActivityFeed('blocked', entry);
+        incrementRouteSparkline(entry);
     });
     metricsEventSource.onopen = function () {
         setSseStatus('connected');
@@ -309,4 +328,3 @@ document.getElementById('connection-selector').addEventListener('change', functi
         applySnapshot(cached);
     }
 });
-
