@@ -118,9 +118,13 @@ function showPage(pageId) {
 
     if (pageId === 'system') {
         fetchSystemHealth();
-        activityEntries = [];
-        Promise.all([loadRecentRequests(), loadRecentErrors(), loadRecentBlocked()])
-            .then(rebuildActivityFromFeeds);
+        if (typeof loadInitialActivityLogPage === 'function') {
+            loadInitialActivityLogPage();
+        } else {
+            activityEntries = [];
+            Promise.all([loadRecentRequests(), loadRecentErrors(), loadRecentBlocked()])
+                .then(rebuildActivityFromFeeds);
+        }
         if (!healthInterval) healthInterval = setInterval(fetchSystemHealth, 5000);
     } else {
         if (healthInterval) {

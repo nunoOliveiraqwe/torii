@@ -52,16 +52,38 @@ function fetchSystemHealth() {
 }
 
 // ---------- Error Log Feed ----------
-var MAX_ERROR_ENTRIES = 20;
-var MAX_REQUEST_ENTRIES = 100;
-var MAX_BLOCK_ENTRIES = 50;
-var MAX_ACTIVITY_ENTRIES = 200;
+var MAX_ERROR_ENTRIES = 1000;
+var MAX_REQUEST_ENTRIES = 1000;
+var MAX_BLOCK_ENTRIES = 1000;
+var MAX_ACTIVITY_ENTRIES = 3000;
+var RECENT_LOG_PAGE_SIZE = 200;
+var ACTIVITY_RENDER_BATCH_SIZE = 200;
+var activityRenderedCount = 0;
+var activityLogPagesLoaded = 0;
+var activityLogPagesExhausted = false;
+var activityLogPageLoading = false;
+var activityLogExhaustedByType = {requests:false, errors:false, blocked:false};
 
 function applyLogCapacities(health) {
     if (health.error_log_capacity)   MAX_ERROR_ENTRIES   = health.error_log_capacity;
     if (health.request_log_capacity) MAX_REQUEST_ENTRIES  = health.request_log_capacity;
     if (health.blocked_log_capacity) MAX_BLOCK_ENTRIES    = health.blocked_log_capacity;
     MAX_ACTIVITY_ENTRIES = MAX_ERROR_ENTRIES + MAX_REQUEST_ENTRIES + MAX_BLOCK_ENTRIES;
+}
+
+function recentLogUrl(path, limit, offset) {
+    var requestedLimit = limit || RECENT_LOG_PAGE_SIZE;
+    var requestedOffset = offset || 0;
+    return path + '?limit=' + encodeURIComponent(requestedLimit) + '&offset=' + encodeURIComponent(requestedOffset);
+}
+
+function isActivityPageVisible() {
+    return typeof currentPage !== 'undefined' && currentPage === 'system';
+}
+
+function isFeedVisible(id) {
+    var el = document.getElementById(id);
+    return el && el.offsetParent !== null;
 }
 
 var errorEntries = [];
@@ -99,6 +121,7 @@ function ensureErrorFeedHeader(el) {
 function addErrorToFeed(entry) {
     errorEntries.unshift(entry);
     if (errorEntries.length > MAX_ERROR_ENTRIES) errorEntries.pop();
+    if (!isFeedVisible('error-feed')) return;
     if (!matchesConnectionFilter(entry.connection_name, errorLogFilter)) return;
     var el = document.getElementById('error-feed');
     var empty = el.querySelector('.error-empty');
@@ -114,6 +137,7 @@ function addErrorToFeed(entry) {
 
 function renderErrorFeed() {
     var el = document.getElementById('error-feed');
+    if (!el || !isFeedVisible('error-feed')) return;
     var filtered = errorEntries.filter(function (e) {
         return matchesConnectionFilter(e.connection_name, errorLogFilter);
     });
@@ -128,19 +152,42 @@ function renderErrorFeed() {
     el.innerHTML = html;
 }
 
-function loadRecentErrors() {
-    return fetch('/api/v1/proxy/errors', {credentials: 'same-origin'})
+function mergeRecentEntries(existing, incoming, maxEntries) {
+    if (!incoming || !incoming.length) return existing.slice(0, maxEntries);
+    var seen = {};
+    var merged = [];
+    existing.concat(incoming).forEach(function (entry) {
+        var key = [
+            entry.timestamp || '',
+            entry.connection_name || '',
+            entry.remote_address || '',
+            entry.method || '',
+            entry.path || '',
+            entry.status_code || entry.status || '',
+            entry.blocking_middleware || ''
+        ].join('|');
+        if (seen[key]) return;
+        seen[key] = true;
+        merged.push(entry);
+    });
+    return merged.slice(0, maxEntries);
+}
+
+function loadRecentErrors(limit, offset) {
+    return fetch(recentLogUrl('/api/v1/proxy/errors', limit, offset), {credentials: 'same-origin'})
         .then(function (resp) {
             return resp.ok ? resp.json() : [];
         })
         .then(function (entries) {
             if (entries && entries.length) {
-                errorEntries = entries.slice(0, MAX_ERROR_ENTRIES);
+                errorEntries = offset ? mergeRecentEntries(errorEntries, entries, MAX_ERROR_ENTRIES) : entries.slice(0, MAX_ERROR_ENTRIES);
                 updateLogFilterDropdowns();
                 renderErrorFeed();
             }
+            return entries || [];
         })
         .catch(function () {
+            return [];
         });
 }
 
@@ -196,6 +243,7 @@ function ensureRequestFeedHeader(el) {
 function addRequestToFeed(entry) {
     requestEntries.unshift(entry);
     if (requestEntries.length > MAX_REQUEST_ENTRIES) requestEntries.pop();
+    if (!isFeedVisible('request-feed')) return;
     if (!matchesConnectionFilter(entry.connection_name, requestLogFilter)) return;
     var el = document.getElementById('request-feed');
     var empty = el.querySelector('.error-empty');
@@ -211,6 +259,7 @@ function addRequestToFeed(entry) {
 
 function renderRequestFeed() {
     var el = document.getElementById('request-feed');
+    if (!el || !isFeedVisible('request-feed')) return;
     var filtered = requestEntries.filter(function (e) {
         return matchesConnectionFilter(e.connection_name, requestLogFilter);
     });
@@ -225,19 +274,21 @@ function renderRequestFeed() {
     el.innerHTML = html;
 }
 
-function loadRecentRequests() {
-    return fetch('/api/v1/proxy/requests', {credentials: 'same-origin'})
+function loadRecentRequests(limit, offset) {
+    return fetch(recentLogUrl('/api/v1/proxy/requests', limit, offset), {credentials: 'same-origin'})
         .then(function (resp) {
             return resp.ok ? resp.json() : [];
         })
         .then(function (entries) {
             if (entries && entries.length) {
-                requestEntries = entries.slice(0, MAX_REQUEST_ENTRIES);
+                requestEntries = offset ? mergeRecentEntries(requestEntries, entries, MAX_REQUEST_ENTRIES) : entries.slice(0, MAX_REQUEST_ENTRIES);
                 updateLogFilterDropdowns();
                 renderRequestFeed();
             }
+            return entries || [];
         })
         .catch(function () {
+            return [];
         });
 }
 
@@ -278,6 +329,7 @@ function ensureBlockFeedHeader(el) {
 function addBlockToFeed(entry) {
     blockEntries.unshift(entry);
     if (blockEntries.length > MAX_BLOCK_ENTRIES) blockEntries.pop();
+    if (!isFeedVisible('block-feed')) return;
     if (!matchesConnectionFilter(entry.connection_name, blockLogFilter)) return;
     var el = document.getElementById('block-feed');
     var empty = el.querySelector('.error-empty');
@@ -293,6 +345,7 @@ function addBlockToFeed(entry) {
 
 function renderBlockFeed() {
     var el = document.getElementById('block-feed');
+    if (!el || !isFeedVisible('block-feed')) return;
     var filtered = blockEntries.filter(function (e) {
         return matchesConnectionFilter(e.connection_name, blockLogFilter);
     });
@@ -307,19 +360,21 @@ function renderBlockFeed() {
     el.innerHTML = html;
 }
 
-function loadRecentBlocked() {
-    return fetch('/api/v1/proxy/blocked', {credentials: 'same-origin'})
+function loadRecentBlocked(limit, offset) {
+    return fetch(recentLogUrl('/api/v1/proxy/blocked', limit, offset), {credentials: 'same-origin'})
         .then(function (resp) {
             return resp.ok ? resp.json() : [];
         })
         .then(function (entries) {
             if (entries && entries.length) {
-                blockEntries = entries.slice(0, MAX_BLOCK_ENTRIES);
+                blockEntries = offset ? mergeRecentEntries(blockEntries, entries, MAX_BLOCK_ENTRIES) : entries.slice(0, MAX_BLOCK_ENTRIES);
                 updateLogFilterDropdowns();
                 renderBlockFeed();
             }
+            return entries || [];
         })
         .catch(function () {
+            return [];
         });
 }
 
@@ -330,7 +385,7 @@ var feedShowErrors = true;
 var feedShowBlocked = true;
 var activityLogFilter = '';
 
-function rebuildActivityFromFeeds() {
+function rebuildActivityFromFeeds(resetRenderedRows) {
     activityEntries = [];
     requestEntries.forEach(function(e) {
         activityEntries.push({type:'request', ts:new Date(e.timestamp), entry:e});
@@ -343,7 +398,10 @@ function rebuildActivityFromFeeds() {
     });
     activityEntries.sort(function(a,b){ return b.ts - a.ts; });
     if (activityEntries.length > MAX_ACTIVITY_ENTRIES) activityEntries.length = MAX_ACTIVITY_ENTRIES;
-    renderActivityFeed();
+    if (resetRenderedRows !== false) {
+        activityRenderedCount = 0;
+        if (isActivityPageVisible()) renderActivityFeed(true);
+    }
 }
 
 function activityBadge(type) {
@@ -428,6 +486,7 @@ function addToActivityFeed(type, entry) {
     var ts = new Date(entry.timestamp);
     activityEntries.unshift({type: type, ts: ts, entry: entry});
     if (activityEntries.length > MAX_ACTIVITY_ENTRIES) activityEntries.pop();
+    if (!isActivityPageVisible()) return;
     updateLogFilterDropdowns();
 
     if (type === 'request' && !feedShowRequests) return;
@@ -443,27 +502,106 @@ function addToActivityFeed(type, entry) {
     var header = el.querySelector('.activity-header');
     var row = buildActivityRow({type: type, ts: ts, entry: entry});
     header.insertAdjacentElement('afterend', row);
+    activityRenderedCount++;
 
-    while (el.children.length > MAX_ACTIVITY_ENTRIES + 1) {
+    while (el.children.length > activityRenderedCount + 1) {
         el.removeChild(el.lastElementChild);
     }
 }
 
-function renderActivityFeed() {
+function getFilteredActivityEntries(limit) {
+    var filtered = [];
+    var max = limit || activityEntries.length;
+    for (var i = 0; i < activityEntries.length && filtered.length < max; i++) {
+        var item = activityEntries[i];
+        if (item.type === 'request' && !feedShowRequests) continue;
+        if (item.type === 'error' && !feedShowErrors) continue;
+        if (item.type === 'blocked' && !feedShowBlocked) continue;
+        if (matchesConnectionFilter(item.entry.connection_name, activityLogFilter)) filtered.push(item);
+    }
+    return filtered;
+}
+
+function renderActivityFeed(reset) {
     var el = document.getElementById('activity-feed');
-    var filtered = activityEntries.filter(function(item) {
-        if (item.type === 'request' && !feedShowRequests) return false;
-        if (item.type === 'error' && !feedShowErrors) return false;
-        if (item.type === 'blocked' && !feedShowBlocked) return false;
-        return matchesConnectionFilter(item.entry.connection_name, activityLogFilter);
-    });
+    if (!el || !isActivityPageVisible()) return;
+    if (reset || !el.querySelector('.activity-header')) {
+        activityRenderedCount = 0;
+        el.innerHTML = activityFeedHeader;
+    }
+    var targetCount = activityRenderedCount + ACTIVITY_RENDER_BATCH_SIZE;
+    var filtered = getFilteredActivityEntries(targetCount);
     if (filtered.length === 0) {
         el.innerHTML = '<div class="error-empty">No activity recorded</div>';
+        activityRenderedCount = 0;
         return;
     }
-    el.innerHTML = activityFeedHeader;
-    filtered.forEach(function(item) {
-        el.appendChild(buildActivityRow(item));
+    var fragment = document.createDocumentFragment();
+    for (var i = activityRenderedCount; i < filtered.length; i++) {
+        fragment.appendChild(buildActivityRow(filtered[i]));
+    }
+    el.appendChild(fragment);
+    activityRenderedCount = filtered.length;
+}
+
+function renderMoreActivityEntries() {
+    var previousCount = activityRenderedCount;
+    renderActivityFeed(false);
+    return activityRenderedCount > previousCount;
+}
+
+function loadNextActivityLogPage(resetRenderedRows) {
+    if (activityLogPageLoading || activityLogPagesExhausted) return Promise.resolve([]);
+    activityLogPageLoading = true;
+    var offset = activityLogPagesLoaded * RECENT_LOG_PAGE_SIZE;
+    var requestLoad = activityLogExhaustedByType.requests ? Promise.resolve([]) : loadRecentRequests(RECENT_LOG_PAGE_SIZE, offset);
+    var errorLoad = activityLogExhaustedByType.errors ? Promise.resolve([]) : loadRecentErrors(RECENT_LOG_PAGE_SIZE, offset);
+    var blockedLoad = activityLogExhaustedByType.blocked ? Promise.resolve([]) : loadRecentBlocked(RECENT_LOG_PAGE_SIZE, offset);
+    return Promise.all([
+        requestLoad,
+        errorLoad,
+        blockedLoad
+    ]).then(function (groups) {
+        activityLogPagesLoaded++;
+        if (!activityLogExhaustedByType.requests && (!groups[0] || groups[0].length < RECENT_LOG_PAGE_SIZE)) activityLogExhaustedByType.requests = true;
+        if (!activityLogExhaustedByType.errors && (!groups[1] || groups[1].length < RECENT_LOG_PAGE_SIZE)) activityLogExhaustedByType.errors = true;
+        if (!activityLogExhaustedByType.blocked && (!groups[2] || groups[2].length < RECENT_LOG_PAGE_SIZE)) activityLogExhaustedByType.blocked = true;
+        activityLogPagesExhausted = activityLogExhaustedByType.requests && activityLogExhaustedByType.errors && activityLogExhaustedByType.blocked;
+        rebuildActivityFromFeeds(resetRenderedRows !== false);
+        return groups;
+    }).catch(function () {
+        return [];
+    }).finally(function () {
+        activityLogPageLoading = false;
+    });
+}
+
+function loadInitialActivityLogPage() {
+    activityEntries = [];
+    requestEntries = [];
+    errorEntries = [];
+    blockEntries = [];
+    activityRenderedCount = 0;
+    activityLogPagesLoaded = 0;
+    activityLogPagesExhausted = false;
+    activityLogPageLoading = false;
+    activityLogExhaustedByType = {requests:false, errors:false, blocked:false};
+    return loadNextActivityLogPage(true);
+}
+
+function maybeLoadMoreActivity() {
+    var el = document.getElementById('activity-feed');
+    if (!el || !isActivityPageVisible()) return;
+    var nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 80;
+    if (!nearBottom) return;
+
+    var loadedVisibleEntries = getFilteredActivityEntries(activityEntries.length).length;
+    if (activityRenderedCount < loadedVisibleEntries) {
+        renderMoreActivityEntries();
+        return;
+    }
+    loadNextActivityLogPage(false).then(function () {
+        renderMoreActivityEntries();
     });
 }
 
@@ -476,7 +614,7 @@ document.querySelectorAll('.feed-link').forEach(function(link) {
         if (type === 'requests') feedShowRequests = this.classList.contains('active');
         if (type === 'errors') feedShowErrors = this.classList.contains('active');
         if (type === 'blocked') feedShowBlocked = this.classList.contains('active');
-        renderActivityFeed();
+        renderActivityFeed(true);
     });
 });
 
@@ -542,6 +680,11 @@ if (systemLogFilter) {
         renderRequestFeed();
         renderErrorFeed();
         renderBlockFeed();
-        renderActivityFeed();
+        renderActivityFeed(true);
     });
+}
+
+var activityFeedEl = document.getElementById('activity-feed');
+if (activityFeedEl) {
+    activityFeedEl.addEventListener('scroll', maybeLoadMoreActivity);
 }
