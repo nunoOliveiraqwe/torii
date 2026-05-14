@@ -26,6 +26,7 @@ api-server:
   read-timeout: 60                 # Read timeout in seconds
   write-timeout: 60                # Write timeout in seconds
   enable-metrics: true              # Collect request/response metrics for the API server (visible in dashboard)
+  enable-activity-log: true         # Log API activity (configurable per route in the dashboard)
 
 # ─────────────────────────────────────────────────────────────────
 # Session (Dashboard login sessions)
@@ -195,16 +196,16 @@ net-config:
           #──────────────────────────────────────────────
           - type: "Headers"
             options:
-              set-headers-req:                    # Headers to add/override on incoming requests (supports $env:VAR, $file:/path)
+              set-headers-req: # Headers to add/override on incoming requests (supports $env:VAR, $file:/path)
                 X-Forwarded-Proto: "https"
-              set-headers-res:                    # Headers to add/override on outgoing responses
+              set-headers-res: # Headers to add/override on outgoing responses
                 X-Api-Version: "1.0"
                 X-Frame-Options: "DENY"
-              strip-headers-req:                  # Header names to remove from incoming requests
+              strip-headers-req: # Header names to remove from incoming requests
                 - "X-Debug"
-              strip-headers-res:                  # Header names to remove from outgoing responses
+              strip-headers-res: # Header names to remove from outgoing responses
                 - "Server"
-              cmp-headers-req:                    # Headers that must match exact values (401 if mismatch)
+              cmp-headers-req: # Headers that must match exact values (401 if mismatch)
                 X-Proxy-Id: "Torii"
 
           #──────────────────────────────────────────────
@@ -213,19 +214,19 @@ net-config:
           #──────────────────────────────────────────────
           - type: "Cors"
             options:
-              allowed-origins:                    # Origins allowed for cross-origin requests (* = all)
+              allowed-origins: # Origins allowed for cross-origin requests (* = all)
                 - "*"
-              allowed-methods:                    # HTTP methods allowed
+              allowed-methods: # HTTP methods allowed
                 - "GET"
                 - "POST"
                 - "PUT"
                 - "DELETE"
                 - "PATCH"
                 - "OPTIONS"
-              allowed-headers:                    # Headers the client can send
+              allowed-headers: # Headers the client can send
                 - "Content-Type"
                 - "Authorization"
-              expose-headers:                     # Response headers accessible from JS
+              expose-headers: # Response headers accessible from JS
                 - "X-Request-Id"
               allow-credentials: false            # Allow cookies/credentials (cannot be used with origin *)
               max-age: 3600                       # How long browsers cache preflight results (seconds, 0 = no cache)
@@ -250,11 +251,11 @@ net-config:
           #──────────────────────────────────────────────
           - type: "IpFilter"
             options:
-              allow:                              # Always allowed (overrides block list)
+              allow: # Always allowed (overrides block list)
                 - 192.168.1.1/24
                 - 2001:db8::/32
                 - 10.10.10.180
-              block:                              # Denied IPs/CIDRs (ignored when AbuseIPDB is configured)
+              block: # Denied IPs/CIDRs (ignored when AbuseIPDB is configured)
                 - 94.0.0.1/24
                 - 2001:db8:1234::/48
                 - 182.78.86.62
@@ -301,7 +302,7 @@ net-config:
           - type: "UserAgentBlocker"
             options:
               block-empty-ua: true                # Block requests with no User-Agent header
-              block-defaults:                     # Built-in UA pattern categories to block
+              block-defaults: # Built-in UA pattern categories to block
                 - "scanners"
                 - "recon"
                 - "scrapers"
@@ -310,13 +311,13 @@ net-config:
                 - "http-clients"
                 - "cli-tools"
                 - "ai-crawlers"
-              block:                              # Custom UA substrings to block (case-insensitive)
+              block: # Custom UA substrings to block (case-insensitive)
                 - "bad-bot-that-i-want-to-block"
-              allow-defaults:                     # Built-in categories to always allow (overrides blocks)
+              allow-defaults: # Built-in categories to always allow (overrides blocks)
                 - "search-engines"
-              allow:                              # Custom UA substrings to always allow (overrides blocks)
+              allow: # Custom UA substrings to always allow (overrides blocks)
                 - "googlebot"
-              lan-allow-list:                     # IPs/CIDRs to allow without blocking (should only be used for internal networks, as it bypasses all UA checks)
+              lan-allow-list: # IPs/CIDRs to allow without blocking (should only be used for internal networks, as it bypasses all UA checks)
                 - "192.168.1.1/24"
               cache-ttl: 24h
               cleanup-interval: 1h
@@ -328,12 +329,12 @@ net-config:
           #──────────────────────────────────────────────
           - type: "HoneyPot"
             options:
-              defaults:                           # Predefined path groups: php, git, infra, backups, cgi
+              defaults: # Predefined path groups: php, git, infra, backups, cgi
                 - "git"
                 - "infra"
                 - "backups"
                 - "cgi"
-              paths:                              # Custom honeypot paths
+              paths: # Custom honeypot paths
                 - "/my-custom-trap-path"
               response:
                 trickster-mode: true              # Reply with deceptive responses to waste bot resources (overrides status-code and body)
@@ -386,7 +387,7 @@ net-config:
           - type: "BasicAuth"
             options:
               realm: "Internal"                   # Realm shown in browser login prompt
-              credentials:                        # Map of username → argon2id password hash
+              credentials: # Map of username → argon2id password hash
                 admin: "$argon2id$v=19$m=65536,t=3,p=4$abc123$hashedpassword"
 
           #──────────────────────────────────────────────
@@ -403,7 +404,7 @@ net-config:
               mode: "detect"                      # detect (log only) | block (reject requests exceeding threshold)
               inspect-request-body: false          # Buffer and inspect request bodies (phases 2-3). Adds latency/memory.
               inspect-response-body: false         # Inspect response bodies (phase 4). Only useful in detect mode.
-              exclusions:                         # CRS rule IDs to suppress (for known false positives)
+              exclusions: # CRS rule IDs to suppress (for known false positives)
                 - "920170"
                 - "941100"
 
@@ -430,7 +431,7 @@ net-config:
               status-code: 503                    # HTTP status code (100-599)
               response-body: '{"status":"maintenance"}' # Response body (leave empty for body-less, e.g., 204)
               content-type: "application/json"    # Content-Type header (only sent when body is set)
-              headers:                            # Additional response headers
+              headers: # Additional response headers
                 Retry-After: "3600"
                 Cache-Control: "no-store"
 
@@ -470,7 +471,7 @@ net-config:
               - type: "RequestId"
               - type: "RequestLog"
                 options:
-                   request-log-path: access.log
+                  request-log-path: access.log
               - type: "Metrics"
 
           - pattern: /users/admin/start
@@ -510,7 +511,7 @@ net-config:
 
             # Route-level trusted proxies (overrides global for this host)
             trusted-proxies:
-               preset: cloudflare
+              preset: cloudflare
 
             middlewares:
               - type: "RequestId"
@@ -561,13 +562,13 @@ net-config:
                   - type: "RequestId"
                   - type: "RequestLog"
                     options:
-                       request-log-path: access.log
+                      request-log-path: access.log
                   - type: "IpFilter"
                     options:
                       allow:
-                       - 192.1.1.1
-                       - 192.168.1.1/24
-                       - 2001:db8::/32
+                        - 192.1.1.1
+                        - 192.168.1.1/24
+                        - 2001:db8::/32
                   - type: "RateLimiter"
                     options:
                       mode: "per-client"
