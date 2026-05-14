@@ -26,6 +26,7 @@ type AcmeConfig struct {
 	RenewalCheckInterval string            `yaml:"renewal-check-interval" json:"renewal-check-interval,omitempty"`
 	Enabled              bool              `yaml:"enabled" json:"enabled"`
 	Domains              []string          `yaml:"domains" json:"domains,omitempty"`
+	DNSResolvers         []string          `yaml:"dns-resolvers" json:"dns-resolvers,omitempty"`
 }
 
 type SessionConfig struct {

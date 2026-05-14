@@ -1096,7 +1096,8 @@
 .mw-resolver-suggest-item:hover,.mw-resolver-suggest-item.active{background:rgba(124,110,240,0.16);}
 .mw-resolver-suggest-value{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-weight:600;color:#9b8cff;white-space:nowrap;}
 .mw-resolver-suggest-help{color:var(--pico-muted-color);line-height:1.25;}
-.acme-domains-input.mw-tag-input{align-items:center;}
+.acme-domains-input.mw-tag-input,
+.acme-dns-resolvers-input.mw-tag-input{align-items:center;}
 .acme-domains-input .mw-tag-list{align-items:center;}
 .acme-domains-input .mw-tag-editor{height:auto;min-height:0;padding:0.2rem 0.3rem;margin:0;line-height:1.4;}
 .lf-section{margin-bottom:1.5rem;}

@@ -54,6 +54,7 @@ func SeedFromYAML(yamlCfg *config.AcmeConfig, acmeStore store.AcmeStore) (*domai
 		Enabled:              yamlCfg.Enabled,
 		SerializedFields:     sf,
 		Domains:              yamlCfg.Domains,
+		DNSResolvers:         NormalizeDNSResolvers(yamlCfg.DNSResolvers),
 	}
 
 	if err := acmeStore.SaveConfiguration(conf); err != nil {

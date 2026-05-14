@@ -63,6 +63,7 @@ session:
 #   domains:                           # Explicit cert domains (optional, recommended)
 #     - "*.example.com"               # One wildcard cert covers all subdomains
 #     - "example.com"                 # Bare domain is NOT covered by the wildcard
+#   dns-resolvers: []                  # Optional; override system DNS resolvers if SOA lookup fails
 #   # When domains is omitted, a separate cert is requested for each route host.
 #   # Use domains with a wildcard when you have multiple subdomains — one cert
 #   # covers them all, and adding new routes doesn't trigger new cert requests.
@@ -588,4 +589,3 @@ net-config:
         backend: http://localhost:8095
         middlewares:
           - type: "RequestId"
-

@@ -34,6 +34,7 @@ type AcmeConfigResponse struct {
 	Enabled              bool     `json:"enabled"`
 	Configured           bool     `json:"configured"`
 	Domains              []string `json:"domains"`
+	DNSResolvers         []string `json:"dnsResolvers"`
 }
 
 type AcmeConfigRequest struct {
@@ -42,6 +43,7 @@ type AcmeConfigRequest struct {
 	RenewalCheckInterval     string                    `json:"renewalCheckInterval"`
 	Enabled                  bool                      `json:"enabled"`
 	Domains                  []string                  `json:"domains"`
+	DNSResolvers             []string                  `json:"dnsResolvers"`
 	DnsProviderConfigRequest *DnsProviderConfigRequest `json:"dns_provider_config_request"`
 }
 

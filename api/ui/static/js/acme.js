@@ -11,6 +11,9 @@ function lockAcmeForm(locked) {
     document.querySelectorAll('#acme-credential-fields input').forEach(function (inp) {
         inp.disabled = locked;
     });
+    document.querySelectorAll('#acme-dns-resolvers-input input, #acme-dns-resolvers-input button').forEach(function (el) {
+        el.disabled = locked;
+    });
     document.getElementById('acme-save-btn').style.display = locked ? 'none' : '';
     document.getElementById('acme-locked-notice').style.display = locked ? '' : 'none';
     document.getElementById('acme-reset-btn').style.display = locked ? '' : 'none';
@@ -63,6 +66,13 @@ document.getElementById('acme-dns-provider').addEventListener('change', function
     renderCredentialFields(this.value, {});
 });
 
+function initAcmeDNSResolvers(values) {
+    var container = document.getElementById('acme-dns-resolvers-input');
+    container.innerHTML = '';
+    container.classList.remove('mw-tag-input');
+    lfInitTagInput(container, values || []);
+}
+
 function loadAcmeConfig() {
     fetch('/api/v1/acme/config', {credentials: 'same-origin'})
         .then(function (resp) {
@@ -82,6 +92,7 @@ function loadAcmeConfig() {
             document.getElementById('acme-dns-provider').value = conf.dnsProvider || '';
             document.getElementById('acme-ca-dir-url').value = conf.caDirUrl || '';
             document.getElementById('acme-renewal-interval').value = conf.renewalCheckInterval || '12h';
+            initAcmeDNSResolvers(conf.dnsResolvers || []);
             renderCredentialFields(conf.dnsProvider, {});
             lockAcmeForm(acmeConfigExists);
         })
@@ -225,6 +236,7 @@ document.getElementById('acme-config-form').addEventListener('submit', function 
         renewalCheckInterval: document.getElementById('acme-renewal-interval').value || '12h',
         enabled: document.getElementById('acme-enabled').checked,
         domains: [],
+        dnsResolvers: lfCollectStringListValues(document.getElementById('acme-dns-resolvers-input')),
         dns_provider_config_request: {
             provider: providerName,
             configurationMap: configMap
@@ -272,6 +284,7 @@ document.getElementById('acme-reset-btn').addEventListener('click', function () 
             document.getElementById('acme-dns-provider').value = '';
             document.getElementById('acme-ca-dir-url').value = '';
             document.getElementById('acme-renewal-interval').value = '';
+            initAcmeDNSResolvers([]);
             document.getElementById('acme-credential-fields').innerHTML = '';
             document.getElementById('acme-config-result').innerHTML = '';
 

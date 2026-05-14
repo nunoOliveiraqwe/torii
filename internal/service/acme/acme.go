@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-acme/lego/v4/certcrypto"
+	"github.com/go-acme/lego/v4/challenge/dns01"
 	"github.com/go-acme/lego/v4/lego"
 	"github.com/nunoOliveiraqwe/torii/internal/domain"
 	"github.com/nunoOliveiraqwe/torii/internal/store"
@@ -19,9 +20,6 @@ type LegoAcmeManager struct {
 	certCache map[string]*tls.Certificate
 
 	store store.AcmeStore
-
-	//store acme conf ID, so each unique lego manager instance can be associated with the correct conf and account in the DB.
-	//This is needed to support multiple lego managers in the future.
 
 	client *lego.Client
 	user   *acmeUser
@@ -75,7 +73,13 @@ func NewLegoAcmeManager(conf *domain.AcmeConfiguration, acmeStore store.AcmeStor
 	if err != nil {
 		return nil, fmt.Errorf("acme: dns provider %q: %w", conf.DNSProvider, err)
 	}
-	if err := client.Challenge.SetDNS01Provider(provider); err != nil {
+	var dnsOpts []dns01.ChallengeOption
+	dnsResolvers := NormalizeDNSResolvers(conf.DNSResolvers)
+	if len(dnsResolvers) > 0 {
+		zap.S().Infof("acme: using recursive DNS resolvers: %v", dnsResolvers)
+		dnsOpts = append(dnsOpts, dns01.AddRecursiveNameservers(dnsResolvers))
+	}
+	if err := client.Challenge.SetDNS01Provider(provider, dnsOpts...); err != nil {
 		return nil, fmt.Errorf("acme: set dns-01 provider: %w", err)
 	}
 

@@ -61,6 +61,7 @@ Seeds ACME (Let's Encrypt) configuration into the database on first startup. Onc
 | `acme.renewal-check-interval` | `duration` | `12h` | How often to check/renew certificates. Minimum `1h`. |
 | `acme.enabled` | `bool` | `false` | Whether ACME is active. Set `false` to seed config without activating. |
 | `acme.domains` | `[]string` | | Explicit list of domains to obtain certificates for. Supports wildcards (e.g. `*.example.com`). When set, only these domains get certs. When empty, a cert is requested for each route host individually. |
+| `acme.dns-resolvers` | `[]string` | system resolvers | Recursive DNS resolvers used for DNS-01 SOA discovery and propagation checks. Useful in Docker when `/etc/resolv.conf` points at Docker's embedded resolver. Values may be `host` or `host:port`. |
 
 **Example — wildcard cert for all subdomains:**
 ```yaml
@@ -75,6 +76,8 @@ acme:
     - "*.example.com"       # one cert covers app.example.com, api.example.com, etc.
     - "example.com"         # bare domain is NOT covered by the wildcard
 ```
+
+Set `acme.dns-resolvers` only when you need to override the system DNS resolvers used by lego.
 
 ### Wildcard Certificates
 

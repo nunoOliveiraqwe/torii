@@ -2,6 +2,7 @@ package sqlite_test
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
@@ -47,6 +48,7 @@ func TestAcmeStore_SaveAndGetConfiguration_CloudflareProvider(t *testing.T) {
 		CADirURL:             "https://acme-staging-v02.api.letsencrypt.org/directory",
 		RenewalCheckInterval: 6 * time.Hour,
 		Enabled:              true,
+		DNSResolvers:         []string{"1.1.1.1:53", "8.8.8.8:53"},
 	}
 
 	if err := store.SaveConfiguration(conf); err != nil {
@@ -75,6 +77,9 @@ func TestAcmeStore_SaveAndGetConfiguration_CloudflareProvider(t *testing.T) {
 	}
 	if !loaded.Enabled {
 		t.Error("Enabled = false, want true")
+	}
+	if !reflect.DeepEqual(loaded.DNSResolvers, conf.DNSResolvers) {
+		t.Errorf("DNSResolvers = %v, want %v", loaded.DNSResolvers, conf.DNSResolvers)
 	}
 
 	if loaded.SerializedFields == nil {
@@ -122,6 +127,7 @@ func TestAcmeStore_SaveConfiguration_Upsert(t *testing.T) {
 		SerializedFields:     blob1,
 		RenewalCheckInterval: 12 * time.Hour,
 		Enabled:              true,
+		DNSResolvers:         []string{"1.1.1.1:53"},
 	})
 	if err != nil {
 		t.Fatalf("first save: %v", err)
@@ -133,6 +139,7 @@ func TestAcmeStore_SaveConfiguration_Upsert(t *testing.T) {
 		SerializedFields:     blob2,
 		RenewalCheckInterval: 1 * time.Hour,
 		Enabled:              false,
+		DNSResolvers:         []string{"9.9.9.9:53", "8.8.4.4:53"},
 	})
 	if err != nil {
 		t.Fatalf("upsert save: %v", err)
@@ -147,6 +154,9 @@ func TestAcmeStore_SaveConfiguration_Upsert(t *testing.T) {
 	}
 	if loaded.Enabled {
 		t.Error("Enabled should be false after upsert")
+	}
+	if !reflect.DeepEqual(loaded.DNSResolvers, []string{"9.9.9.9:53", "8.8.4.4:53"}) {
+		t.Errorf("DNSResolvers = %v, want %v", loaded.DNSResolvers, []string{"9.9.9.9:53", "8.8.4.4:53"})
 	}
 
 	var m map[string]string

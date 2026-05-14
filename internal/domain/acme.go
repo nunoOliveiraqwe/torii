@@ -13,6 +13,7 @@ type AcmeConfiguration struct {
 	RenewalCheckInterval time.Duration // how often the renewal loop ticks
 	Enabled              bool
 	Domains              []string
+	DNSResolvers         []string
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 }

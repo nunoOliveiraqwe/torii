@@ -60,6 +60,10 @@ func handleGetAcmeConfig(svc app.SystemService) http.HandlerFunc {
 		if domains == nil {
 			domains = []string{}
 		}
+		dnsResolvers := result.DNSResolvers
+		if dnsResolvers == nil {
+			dnsResolvers = []string{}
+		}
 		WriteResponseAsJSON(AcmeConfigResponse{
 			Email:                result.Email,
 			DNSProvider:          result.DNSProvider,
@@ -68,6 +72,7 @@ func handleGetAcmeConfig(svc app.SystemService) http.HandlerFunc {
 			Enabled:              result.Enabled,
 			Configured:           true,
 			Domains:              domains,
+			DNSResolvers:         dnsResolvers,
 		}, w)
 	}
 }
@@ -99,6 +104,7 @@ func handleSaveAcmeConfig(svc app.SystemService) http.HandlerFunc {
 			DNSProvider:          dnsProvider,
 			CredentialMap:        credMap,
 			Domains:              req.Domains,
+			DNSResolvers:         req.DNSResolvers,
 		})
 		if err != nil {
 			status := http.StatusInternalServerError

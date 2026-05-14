@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"context"
 	"time"
 
 	"go.uber.org/zap"
@@ -47,7 +48,7 @@ func (m *LegoAcmeManager) EnsureCertificates() error {
 	return firstErr
 }
 
-func (m *LegoAcmeManager) StartRenewalLoop() {
+func (m *LegoAcmeManager) startRenewalLoop(ctx context.Context) {
 	go func() {
 		if err := m.EnsureCertificates(); err != nil {
 			zap.S().Errorf("acme: initial cert check: %v", err)
@@ -62,7 +63,7 @@ func (m *LegoAcmeManager) StartRenewalLoop() {
 				if err := m.EnsureCertificates(); err != nil {
 					zap.S().Errorf("acme: renewal tick: %v", err)
 				}
-			case <-m.stopCh:
+			case <-ctx.Done():
 				zap.S().Info("acme: renewal loop stopped")
 				return
 			}

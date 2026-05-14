@@ -33,6 +33,7 @@ type AcmeConfigResult struct {
 	RenewalCheckInterval string
 	Enabled              bool
 	Configured           bool
+	DNSResolvers         []string
 }
 
 // AcmeCertResult is returned by ListCertificates.
@@ -51,6 +52,7 @@ type SaveAcmeConfigRequest struct {
 	DNSProvider          string
 	CredentialMap        map[string]string
 	Domains              []string
+	DNSResolvers         []string
 }
 
 type AcmeRegisteredProxy struct {
@@ -153,6 +155,7 @@ func (s *AcmeService) SaveConfiguration(req *SaveAcmeConfigRequest) error {
 		Enabled:              req.Enabled,
 		SerializedFields:     sf,
 		Domains:              req.Domains,
+		DNSResolvers:         acme.NormalizeDNSResolvers(req.DNSResolvers),
 	}
 
 	if err := s.store.SaveConfiguration(conf); err != nil {
@@ -303,7 +306,10 @@ func (s *AcmeService) collectAllDomains() []string {
 	// Include domains stored in the ACME configuration
 	conf, err := s.store.GetConfiguration()
 	if err == nil && conf != nil {
-		domains = append(domains, conf.Domains...)
+		if len(conf.Domains) > 0 {
+			domains = append(domains, conf.Domains...)
+			return domains
+		}
 	}
 
 	for _, p := range s.registeredProxy {
