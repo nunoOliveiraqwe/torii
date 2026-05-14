@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/nunoOliveiraqwe/torii/config"
@@ -14,14 +15,15 @@ import (
 )
 
 var (
-	ErrAcmeAlreadyConfigured = fmt.Errorf("ACME is already configured; reset to reconfigure")
-	ErrAcmeNotConfigured     = fmt.Errorf("no ACME configuration exists")
-	ErrEmailRequired         = fmt.Errorf("email is required")
-	ErrDNSProviderRequired   = fmt.Errorf("DNS provider is required")
-	ErrInvalidDNSProvider    = fmt.Errorf("invalid DNS provider")
-	ErrInvalidDNSProviderCfg = fmt.Errorf("invalid DNS provider configuration")
-	ErrInvalidRenewalFmt     = fmt.Errorf("invalid renewal interval format (use Go duration, e.g. 12h, 6h30m)")
-	ErrRenewalTooShort       = fmt.Errorf("renewal interval must be at least 1h")
+	ErrAcmeAlreadyConfigured     = fmt.Errorf("ACME is already configured; reset to reconfigure")
+	ErrAcmeNotConfigured         = fmt.Errorf("no ACME configuration exists")
+	ErrLegoManagerNotInitialized = fmt.Errorf("ACME manager is not initialized")
+	ErrEmailRequired             = fmt.Errorf("email is required")
+	ErrDNSProviderRequired       = fmt.Errorf("DNS provider is required")
+	ErrInvalidDNSProvider        = fmt.Errorf("invalid DNS provider")
+	ErrInvalidDNSProviderCfg     = fmt.Errorf("invalid DNS provider configuration")
+	ErrInvalidRenewalFmt         = fmt.Errorf("invalid renewal interval format (use Go duration, e.g. 12h, 6h30m)")
+	ErrRenewalTooShort           = fmt.Errorf("renewal interval must be at least 1h")
 )
 
 type AcmeConfigResult struct {
@@ -58,19 +60,20 @@ type AcmeRegisteredProxy struct {
 type AcmeService struct {
 	registeredProxy []*AcmeRegisteredProxy
 	store           store.AcmeStore
-	mgr             *acme.LegoAcmeManager
-	mgrStarted      bool
+
+	legoManager atomic.Pointer[acme.LegoAcmeManager]
 }
 
 func NewAcmeService(acmeStore store.AcmeStore, conf *config.AcmeConfig) *AcmeService {
-	mgr, err := initManager(acmeStore, conf)
+	mgr, err := getLegoManagerViaBootstrap(acmeStore, conf)
 	if err != nil {
 		zap.S().Errorf("Failed to initialize ACME manager: %v. HTTPS will not work properly if ACME is specified ", err)
 	}
-	return &AcmeService{
+	svc := &AcmeService{
 		store: acmeStore,
-		mgr:   mgr,
 	}
+	svc.legoManager.Store(mgr)
+	return svc
 }
 
 func (s *AcmeService) RegisterProxy(p *AcmeRegisteredProxy) {
@@ -78,11 +81,13 @@ func (s *AcmeService) RegisterProxy(p *AcmeRegisteredProxy) {
 }
 
 func (s *AcmeService) NotifyDomainsChanged() {
-	if s.mgr == nil || !s.mgrStarted {
+	currentManager := s.legoManager.Load()
+	if currentManager == nil || !currentManager.IsStarted() {
 		return
 	}
+
 	go func() {
-		if err := s.mgr.EnsureCertificates(); err != nil {
+		if err := currentManager.EnsureCertificates(); err != nil {
 			zap.S().Errorf("acme: ensure certs after domain change: %v", err)
 		}
 	}()
@@ -154,8 +159,8 @@ func (s *AcmeService) SaveConfiguration(req *SaveAcmeConfigRequest) error {
 		return fmt.Errorf("failed to save ACME configuration: %w", err)
 	}
 
-	if err := s.reloadAcme(); err != nil {
-		return fmt.Errorf("configuration saved but failed to apply: %w", err)
+	if err := s.initializeLegoAcmeManager(); err != nil {
+		return fmt.Errorf("configuration saved but failed to initialize ACME manager: %w", err)
 	}
 
 	zap.S().Infow("ACME configuration saved and applied",
@@ -174,14 +179,20 @@ func (s *AcmeService) ToggleEnabled(enabled bool) error {
 	if conf == nil {
 		return ErrAcmeNotConfigured
 	}
+	currentManager := s.legoManager.Load()
+	if currentManager == nil {
+		return ErrLegoManagerNotInitialized
+	}
 
 	conf.Enabled = enabled
 	if err := s.store.SaveConfiguration(conf); err != nil {
 		return fmt.Errorf("failed to update ACME enabled state: %w", err)
 	}
 
-	if err := s.reloadAcme(); err != nil {
-		return fmt.Errorf("state saved but failed to apply: %w", err)
+	if enabled {
+		currentManager.Start()
+	} else {
+		currentManager.Stop()
 	}
 
 	state := "disabled"
@@ -216,14 +227,14 @@ func (s *AcmeService) ListCertificates() ([]AcmeCertResult, error) {
 }
 
 func (s *AcmeService) ResetAll() error {
-	if s.mgr != nil {
+	currentManager := s.legoManager.Swap(nil)
+
+	if currentManager != nil {
 		zap.S().Info("Resetting ACME data: stopping renewal loop, revoking certificates and clearing configuration")
-		s.mgr.Stop()
-		s.mgrStarted = false
-		if err := s.mgr.ResetAll(); err != nil {
+		currentManager.Stop()
+		if err := currentManager.ResetAll(); err != nil {
 			zap.S().Warnf("ACME manager reset had errors (continuing): %v", err)
 		}
-		s.mgr = nil
 		zap.S().Info("ACME data reset successfully")
 		return nil
 	}
@@ -236,15 +247,6 @@ func (s *AcmeService) ResetAll() error {
 	return nil
 }
 
-func (s *AcmeService) Restart() error {
-	zap.S().Info("Reloading ACME manager from DB configuration")
-	if err := s.reloadAcme(); err != nil {
-		return err
-	}
-	zap.S().Info("ACME manager reloaded successfully")
-	return nil
-}
-
 func (s *AcmeService) GetAcmeTLSConfig() *tls.Config {
 	return &tls.Config{
 		GetCertificate: s.getCertificate,
@@ -253,58 +255,27 @@ func (s *AcmeService) GetAcmeTLSConfig() *tls.Config {
 }
 
 func (s *AcmeService) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	if s.mgr == nil {
+	currentManager := s.legoManager.Load()
+	if currentManager == nil {
 		return nil, fmt.Errorf("ACME is not configured")
 	}
-	return s.mgr.GetCertificate(hello)
+
+	return currentManager.GetCertificate(hello)
 }
 
 func (s *AcmeService) Start() {
-	if s.mgr != nil {
-		s.mgr.SetDomainSupplier(s.collectAllDomains)
-		if !s.mgrStarted {
-			s.mgr.StartRenewalLoop()
-			s.mgrStarted = true
-		}
+	currentManager := s.legoManager.Load()
+	if currentManager != nil {
+		currentManager.SetDomainSupplier(s.collectAllDomains)
+		currentManager.Start()
 	}
 }
 
 func (s *AcmeService) Stop() {
-	if s.mgr != nil {
-		s.mgr.Stop()
+	currentManager := s.legoManager.Load()
+	if currentManager != nil {
+		currentManager.Stop()
 	}
-	s.mgrStarted = false
-}
-
-func (s *AcmeService) reloadAcme() error {
-	conf, err := s.GetConfiguration()
-	if err != nil {
-		return fmt.Errorf("failed to read ACME configuration: %w", err)
-	}
-	if conf == nil || !conf.Enabled {
-		if s.mgr != nil {
-			s.mgr.Stop()
-			s.mgr = nil
-		}
-		s.mgrStarted = false
-		return nil
-	}
-	newMgr, err := acme.NewLegoAcmeManager(conf, s.store)
-	if err != nil {
-		return fmt.Errorf("failed to create ACME manager: %w", err)
-	}
-	newMgr.SetDomainSupplier(s.collectAllDomains)
-
-	wasStarted := s.mgrStarted
-	if s.mgr != nil {
-		s.mgr.Stop()
-	}
-	s.mgr = newMgr
-	if wasStarted {
-		s.mgr.StartRenewalLoop()
-		s.mgrStarted = true
-	}
-	return nil
 }
 
 func (s *AcmeService) UpdateDomains(domains []string) error {
@@ -343,12 +314,70 @@ func (s *AcmeService) collectAllDomains() []string {
 	return domains
 }
 
-func initManager(acmeStore store.AcmeStore, conf *config.AcmeConfig) (*acme.LegoAcmeManager, error) {
+// getLegoManagerViaBootstrap initializes the ACME manager using the bootstrap method, which reads configuration from the store and sets up the manager accordingly.
+// This is used during service initialization to ensure that if there is existing configuration, it is loaded properly. I can return nil
+// if no configuration exists, and the caller can handle that case by leaving the manager uninitialized until configuration is saved.
+func getLegoManagerViaBootstrap(acmeStore store.AcmeStore,
+	conf *config.AcmeConfig) (*acme.LegoAcmeManager, error) {
 	acmeMgr, err := acme.Bootstrap(acmeStore, conf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to bootstrap ACME: %w", err)
 	}
 	return acmeMgr, nil
+}
+
+// initializeLegoAcmeManager initializes the ACME manager based on the current configuration in the store.
+// It checks if the manager is already initialized to prevent reinitialization, then reads the configuration, creates a new manager,
+// and sets it up with the domain supplier. This is called after saving new configuration to apply changes.
+// this is used when the config is supplied via API and we want to initialize the manager immediately after saving the config.
+func (s *AcmeService) initializeLegoAcmeManager() error {
+	if s.legoManager.Load() != nil {
+		return fmt.Errorf("ACME manager is already initialized")
+	}
+
+	conf, err := s.store.GetConfiguration()
+	if err != nil {
+		return fmt.Errorf("failed to read ACME configuration: %w", err)
+	}
+
+	newMgr, err := acme.NewLegoAcmeManager(conf, s.store)
+	if err != nil {
+		return fmt.Errorf("failed to create ACME manager: %w", err)
+	}
+	newMgr.SetDomainSupplier(s.collectAllDomains)
+
+	if !s.legoManager.CompareAndSwap(nil, newMgr) {
+		return fmt.Errorf("ACME manager is already initialized")
+	}
+	if conf.Enabled {
+		newMgr.Start()
+	}
+	return nil
+}
+
+func (s *AcmeService) reloadLegoAcmeManager() error {
+	conf, err := s.store.GetConfiguration()
+	if err != nil {
+		return fmt.Errorf("failed to read ACME configuration: %w", err)
+	}
+
+	var newManager *acme.LegoAcmeManager
+	if conf != nil && conf.Enabled {
+		newManager, err = acme.NewLegoAcmeManager(conf, s.store)
+		if err != nil {
+			return fmt.Errorf("failed to create ACME manager: %w", err)
+		}
+		newManager.SetDomainSupplier(s.collectAllDomains)
+	}
+
+	oldManager := s.legoManager.Swap(newManager)
+	if oldManager != nil {
+		oldManager.Stop()
+	}
+	if newManager != nil {
+		newManager.Start()
+	}
+	return nil
 }
 
 func isCertDomainActive(certDomain string, activeDomains map[string]bool) bool {

@@ -15,7 +15,6 @@ func (m *LegoAcmeManager) SetDomainSupplier(fn func() []string) {
 func (m *LegoAcmeManager) resolveDomains() []string {
 
 	var all []string
-	all = append(all, m.conf.Domains...)
 
 	m.mu.RLock()
 	supplier := m.domainSupplier

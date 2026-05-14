@@ -116,9 +116,23 @@ func (a *Application) loadManaged() error {
 		}
 	} else {
 		logBoot("--config provided: %s", a.flags.ConfigPath)
-		conf, err = config.LoadConfiguration(a.flags.ConfigPath)
-		if err != nil {
-			return fmt.Errorf("failed to load working config from %q: %w", a.flags.ConfigPath, err)
+		_, err := os.Stat(a.flags.ConfigPath)
+		if err != nil && os.IsNotExist(err) {
+			logBoot("Provided config path %s does not exist", a.flags.ConfigPath)
+			logBoot("Using default configuration")
+			conf = config.DefaultConfiguration()
+			if err := config.SaveConfiguration(a.flags.ConfigPath, conf); err != nil {
+				return fmt.Errorf("failed to save default configuration to %s: %w", a.flags.ConfigPath, err)
+			}
+			logBoot("Saved default configuration to %s", a.flags.ConfigPath)
+		} else if err != nil {
+			return fmt.Errorf("error accessing provided config path %s: %w", a.flags.ConfigPath, err)
+		} else {
+			logBoot("Loading configuration from provided path %s", a.flags.ConfigPath)
+			conf, err = config.LoadConfiguration(a.flags.ConfigPath)
+			if err != nil {
+				return fmt.Errorf("failed to load working config from %q: %w", a.flags.ConfigPath, err)
+			}
 		}
 		a.workingConfigPath = a.flags.ConfigPath
 	}

@@ -25,29 +25,29 @@ func (u *acmeUser) GetEmail() string                        { return u.email }
 func (u *acmeUser) GetRegistration() *registration.Resource { return u.registration }
 func (u *acmeUser) GetPrivateKey() crypto.PrivateKey        { return u.key }
 
-func (m *LegoAcmeManager) loadOrCreateAccount() error {
-	existing, err := m.store.GetAccount(m.conf.Email)
+func (m *LegoAcmeManager) loadOrCreateAccount(acmeConf *domain.AcmeConfiguration) error {
+	account, err := m.store.GetAccount(acmeConf.Email)
 	if err != nil {
-		return fmt.Errorf("store lookup: %w", err)
+		return fmt.Errorf("could not load existing acme account: %w", err)
 	}
-	if existing != nil {
-		key, err := pemToECKey(existing.PrivateKey)
+	if account != nil {
+		key, err := pemToECKey(account.PrivateKey)
 		if err != nil {
-			return fmt.Errorf("parse stored key: %w", err)
+			return fmt.Errorf("could not parse acme stored key: %w", err)
 		}
 		var reg registration.Resource
-		if existing.Registration != "" {
-			if err := json.Unmarshal([]byte(existing.Registration), &reg); err != nil {
-				return fmt.Errorf("parse stored registration: %w", err)
+		if account.Registration != "" {
+			if err := json.Unmarshal([]byte(account.Registration), &reg); err != nil {
+				return fmt.Errorf("could not parse acme stored registration: %w", err)
 			}
 		}
 
 		m.user = &acmeUser{
-			email:        existing.Email,
+			email:        account.Email,
 			registration: &reg,
 			key:          key,
 		}
-		zap.S().Infof("acme: loaded existing account for %s", existing.Email)
+		zap.S().Infof("loaded existing acme account for %s", account.Email)
 		return nil
 	}
 
@@ -55,12 +55,12 @@ func (m *LegoAcmeManager) loadOrCreateAccount() error {
 	if err != nil {
 		return fmt.Errorf("generate key: %w", err)
 	}
-	m.user = &acmeUser{email: m.conf.Email, key: key}
-	zap.S().Infof("acme: generated new account key for %s", m.conf.Email)
+	m.user = &acmeUser{email: acmeConf.Email, key: key}
+	zap.S().Infof("generated new acme account key for %s", acmeConf.Email)
 	return nil
 }
 
-func (m *LegoAcmeManager) registerIfNeeded() error {
+func (m *LegoAcmeManager) registerIfNeeded(acmeConf *domain.AcmeConfiguration) error {
 	if m.user.registration != nil && m.user.registration.URI != "" {
 		return nil // already registered
 	}
@@ -69,21 +69,22 @@ func (m *LegoAcmeManager) registerIfNeeded() error {
 		TermsOfServiceAgreed: true,
 	})
 	if err != nil {
-		return fmt.Errorf("register: %w", err)
+		return fmt.Errorf("cannot register acme client: %w", err)
 	}
 	m.user.registration = reg
 
-	if err := m.persistAccount(); err != nil {
-		return fmt.Errorf("persist account: %w", err)
+	if err := m.persistAccount(acmeConf); err != nil {
+		return fmt.Errorf("cannot persist acme account: %w", err)
 	}
-	zap.S().Infof("acme: registered new account for %s (URI: %s)", m.conf.Email, reg.URI)
+
+	zap.S().Infof("registered new acme account for %s (URI: %s)", acmeConf.Email, reg.URI)
 	return nil
 }
 
-func (m *LegoAcmeManager) persistAccount() error {
+func (m *LegoAcmeManager) persistAccount(acmeConf *domain.AcmeConfiguration) error {
 	ecKey, ok := m.user.key.(*ecdsa.PrivateKey)
 	if !ok {
-		return fmt.Errorf("account key is not ECDSA")
+		return fmt.Errorf("acme account key is not ECDSA")
 	}
 	keyPEM, err := ecKeyToPEM(ecKey)
 	if err != nil {
@@ -91,10 +92,10 @@ func (m *LegoAcmeManager) persistAccount() error {
 	}
 	regJSON, err := json.Marshal(m.user.registration)
 	if err != nil {
-		return fmt.Errorf("marshal registration: %w", err)
+		return fmt.Errorf("cannot marshal acme registration: %w", err)
 	}
 	return m.store.SaveAccount(&domain.AcmeAccount{
-		Email:        m.conf.Email,
+		Email:        acmeConf.Email,
 		PrivateKey:   keyPEM,
 		Registration: string(regJSON),
 	})

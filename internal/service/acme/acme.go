@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"sync"
@@ -14,15 +15,22 @@ import (
 )
 
 type LegoAcmeManager struct {
-	mu              sync.RWMutex
-	store           store.AcmeStore
-	client          *lego.Client
-	user            *acmeUser
-	certCache       map[string]*tls.Certificate
-	conf            *domain.AcmeConfiguration
+	mu        sync.RWMutex
+	certCache map[string]*tls.Certificate
+
+	store store.AcmeStore
+
+	//store acme conf ID, so each unique lego manager instance can be associated with the correct conf and account in the DB.
+	//This is needed to support multiple lego managers in the future.
+
+	client *lego.Client
+	user   *acmeUser
+
 	domainSupplier  func() []string // callback to discover route domains from the proxy
 	renewalInterval time.Duration
-	stopCh          chan struct{}
+
+	startStopMu sync.Mutex
+	cancelFunc  context.CancelFunc
 }
 
 func NewLegoAcmeManager(conf *domain.AcmeConfiguration, acmeStore store.AcmeStore) (*LegoAcmeManager, error) {
@@ -40,13 +48,11 @@ func NewLegoAcmeManager(conf *domain.AcmeConfiguration, acmeStore store.AcmeStor
 
 	mgr := &LegoAcmeManager{
 		store:           acmeStore,
-		conf:            conf,
 		certCache:       make(map[string]*tls.Certificate),
 		renewalInterval: renewalInterval,
-		stopCh:          make(chan struct{}),
 	}
 	registerLogger()
-	if err := mgr.loadOrCreateAccount(); err != nil {
+	if err := mgr.loadOrCreateAccount(conf); err != nil {
 		return nil, fmt.Errorf("acme: account init: %w", err)
 	}
 	legoCfg := lego.NewConfig(mgr.user)
@@ -75,7 +81,7 @@ func NewLegoAcmeManager(conf *domain.AcmeConfiguration, acmeStore store.AcmeStor
 
 	mgr.client = client
 
-	if err := mgr.registerIfNeeded(); err != nil {
+	if err := mgr.registerIfNeeded(conf); err != nil {
 		return nil, fmt.Errorf("acme: registration: %w", err)
 	}
 
@@ -94,14 +100,33 @@ func (m *LegoAcmeManager) GetTLSConfig() *tls.Config {
 }
 
 func (m *LegoAcmeManager) Start() {
-	m.StartRenewalLoop()
+	m.startStopMu.Lock()
+	defer m.startStopMu.Unlock()
+
+	if m.cancelFunc != nil {
+		zap.S().Warn("Superfluous call to LegoAcmeManager.Start() ignored")
+		return // already started
+	}
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	m.cancelFunc = cancelFunc
+	m.startRenewalLoop(ctx)
 }
 
 func (m *LegoAcmeManager) Stop() {
-	select {
-	case <-m.stopCh:
-		// already closed
-	default:
-		close(m.stopCh)
+	m.startStopMu.Lock()
+	defer m.startStopMu.Unlock()
+
+	if m.cancelFunc == nil {
+		zap.S().Warn("Superfluous call to LegoAcmeManager.Stop() ignored")
+		return // already stopped
 	}
+	m.cancelFunc()
+	m.cancelFunc = nil
+}
+
+func (m *LegoAcmeManager) IsStarted() bool {
+	m.startStopMu.Lock()
+	defer m.startStopMu.Unlock()
+
+	return m.cancelFunc != nil
 }

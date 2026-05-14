@@ -29,14 +29,16 @@ func Bootstrap(acmeStore store.AcmeStore, yamlCfg *config.AcmeConfig) (*LegoAcme
 		conf = seeded
 	}
 
-	if conf == nil || !conf.Enabled {
+	if conf == nil {
 		return nil, nil
 	}
 
-	mgr, err := NewLegoAcmeManager(conf, acmeStore)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create ACME manager: %w", err)
+	if conf.IsValid() {
+		mgr, err := NewLegoAcmeManager(conf, acmeStore)
+		if err == nil {
+			return mgr, nil
+		}
+		zap.S().Errorf("Failed to initialize ACME manager with existing configuration: %v", err)
 	}
-
-	return mgr, nil
+	return nil, nil
 }

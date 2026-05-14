@@ -17,6 +17,10 @@ type AcmeConfiguration struct {
 	UpdatedAt            time.Time
 }
 
+func (a *AcmeConfiguration) IsValid() bool {
+	return a.Email != "" && a.DNSProvider != "" && len(a.SerializedFields) > 0 && a.CADirURL != ""
+}
+
 type AcmeAccount struct {
 	ID           int
 	Email        string

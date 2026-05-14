@@ -369,15 +369,10 @@ func appendDomainsFromServers(servers map[int]MicroHttpServer, domains []string)
 			continue
 		}
 
-		handler := server.getHandler()
-
-		if handler == nil {
-			zap.S().Warnf("Found nil httpServerHandler, skipping")
-			continue
-		}
-
-		if dispatcher, ok := handler.(*VirtualHostDispatcher); ok {
-			domains = append(domains, dispatcher.routeTrie.GetAllHosts()...)
+		for _, r := range httpsServer.routes {
+			if r.Host != "" {
+				domains = append(domains, r.Host)
+			}
 		}
 	}
 	return domains
