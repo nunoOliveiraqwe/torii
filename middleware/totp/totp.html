@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Verification Required</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --bg: #f5f7fa;
+            --panel: #ffffff;
+            --text: #18202a;
+            --muted: #5d6978;
+            --border: #cfd7e2;
+            --accent: #c43f32;
+            --danger: #b42318;
+            --key-bg: #eef2f6;
+            --key-active: #dde5ed;
+            --submit-bg: #253241;
+            --submit-text: #ffffff;
+            --submit-active: #1d2834;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #101418;
+                --panel: #171d23;
+                --text: #edf2f7;
+                --muted: #aab4c0;
+                --border: #33404c;
+                --accent: #ef6a5d;
+                --danger: #f97066;
+                --key-bg: #202832;
+                --key-active: #2a3540;
+                --submit-bg: #edf2f7;
+                --submit-text: #18202a;
+                --submit-active: #dbe4ee;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            display: grid;
+            place-items: center;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        main {
+            width: min(100% - 2rem, 25rem);
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--panel);
+        }
+
+        h1 {
+            margin: 0 0 0.5rem;
+            font-size: 1.35rem;
+            line-height: 1.2;
+            font-weight: 700;
+        }
+
+        p {
+            margin: 0 0 1rem;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        .error {
+            margin-bottom: 1rem;
+            color: var(--danger);
+            font-weight: 650;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            margin-bottom: 0.8rem;
+            color: var(--accent);
+            opacity: 0.56;
+            pointer-events: none;
+        }
+
+        .brand svg {
+            width: 1.15rem;
+            height: 1.15rem;
+            flex: 0 0 auto;
+        }
+
+        .brand span {
+            color: var(--muted);
+            font-size: 0.7rem;
+            font-weight: 700;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        form {
+            display: grid;
+            gap: 0.85rem;
+        }
+
+        .code-display {
+            width: 100%;
+            min-height: 3.2rem;
+            display: none;
+            grid-template-columns: repeat(var(--digits), minmax(0, 1fr));
+            gap: 0.45rem;
+        }
+
+        .js .code-display {
+            display: grid;
+        }
+
+        .code-slot {
+            height: 3.2rem;
+            display: grid;
+            place-items: center;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 1.35rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.55rem;
+        }
+
+        button {
+            min-height: 3.2rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--key-bg);
+            color: var(--text);
+            font: inherit;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        button:active {
+            background: var(--key-active);
+        }
+
+        .submit {
+            margin-top: 0.2rem;
+            background: var(--submit-bg);
+            color: var(--submit-text);
+            border-color: var(--submit-bg);
+        }
+
+        .submit:active {
+            background: var(--submit-active);
+        }
+
+        .fallback-input {
+            width: 100%;
+            min-height: 3rem;
+            padding: 0 0.8rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--panel);
+            color: var(--text);
+            font: inherit;
+            font-size: 1.25rem;
+            letter-spacing: 0.12rem;
+        }
+
+        .js .fallback-input {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+    </style>
+    <script>document.documentElement.className = 'js';</script>
+</head>
+<body>
+<main>
+    <div class="brand" aria-hidden="true">
+        <svg viewBox="0 0 64 64" focusable="false">
+            <rect x="4" y="10" width="56" height="6" rx="1.5" fill="currentColor"></rect>
+            <rect x="10" y="20" width="44" height="4" rx="1" fill="currentColor"></rect>
+            <rect x="14" y="16" width="5" height="42" rx="1" fill="currentColor"></rect>
+            <rect x="45" y="16" width="5" height="42" rx="1" fill="currentColor"></rect>
+            <rect x="11" y="56" width="11" height="3" rx="1" fill="currentColor"></rect>
+            <rect x="42" y="56" width="11" height="3" rx="1" fill="currentColor"></rect>
+        </svg>
+        <span>Torii Proxy</span>
+    </div>
+    <h1>Verification Required</h1>
+    <p>Enter the code from your authenticator app.</p>
+    {{if .Error}}<div class="error" role="alert">{{.Error}}</div>{{end}}
+
+    <form method="post" action="{{.Action}}" autocomplete="off" novalidate>
+        <input
+            class="fallback-input"
+            id="totp-code"
+            name="code"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            maxlength="{{.Digits}}"
+            autocomplete="one-time-code"
+            aria-label="Verification code"
+            required>
+        <div class="code-display" id="code-display" style="--digits: {{.Digits}}" aria-hidden="true"></div>
+        <div class="keypad" id="keypad" aria-label="Numeric keyboard"></div>
+        <button class="submit" type="submit">Verify</button>
+    </form>
+</main>
+
+<script>
+(function () {
+    var digits = {{.Digits}};
+    var input = document.getElementById('totp-code');
+    var display = document.getElementById('code-display');
+    var keypad = document.getElementById('keypad');
+
+    function renderDisplay() {
+        display.textContent = '';
+        for (var i = 0; i < digits; i++) {
+            var slot = document.createElement('div');
+            slot.className = 'code-slot';
+            slot.textContent = i < input.value.length ? '•' : '';
+            display.appendChild(slot);
+        }
+    }
+
+    function addDigit(value) {
+        if (input.value.length >= digits) return;
+        input.value += value;
+        renderDisplay();
+    }
+
+    function backspace() {
+        input.value = input.value.slice(0, -1);
+        renderDisplay();
+    }
+
+    function clearCode() {
+        input.value = '';
+        renderDisplay();
+    }
+
+    function button(label, onClick) {
+        var el = document.createElement('button');
+        el.type = 'button';
+        el.textContent = label;
+        el.addEventListener('click', onClick);
+        keypad.appendChild(el);
+    }
+
+    ['1', '2', '3', '4', '5', '6', '7', '8', '9'].forEach(function (digit) {
+        button(digit, function () { addDigit(digit); });
+    });
+    button('Clear', clearCode);
+    button('0', function () { addDigit('0'); });
+    button('⌫', backspace);
+    renderDisplay();
+})();
+</script>
+</body>
+</html>

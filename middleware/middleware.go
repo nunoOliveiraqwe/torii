@@ -46,6 +46,7 @@ func init() {
 		"StaticFileServer": {Fn: StaticFileServerMiddleware, Terminates: true},
 		"Compression":      {Fn: CompressionMiddleware},
 		"BasicAuth":        {Fn: BasicAuthMiddleware},
+		"TOTP":             {Fn: TOTPMiddleware},
 		"CorazaWaf":        {Fn: CorazaWAFMiddleware},
 	}
 }

@@ -99,13 +99,13 @@ func (h *uiHandler) handleDashboardPage(w http.ResponseWriter, r *http.Request) 
 		http.Redirect(w, r, "/ui/login", http.StatusSeeOther)
 		return
 	}
-	username := h.svc.GetSessionRegistry().GetValueFromSession(r, "username")
+	username := h.svc.GetSessionRegistry().GetValueFromSession(r)
 	h.renderPage(w, r, "dashboard", dashboardData{Username: username})
 }
 
 // handleLogout destroys the current session (HTMX POST).
 func (h *uiHandler) handleLogout(w http.ResponseWriter, r *http.Request) {
-	h.svc.GetSessionRegistry().LogoutSession(w, r)
+	h.svc.GetSessionRegistry().LogoutSession(r)
 	w.Header().Set("HX-Redirect", "/ui/login")
 	w.WriteHeader(http.StatusOK)
 }

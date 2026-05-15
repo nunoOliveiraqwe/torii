@@ -111,7 +111,7 @@ func (s *headlessService) Stop() error {
 	return nil
 }
 
-func (s *headlessService) GetSessionRegistry() *session.Registry {
+func (s *headlessService) GetSessionRegistry() *session.UserRegistry {
 	return nil
 }
 

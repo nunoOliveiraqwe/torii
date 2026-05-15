@@ -392,6 +392,30 @@ net-config:
                 admin: "$argon2id$v=19$m=65536,t=3,p=4$abc123$hashedpassword"
 
           #──────────────────────────────────────────────
+          # TOTP
+          # Time-based one-time-password challenge.
+          # The challenge is served by the middleware and posts back to the same URL.
+          #──────────────────────────────────────────────
+          - type: "TOTP"
+            options:
+              seed: "$env:TORII_TOTP_SEED"        # Base32 seed. Supports $env:VAR and $file:/path. Keep this secret
+              label: "shared-home"                # Optional label stored in the TOTP session
+              algorithm: "SHA1"                   # SHA1 | SHA256 | SHA512
+              digits: 6                           # Verification code length, usually 6
+              period: "30s"                       # TOTP time step
+              code-window: 1                      # Accept adjacent time steps for clock drift
+              rate-limit-enabled: true            # Per-client limiter for verification attempts
+              limiter-req:
+                rate-per-second: 0.083333333      # 1 attempt every 12s after burst is exhausted
+                burst: 5                          # Immediate attempts allowed per client
+              rate-limit-cache-ttl: "1h"          # Idle verifier limiter entry TTL
+              rate-limit-cleanup-interval: "10m"  # Verifier limiter cache cleanup interval
+              rate-limit-max-clients: 100000      # Max verifier limiter entries
+              session-lifetime: "16h"             # Maximum TOTP session lifetime
+              session-idle-timeout: "60m"         # Idle timeout for verified sessions
+              cookie-secure: true                 # Enable for HTTPS
+
+          #──────────────────────────────────────────────
           # CorazaWaf
           # Web Application Firewall (Coraza + OWASP CRS).
           # Inspects headers/URI by default (phase 1).

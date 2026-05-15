@@ -263,15 +263,7 @@ Keeping track of what's done and what's next. This is not a roadmap, just my per
 
 ### Known Bugs
 
-- [x] With the introduction of the flag --data-dir, the default config file location is now relative to the data dir,
-  however, when the config file is supplied via --config, the path is not resolved relative to the data dir, and when
-  making changes via UI the persist location is the data dir. Since no conf file is the, the default file name '
-  torii-conf.yaml' is created in the data dir and the changes persisted. On restart the config file flag always takes
-  precedence, so if the flag is used, the changes made via UI are not loaded. The config file location is not consistent
-  between CLI and UI. Need to unify this so there's a single source of truth for the config file location, ideally the
-  CLI flag should be the source of truth, and the UI should persist to that location regardless of whether it's the
-  default or a custom path. Which means only the sqlite db will be in the data dir if the conf file is specified to
-  another location.
+- [ ] Create proxy button doesn't work when a middleware is not configured correctly. e.g static response missing status code. No error is shown, and the UI just doesn't respond to the click. 
 
 ### Maybe
 

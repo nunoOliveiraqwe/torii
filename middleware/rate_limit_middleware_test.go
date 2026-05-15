@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nunoOliveiraqwe/torii/internal/ratelimit"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/time/rate"
 )
 
 // ---------------------------------------------------------------------------
@@ -302,7 +302,7 @@ func TestNewLimiter_Global(t *testing.T) {
 		Mode:          "global",
 	})
 	require.NoError(t, err)
-	assert.IsType(t, &globalLimiter{}, l)
+	assert.NotNil(t, l)
 }
 
 func TestNewLimiter_PerClient(t *testing.T) {
@@ -317,58 +317,52 @@ func TestNewLimiter_PerClient(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	assert.IsType(t, &perClientLimiter{}, l)
+	assert.NotNil(t, l)
 }
 
 // ---------------------------------------------------------------------------
-// globalLimiter.limit
+// shared limiter global mode
 // ---------------------------------------------------------------------------
 
 func TestGlobalLimiter_AllowsUpToBurst(t *testing.T) {
-	l := &globalLimiter{
-		internalLimiter: rate.NewLimiter(rate.Limit(5), 5),
-		retryAfter:      "1",
-	}
+	l, err := ratelimit.New(ratelimit.Config{Mode: ratelimit.ModeGlobal, RatePerSecond: 5, Burst: 5})
+	require.NoError(t, err)
 
 	for i := 0; i < 5; i++ {
-		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		assert.True(t, l.limit(req, rec), "request %d should be allowed", i)
+		decision := l.Allow(req)
+		assert.True(t, decision.Allowed, "request %d should be allowed", i)
 	}
 }
 
 func TestGlobalLimiter_RejectsOverBurst(t *testing.T) {
 	// burst=2, rate very low so no tokens refill during test
-	l := &globalLimiter{
-		internalLimiter: rate.NewLimiter(rate.Limit(0.001), 2),
-		retryAfter:      "1000",
-	}
+	l, err := ratelimit.New(ratelimit.Config{Mode: ratelimit.ModeGlobal, RatePerSecond: 0.001, Burst: 2})
+	require.NoError(t, err)
 
 	// drain burst
 	for i := 0; i < 2; i++ {
-		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		require.True(t, l.limit(req, rec))
+		require.True(t, l.Allow(req).Allowed)
 	}
 
-	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	assert.False(t, l.limit(req, rec))
-	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
-	assert.Equal(t, "1000", rec.Header().Get("Retry-After"))
+	decision := l.Allow(req)
+	assert.False(t, decision.Allowed)
+	assert.Equal(t, "1000", decision.RetryAfter)
 }
 
 // ---------------------------------------------------------------------------
-// perClientLimiter.limit
+// shared limiter per-client mode
 // ---------------------------------------------------------------------------
 
 func TestPerClientLimiter_AllowsUpToBurst(t *testing.T) {
 	l := newTestPerClientLimiter(5, 5)
 	for i := 0; i < 5; i++ {
-		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.RemoteAddr = "10.0.0.1:12345"
-		assert.True(t, l.limit(req, rec), "request %d should be allowed", i)
+		decision := l.Allow(req)
+		assert.True(t, decision.Allowed, "request %d should be allowed", i)
 	}
 }
 
@@ -376,49 +370,42 @@ func TestPerClientLimiter_RejectsOverBurst(t *testing.T) {
 	l := newTestPerClientLimiter(0.001, 2)
 
 	for i := 0; i < 2; i++ {
-		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.RemoteAddr = "10.0.0.1:12345"
-		require.True(t, l.limit(req, rec))
+		require.True(t, l.Allow(req).Allowed)
 	}
 
-	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.RemoteAddr = "10.0.0.1:12345"
-	assert.False(t, l.limit(req, rec))
-	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+	assert.False(t, l.Allow(req).Allowed)
 }
 
 func TestPerClientLimiter_IndependentClients(t *testing.T) {
 	l := newTestPerClientLimiter(0.001, 1)
 
 	// Client A exhausts its burst
-	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.RemoteAddr = "10.0.0.1:12345"
-	require.True(t, l.limit(req, rec))
+	require.True(t, l.Allow(req).Allowed)
 
-	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/", nil)
 	req.RemoteAddr = "10.0.0.1:12345"
-	assert.False(t, l.limit(req, rec))
+	assert.False(t, l.Allow(req).Allowed)
 
 	// Client B should still be allowed
-	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/", nil)
 	req.RemoteAddr = "10.0.0.2:12345"
-	assert.True(t, l.limit(req, rec))
+	assert.True(t, l.Allow(req).Allowed)
 }
 
 func TestPerClientLimiter_BadRemoteAddr(t *testing.T) {
 	l := newTestPerClientLimiter(10, 10)
 
-	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.RemoteAddr = "bad-addr" // no port → GetClientIP fails
-	assert.False(t, l.limit(req, rec))
-	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
-	assert.NotEmpty(t, rec.Header().Get("Retry-After"))
+	decision := l.Allow(req)
+	assert.False(t, decision.Allowed)
+	assert.NotEmpty(t, decision.RetryAfter)
 }
 
 // ---------------------------------------------------------------------------
@@ -550,16 +537,19 @@ func TestRateLimitMiddleware_MisconfigReturnServiceUnavailable(t *testing.T) {
 // helpers
 // ---------------------------------------------------------------------------
 
-func newTestPerClientLimiter(ratePerSec float64, burst int) *perClientLimiter {
-	cache, _ := util.NewCache[*clientEntry](&util.CacheOptions{
-		MaxEntries:      10000,
-		TTL:             time.Hour,
-		CleanupInterval: time.Hour,
+func newTestPerClientLimiter(ratePerSec float64, burst int) *ratelimit.Limiter {
+	limiter, err := ratelimit.New(ratelimit.Config{
+		Mode:          ratelimit.ModePerClient,
+		RatePerSecond: ratePerSec,
+		Burst:         burst,
+		CacheOptions: &util.CacheOptions{
+			MaxEntries:      10000,
+			TTL:             time.Hour,
+			CleanupInterval: time.Hour,
+		},
 	})
-	return &perClientLimiter{
-		clientCache:   cache,
-		ratePerSecond: ratePerSec,
-		burst:         burst,
-		retryAfter:    computeRetryAfter(ratePerSec),
+	if err != nil {
+		panic(err)
 	}
+	return limiter
 }

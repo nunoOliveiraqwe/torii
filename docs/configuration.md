@@ -25,6 +25,7 @@
   - [Timeout](#timeout)
   - [Compression](#compression)
   - [BasicAuth](#basicauth)
+  - [TOTP](#totp)
   - [CorazaWaf](#corazawaf)
   - [StaticResponse](#staticresponse)
   - [StaticFileServer](#staticfileserver)
@@ -479,6 +480,33 @@ HTTP Basic Authentication with Argon2id password hashes. Generate hashes with th
     realm: "Internal"
     credentials:
       admin: "$argon2id$v=19$m=65536,t=3,p=4$abc123$hashedpassword"
+```
+
+---
+
+### TOTP
+
+Protects a route with a time-based one-time-password challenge. The challenge is served by the middleware itself and posts back to the same requested URL with the reserved `__torii_totp=verify` query parameter, so no internal Torii route needs to be registered. Torii-owned `__torii_*` query parameters may be intercepted by middleware.
+
+```yaml
+- type: "TOTP"
+  options:
+    seed: "$env:TORII_TOTP_SEED"       # Base32 seed. Supports $env:... and $file:...
+    label: "shared-home"               # Optional audit/debug label, not a username
+    algorithm: "SHA1"                  # SHA1, SHA256, or SHA512
+    digits: 6
+    period: "30s"
+    code-window: 1
+    rate-limit-enabled: true
+    limiter-req:
+      rate-per-second: 0.083333333    # 1 attempt every 12s after burst
+      burst: 5
+    rate-limit-cache-ttl: "1h"
+    rate-limit-cleanup-interval: "10m"
+    rate-limit-max-clients: 100000
+    session-lifetime: "16h"
+    session-idle-timeout: "60m"
+    cookie-secure: true
 ```
 
 ---

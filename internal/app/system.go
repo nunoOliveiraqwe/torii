@@ -50,7 +50,7 @@ type SystemService interface {
 	AddHttpListener(conf config.HTTPListener) error
 	EditProxy(port int, conf config.HTTPListener) error
 
-	GetSessionRegistry() *session.Registry
+	GetSessionRegistry() *session.UserRegistry
 	GetServiceStore() *service.ServiceStore
 	GetConfiguredProxyServers() []*proxy.ProxySnapshot
 	GetGlobalMetricsManager() *metrics.ConnectionMetricsManager
@@ -115,7 +115,7 @@ type managedService struct {
 	micro                *proxy.Torii
 	cacheSubsystem       *cacheSub.Subsystem
 	db                   *sqlite.DB
-	sessions             *session.Registry
+	sessions             *session.UserRegistry
 	serviceStore         *service.ServiceStore
 	globalMetricsManager *metrics.ConnectionMetricsManager
 	sseBroker            *SSEBroker
@@ -202,7 +202,7 @@ func (s *managedService) Stop() error {
 	return nil
 }
 
-func (s *managedService) GetSessionRegistry() *session.Registry {
+func (s *managedService) GetSessionRegistry() *session.UserRegistry {
 	return s.sessions
 }
 

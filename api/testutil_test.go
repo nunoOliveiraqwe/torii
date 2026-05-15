@@ -141,7 +141,7 @@ func (m *mockProxyMetricsStore) UpdateGlobalProxyMetrics(ctx context.Context, me
 
 type testSystemService struct {
 	serviceStore   *service.ServiceStore
-	sessions       *session.Registry
+	sessions       *session.UserRegistry
 	proxies        []*proxy.ProxySnapshot
 	metricsManager *metrics.ConnectionMetricsManager
 }
@@ -149,7 +149,7 @@ type testSystemService struct {
 func (t *testSystemService) Start() error                                      { return nil }
 func (t *testSystemService) Stop() error                                       { return nil }
 func (t *testSystemService) StartStopAcme() error                              { return nil }
-func (t *testSystemService) GetSessionRegistry() *session.Registry             { return t.sessions }
+func (t *testSystemService) GetSessionRegistry() *session.UserRegistry         { return t.sessions }
 func (t *testSystemService) GetServiceStore() *service.ServiceStore            { return t.serviceStore }
 func (t *testSystemService) GetConfiguredProxyServers() []*proxy.ProxySnapshot { return t.proxies }
 func (t *testSystemService) GetGlobalMetricsManager() *metrics.ConnectionMetricsManager {

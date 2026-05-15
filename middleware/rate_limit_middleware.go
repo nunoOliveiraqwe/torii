@@ -1,21 +1,15 @@
 package middleware
 
 import (
-	"errors"
 	"fmt"
-	"math"
 	"net/http"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/nunoOliveiraqwe/torii/internal/bus"
-	"github.com/nunoOliveiraqwe/torii/internal/netutil"
+	"github.com/nunoOliveiraqwe/torii/internal/ratelimit"
 	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
-	cacheSub "github.com/nunoOliveiraqwe/torii/internal/subsystem/cache"
 	"github.com/nunoOliveiraqwe/torii/internal/util"
 	"go.uber.org/zap"
-	"golang.org/x/time/rate"
 )
 
 type rateLimitConf struct {
@@ -23,97 +17,6 @@ type rateLimitConf struct {
 	RatePerSecond float64
 	Mode          string
 	CacheOpt      *util.CacheOptions
-}
-
-type limiter interface {
-	limit(r *http.Request, w http.ResponseWriter) bool
-}
-
-type globalLimiter struct {
-	internalLimiter *rate.Limiter
-	retryAfter      string
-}
-
-type clientEntry struct {
-	limiter  *rate.Limiter
-	lastSeen time.Time
-}
-
-type perClientLimiter struct {
-	clientCache   *util.Cache[*clientEntry]
-	ratePerSecond float64
-	burst         int
-	retryAfter    string
-}
-
-func (e *clientEntry) Touch() {
-	e.lastSeen = time.Now()
-}
-
-func (e *clientEntry) GetLastReadAt() time.Time {
-	return e.lastSeen
-}
-
-func (e *clientEntry) CacheEntryDescriptor() cacheSub.EntryDescriptor {
-	fields := map[string]string{}
-	summary := "per-client limiter"
-	if e.limiter != nil {
-		fields["rate_per_second"] = fmt.Sprintf("%g", float64(e.limiter.Limit()))
-		fields["burst"] = strconv.Itoa(e.limiter.Burst())
-		summary = fmt.Sprintf("%g req/s, burst %d", float64(e.limiter.Limit()), e.limiter.Burst())
-	}
-	return cacheSub.EntryDescriptor{
-		Disposition: cacheSub.EntryDispositionNeutral,
-		Summary:     summary,
-		Fields:      fields,
-		UpdatedAt:   e.lastSeen,
-	}
-}
-
-func (g *globalLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
-	if g.internalLimiter.Allow() {
-		return true
-	}
-	w.Header().Set("Retry-After", g.retryAfter)
-	requestctx.CreateAndAddBlockInfoToRequestContext(r,
-		"rate-limit",
-		fmt.Sprintf("global rate limit of %f req/s exceeded", g.internalLimiter.Limit()), bus.TopicRateLimitTriggered)
-	http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
-	return false
-}
-
-func (l *perClientLimiter) limit(r *http.Request, w http.ResponseWriter) bool {
-	logger := GetRequestLoggerFromContext(r)
-	ipAddr, err := netutil.GetClientIP(r)
-	if err != nil {
-		logger.Warn("RateLimitMiddleware: failed to extract client IP", zap.Error(err))
-		requestctx.CreateAndAddBlockInfoToRequestContext(r, "rate-limit", "failed to extract client IP", bus.TopicRateLimitTriggered)
-		w.Header().Set("Retry-After", l.retryAfter)
-		http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
-		return false
-	}
-	entry, err := l.clientCache.GetValue(ipAddr)
-	if err != nil && errors.Is(err, util.ErrCacheMiss) {
-		entry = &clientEntry{
-			limiter: rate.NewLimiter(rate.Limit(l.ratePerSecond), l.burst),
-		}
-		l.clientCache.CacheValue(ipAddr, entry)
-	} else if err != nil {
-		logger.Warn("RateLimitMiddleware: failed to get client entry from cache for IP", zap.String("Ip", ipAddr), zap.Error(err))
-		requestctx.CreateAndAddBlockInfoToRequestContext(r, "rate-limit", "cache error on get", bus.TopicRateLimitTriggered)
-		w.Header().Set("Retry-After", l.retryAfter)
-		http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
-		return false
-	}
-	if entry.limiter.Allow() {
-		return true
-	}
-	logger.Warn("RateLimitMiddleware: rate limit exceeded for client IP", zap.String("Ip", ipAddr))
-	requestctx.CreateAndAddBlockInfoToRequestContext(r, "rate-limit",
-		fmt.Sprintf("rate limit of %f req/s exceeded", entry.limiter.Limit()), bus.TopicRateLimitTriggered)
-	w.Header().Set("Retry-After", l.retryAfter)
-	http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
-	return false
 }
 
 func RateLimitMiddleware(ctx BuildContext, next http.HandlerFunc, conf Config) http.HandlerFunc {
@@ -132,43 +35,36 @@ func RateLimitMiddleware(ctx BuildContext, next http.HandlerFunc, conf Config) h
 		}
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		if l.limit(r, w) {
-			next.ServeHTTP(w, r)
+		decision := l.Allow(r)
+		if !decision.Allowed {
+			if decision.Err != nil {
+				GetRequestLoggerFromContext(r).Warn("RateLimitMiddleware: request denied by limiter",
+					zap.String("key", decision.Key),
+					zap.Error(decision.Err))
+			}
+			if decision.RetryAfter != "" {
+				w.Header().Set("Retry-After", decision.RetryAfter)
+			}
+			requestctx.CreateAndAddBlockInfoToRequestContext(r, "rate-limit", decision.Reason, bus.TopicRateLimitTriggered)
+			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+			return
 		}
+		next.ServeHTTP(w, r)
 	}
 }
 
 func computeRetryAfter(ratePerSecond float64) string {
-	if ratePerSecond <= 0 {
-		return "1"
-	}
-	secs := int(math.Ceil(1.0 / ratePerSecond))
-	if secs < 1 {
-		secs = 1
-	}
-	return strconv.Itoa(secs)
+	return ratelimit.ComputeRetryAfter(ratePerSecond)
 }
 
-func newLimiter(c *rateLimitConf) (limiter, error) {
-	retryAfter := computeRetryAfter(c.RatePerSecond)
-	if strings.EqualFold(c.Mode, "per-client") {
-		cache, err := util.NewCache[*clientEntry](c.CacheOpt)
-		if err != nil {
-			zap.S().Errorf("Failed to initialize client cache for per-client rate limiter: %v. Failing closed.", err)
-			return nil, err
-		}
-		pcl := &perClientLimiter{
-			clientCache:   cache,
-			ratePerSecond: c.RatePerSecond,
-			burst:         c.Burst,
-			retryAfter:    retryAfter,
-		}
-		return pcl, nil
-	}
-	return &globalLimiter{
-		internalLimiter: rate.NewLimiter(rate.Limit(c.RatePerSecond), c.Burst),
-		retryAfter:      retryAfter,
-	}, nil
+func newLimiter(c *rateLimitConf) (*ratelimit.Limiter, error) {
+	return ratelimit.New(ratelimit.Config{
+		Mode:          ratelimit.Mode(c.Mode),
+		RatePerSecond: c.RatePerSecond,
+		Burst:         c.Burst,
+		CacheOptions:  c.CacheOpt,
+		ReasonPrefix:  "rate limit",
+	})
 }
 
 func parseRateLimitConfig(ctx BuildContext, conf Config) (*rateLimitConf, error) {
