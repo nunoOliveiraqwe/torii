@@ -178,6 +178,7 @@ func (t *testSystemService) GetRecentBlockedEntries(n int) []activity.BlockLogEn
 	return []activity.BlockLogEntry{}
 }
 func (t *testSystemService) PersistConfig() error                   { return nil }
+func (t *testSystemService) GetToriiVersion() string                { return "test-version" }
 func (t *testSystemService) IsHeadless() bool                       { return false }
 func (t *testSystemService) GetCacheSubsystem() *cacheSub.Subsystem { return nil }
 func (t *testSystemService) GetEventBus() bus.Bus                   { return nil }
