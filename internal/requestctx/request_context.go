@@ -19,6 +19,7 @@ var requestIDCounter uint64
 type RequestContextStruct struct {
 	BlockInfo         *BlockInfo
 	CountryCode       string
+	ClientIP          string
 	ContinentCode     string
 	InternalRequestId string //used internally to match requests. requestId is an optional middleware that might not be present
 	RequestId         string
@@ -105,9 +106,17 @@ func raiseProcessedRequestEvent(incomingTime time.Time,
 		return
 	}
 	ctxStruct := GetContextStruct(r)
-	clientIP, err := netutil.GetClientIP(r)
-	if err != nil {
-		clientIP = r.RemoteAddr
+
+	clientIP := ctxStruct.ClientIP
+
+	if clientIP == "" {
+		clientIP2, err := netutil.GetClientIP(r)
+		if err != nil {
+			clientIP = r.RemoteAddr
+		} else {
+			clientIP = clientIP2
+		}
+
 	}
 
 	var blocked *bus.RequestBlocked

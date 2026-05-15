@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/nunoOliveiraqwe/torii/internal/netutil"
+	"github.com/nunoOliveiraqwe/torii/internal/requestctx"
 	"go.uber.org/zap"
 )
 
@@ -31,6 +32,7 @@ func (r *Matcher) WrapHandler(next http.HandlerFunc) http.HandlerFunc {
 			zap.S().Debugf("trusted-proxy: rewriting RemoteAddr from %s to %s", req.RemoteAddr, resolved)
 			req.RemoteAddr = resolved
 		}
+		requestctx.GetContextStruct(req).ClientIP = resolved
 		next(w, req)
 	}
 }
