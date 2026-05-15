@@ -59,6 +59,7 @@ type SystemService interface {
 	GetEventBus() bus.Bus
 	GetProxyConfig(port int) *config.HTTPListener
 	GetSystemHealth() *SystemHealth
+	GetToriiVersion() string
 
 	GetSubsystemManager() *subsystem.Manager
 	GetRecentErrors(n int) []activity.ErrorLogEntry
@@ -122,9 +123,10 @@ type managedService struct {
 	startTime            time.Time
 	configPath           string
 	appConfig            config.AppConfig
+	toriiVersion         string
 }
 
-func NewSystemService(conf config.AppConfig, configPath string, dataDir string) (SystemService, error) {
+func NewSystemService(conf config.AppConfig, configPath, dataDir, toriiVersion string) (SystemService, error) {
 	zap.S().Info("Initializing managed system service")
 	mgr := metrics.NewGlobalMetricsHandler(2, context.Background())
 	cacheSubsystem := cacheSub.NewSubsystem()
@@ -159,6 +161,7 @@ func NewSystemService(conf config.AppConfig, configPath string, dataDir string) 
 		configPath:           configPath,
 		appConfig:            conf,
 		serviceStore:         serviceStore,
+		toriiVersion:         toriiVersion,
 	}, nil
 }
 
@@ -224,6 +227,10 @@ func (s *managedService) GetCacheSubsystem() *cacheSub.Subsystem {
 
 func (s *managedService) GetSSEBroker() *SSEBroker {
 	return s.sseBroker
+}
+
+func (s *managedService) GetToriiVersion() string {
+	return s.toriiVersion
 }
 
 func (s *managedService) GetConfiguredProxyServers() []*proxy.ProxySnapshot {

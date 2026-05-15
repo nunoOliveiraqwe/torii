@@ -54,6 +54,7 @@ func (h *uiHandler) renderPage(w http.ResponseWriter, r *http.Request, page stri
 
 type dashboardData struct {
 	Username string
+	Version  string
 }
 
 // --- page handlers ---------------------------------------------------------
@@ -100,7 +101,11 @@ func (h *uiHandler) handleDashboardPage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	username := h.svc.GetSessionRegistry().GetValueFromSession(r)
-	h.renderPage(w, r, "dashboard", dashboardData{Username: username})
+	version := h.svc.GetToriiVersion()
+	h.renderPage(w, r, "dashboard", dashboardData{
+		Username: username,
+		Version:  version,
+	})
 }
 
 // handleLogout destroys the current session (HTMX POST).

@@ -143,6 +143,10 @@ func (s *headlessService) GetProxyConfig(port int) *config.HTTPListener {
 	return s.micro.GetProxyConfig(port)
 }
 
+func (s *headlessService) GetToriiVersion() string {
+	return ""
+}
+
 func (s *headlessService) GetSystemHealth() *SystemHealth {
 	return collectSystemHealth(s.startTime, s.subManager.GetActivitySubsystem())
 }

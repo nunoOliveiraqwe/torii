@@ -165,7 +165,7 @@ func TestUIHandleDashboardPage_RendersDashboard_WhenAuthenticated(t *testing.T) 
 	loginRec := serveWithSession(f, handleLogin(f.svc), loginReq)
 	cookies := loginRec.Result().Cookies()
 
-	h := newUIHandler(f.svc)
+	h := newUIHandler(f.svc, BuildInfo{Version: "1.2.3"})
 	req := httptest.NewRequest(http.MethodGet, "/ui/dashboard", nil)
 	for _, c := range cookies {
 		req.AddCookie(c)
@@ -174,6 +174,7 @@ func TestUIHandleDashboardPage_RendersDashboard_WhenAuthenticated(t *testing.T) 
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Header().Get("Content-Type"), "text/html")
+	assert.Contains(t, rec.Body.String(), "version 1.2.3")
 }
 
 // ---------------------------------------------------------------------------

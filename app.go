@@ -192,7 +192,7 @@ func (a *Application) startHeadless() error {
 }
 
 func (a *Application) startManaged() error {
-	svc, err := app.NewSystemService(a.appConfig, a.workingConfigPath, a.dataDir)
+	svc, err := app.NewSystemService(a.appConfig, a.workingConfigPath, a.dataDir, Version)
 	if err != nil {
 		return fmt.Errorf("failed to create system service: %w", err)
 	}

@@ -311,9 +311,22 @@
     align-items: center;
     gap: 0.6rem;
 }
+.sidebar-brand-mark {
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+    min-width: 0;
+}
 .sidebar-brand strong {
     font-size: 1.15rem;
     color: #fff;
+    line-height: 1.1;
+}
+.sidebar-version {
+    color: var(--torii-sidebar-section);
+    font-size: 0.68rem;
+    line-height: 1;
+    white-space: nowrap;
 }
 .sidebar-collapse-btn {
     display: inline-flex;
@@ -344,7 +357,7 @@
     width: 56px;
     min-width: 56px;
 }
-.sidebar.collapsed .sidebar-brand strong,
+.sidebar.collapsed .sidebar-brand-mark,
 .sidebar.collapsed .sidebar-nav .nav-label,
 .sidebar.collapsed .sidebar-section,
 .sidebar.collapsed .sidebar-footer .sidebar-user-name,
@@ -515,7 +528,7 @@
 /* Mobile: collapse sidebar */
 @media (max-width: 768px) {
     .sidebar { width: 56px; min-width: 56px; }
-    .sidebar-brand strong,
+    .sidebar-brand-mark,
     .sidebar-nav .nav-label,
     .sidebar-section,
     .sidebar-footer .sidebar-user-name,
