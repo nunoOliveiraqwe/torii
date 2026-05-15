@@ -9,7 +9,14 @@
 </p>
 
 <p align="center">
-  <b>See everything hitting your server. Block what shouldn't be there.</b>
+  <b>See everything hitting your server. Block what should not be there.</b>
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#installation">Installation</a> ·
+  <a href="#documentation">Docs</a>
 </p>
 
 ---
@@ -19,31 +26,25 @@
 </p>
 
 <p align="center">
-  <i>Live dashboard on a Raspberry Pi exposed to the internet. Every request, every blocked IP, every bot caught — in real time.</i>
+  <i>Live dashboard on a Raspberry Pi exposed to the internet. Every request, every blocked IP, every bot caught, in real time.</i>
 </p>
 
 ---
 
-## What is this?
+## What Is Torii?
 
-A reverse proxy with a built-in security dashboard. One binary, one config file, no dependencies.
+Torii is a reverse proxy with a built-in security dashboard. It sits in front of your services, routes HTTP/HTTPS traffic,
+handles TLS, applies security middleware, and shows live request activity from one small Go binary.
 
-You point it at your services, expose it to the internet, and watch what happens. Torii handles routing, TLS
-certificates, rate limiting, and bot defense — and shows you all of it live.
+It is aimed at internet-facing home labs, Raspberry Pi deployments, and small self-hosted services where you want the
+convenience of a proxy and the visibility of a security console without running a stack of separate tools.
 
-## 30-second start
+## Quick Start
 
 ```bash
 go build -o torii ./cmd/torii
-./torii -config config.yaml --debug
-```
 
-Open `http://127.0.0.1:27000/ui`, set your password, and you're looking at live traffic. `--debug` starts stub backends
-so you can explore without configuring real services.
-
-### Minimal config
-
-```yaml
+cat > torii.yaml <<'YAML'
 log:
   log-level: INFO
 
@@ -53,61 +54,61 @@ api-server:
 
 net-config:
   http:
-    - port: 80
+    - port: 8090
       default:
-        backend: http://192.168.1.50:8080
+        backend: http://127.0.0.1:9000
+YAML
+
+./torii -config torii.yaml -debug
 ```
 
-That's it. Torii adds request logging, metrics, and request IDs automatically.
+Open `http://127.0.0.1:27000/ui` and set the first admin password. Debug mode starts stub backends for configured
+services, so you can explore the dashboard before pointing Torii at real traffic.
 
-Full configuration reference → [docs/configuration.md](docs/configuration.md)
+Full configuration reference: [docs/configuration.md](docs/configuration.md)
 
----
+## What It Catches
 
-## What it catches
+Torii is running on a Raspberry Pi 3 with ports open to the internet. On a normal day it sees and blocks things like:
 
-Torii is running on a Raspberry Pi 3 with ports open to the internet. Here's what a typical day looks like:
+- **Vulnerability scanners** probing `.env`, `wp-login.php`, `.git/config`, and other high-signal paths
+- **Known scanner user agents** such as Nuclei, zgrab, scrapers, and AI crawlers
+- **IPs with abuse history** through AbuseIPDB checks and optional reporting
+- **Brute-force attempts** with token-bucket rate limits and proper `429` + `Retry-After` responses
+- **Unexpected geography** with GeoIP country and continent rules
+- **Suspicious payloads** through the Coraza WAF and OWASP Core Rule Set
 
-- **Scanners probing for vulnerabilities** — `.env`, `wp-login.php`, `.git/config` — caught by honeypot traps and
-  auto-blocked
-- **Known scanner user agents** — Nuclei, zgrab, scrapers, AI crawlers — matched and blocked on sight
-- **IPs with known abuse history** — checked against AbuseIPDB in real time
-- **Brute-force attempts** — rate limited with proper `429` + `Retry-After`, repeat offenders blocked
-- **Traffic from unexpected countries** — geo-blocked before it reaches your services
-
-Everything that gets blocked shows up in the dashboard with timestamps, IPs, and the reason it was caught.
+Blocked requests show up in the dashboard with timestamps, IPs, middleware names, and block reasons.
 
 |                Activity Log                |                  Under Load                  |
 |:------------------------------------------:|:--------------------------------------------:|
 | ![Activity](docs/screenshots/activity.png) | ![Load Test](docs/screenshots/load-test.png) |
 
----
+## Features
 
-## What it does
+**Routing**: HTTP/HTTPS listeners, virtual-host routing, wildcard hosts, path rules, per-path backend overrides, and
+trusted proxy support.
 
-**Routing** — HTTP/HTTPS, virtual-host routing, path-based routing with wildcards, per-path backend overrides.
+**Automatic TLS**: Let's Encrypt via DNS-01, per-domain SNI, wildcard certificates, and background renewal.
 
-**Automatic TLS** — Let's Encrypt via DNS-01. No port 80 required. Per-domain SNI. Background renewal.
+**Security middleware**: WAF, user-agent blocking, IP filtering, AbuseIPDB, honeypots, GeoIP blocking, basic auth, TOTP,
+request/response header policies, body limits, timeouts, and rate limiting.
 
-**Bot defense** — UA blocking (scanners, scrapers, AI crawlers), honeypot traps with optional trickster mode (tarpits,
-fake credentials, infinite streams), GeoIP blocking.
+**Resilience**: Circuit breakers stop forwarding to unhealthy backends until they recover.
 
-**Rate limiting** — Token-bucket, global or per-client IP.
+**Observability**: Hierarchical metrics from global to route to path, live request/error/block logs over SSE, request IDs,
+latency percentiles, byte counts, status-code buckets, and active connection counts.
 
-**Circuit breaker** — Stops forwarding to unhealthy backends until they recover.
+**Dashboard and API**: First-time setup, route management, ACME configuration, API keys, read-only stats access, and a
+management API documented in [docs/api.md](docs/api.md).
 
-**AbuseIPDB integration** — Check client IPs against community abuse reports. Optionally report blocked IPs back.
+**20 composable middlewares**: available globally, per route, or per path. See the
+[middleware reference](docs/configuration.md#middleware-reference).
 
-**Live dashboard** — Hierarchical metrics (global → route → path), real-time request and error logs via SSE, blocked IP
-log.
+## Homepage Integration
 
-**19 composable middlewares** — all per-route or per-path. [Full list →](docs/configuration.md#middleware-reference)
-
----
-
-## Homepage integration
-
-Torii has scoped API keys for read-only stats access. Add this to your [Homepage](https://gethomepage.dev) config:
+Torii has scoped API keys for read-only stats access. Create an API key with the `read_stats` scope, then add this to
+your [Homepage](https://gethomepage.dev) config:
 
 ```yaml
 - Torii:
@@ -119,17 +120,15 @@ Torii has scoped API keys for read-only stats access. Add this to your [Homepage
       headers:
         Authorization: Bearer <your-api-key>
       mappings:
-        - field: total_requests
+        - field: request_count
           label: Requests
-        - field: blocked_ips
-          label: Blocked IPs
+        - field: blocked_total
+          label: Blocked
 ```
 
 <p align="center">
   <img src="docs/screenshots/homepage.png" alt="Homepage Integration"/>
 </p>
-
----
 
 ## Screenshots
 
@@ -137,16 +136,16 @@ Torii has scoped API keys for read-only stats access. Add this to your [Homepage
 |:--------------------------------------------:|:--------------------------------------------------:|
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Proxy Routes](docs/screenshots/proxy-routes.png) |
 
----
-
 ## Installation
 
 ### Binary
 
 ```bash
 go build -o torii ./cmd/torii
-./torii -config config.yaml
+./torii -config torii.yaml
 ```
+
+Torii uses SQLite through `mattn/go-sqlite3`, so local source builds need CGO enabled.
 
 ### Docker
 
@@ -154,25 +153,23 @@ go build -o torii ./cmd/torii
 docker run -d \
   --network host \
   -v torii-data:/data \
-  -v /path/to/config.yaml:/etc/torii/config.yaml \
-  ghcr.io/nunoOliveiraqwe/torii:latest
+  -v /path/to/torii.yaml:/etc/torii/config.yaml \
+  ghcr.io/nunooliveiraqwe/torii:latest
 ```
 
 `--network host` is recommended so Torii can bind directly to host interfaces.
 
-| Mount                  | Purpose                                    |
-|------------------------|--------------------------------------------|
-| `torii-data:/data`     | SQLite database (persists across restarts) |
-| `/path/to/config.yaml` | Config file                                |
+| Mount                         | Purpose                                    |
+|-------------------------------|--------------------------------------------|
+| `torii-data:/data`            | SQLite database and runtime state          |
+| `/path/to/torii.yaml`         | Config file mounted into the container     |
 
 <details>
-<summary>Building from source (Docker)</summary>
+<summary>Building from source with Docker</summary>
 
 ```bash
 docker build -f docker/Multistage.Dockerfile -t torii .
 ```
-
-Torii uses `mattn/go-sqlite3` which requires CGO. The binary must be built with `CGO_ENABLED=1`.
 
 </details>
 
@@ -182,105 +179,75 @@ Torii uses `mattn/go-sqlite3` which requires CGO. The binary must be built with 
 dpkg -i torii_<version>_amd64.deb
 ```
 
----
-
 ## Performance
 
-Full middleware chain over HTTPS on a **Raspberry Pi 3** (4-core ARM, 906 MB RAM):
+Full middleware chain over HTTPS on a **Raspberry Pi 3** with 4-core ARM and 906 MB RAM:
 
 | Concurrency |   Req/s |    p50 |    p99 |
 |:-----------:|--------:|-------:|-------:|
 |     10      | **663** |  12 ms |  98 ms |
 |     100     | **656** | 146 ms | 359 ms |
 
-**Desktop** (AMD 9800X3D, 32 GB RAM):
+**Desktop** with AMD 9800X3D and 32 GB RAM:
 
 | Concurrency |      Req/s |   p50 |    p99 |
 |:-----------:|-----------:|------:|-------:|
 |     100     |  **9,540** |  9 ms |  96 ms |
 |     200     | **13,114** | 12 ms | 100 ms |
 
----
-
 ## Documentation
 
-- [Configuration & Middleware Reference](docs/configuration.md)
+- [Configuration and Middleware Reference](docs/configuration.md)
 - [Management API](docs/api.md)
-
-## TODO
-
-Keeping track of what's done and what's next. This is not a roadmap, just my personal scratchpad for the project.
-
-### Needs work
-
-- [ ] Create HTTP Proxy UI: works, but the UX needs another pass
-- [ ] ACME UI: need a revoke button for individual certificates (altough this might cause some 'funny' side effects),
-  the reset button placement is bad
-- [ ] Proxy Routes UI: host names should be clickable links that open in a new tab
-
-### Up next
-
-- [x] The rolling logs needs to be decoupled from metrics. Right now the metrics middleware is used to track them, but
-  this feels wrong, it's just not elegant, and is leading to ~~issues~~ quirks when using global middlewares.
-- [ ] Enabled API server midlewares to be fully configurable through the config file
-- [ ] TCP proxying: config schema is there, implementation is not
-- [ ] UA fingerprint rotation detection: bots that rotate user agents mid-scan are easy to spot — a real client doesn't
-  switch from macOS to Linux to Windows between requests. Track UA consistency per IP and flag or block IPs whose
-  OS/browser family changes unnaturally fast. I encountered this with a bot that rotated through 20+ UAs in a single
-  scan, hitting 100+ endpoints in minutes. The honeypot caught it, but this would be another layer of defense against UA
-  rotation.
-- [ ] ForwardAuth middleware: delegate auth decisions to an external service (like Traefik's ForwardAuth / nginx
-  auth_request)
-- [x] Setting headers based on IP or other request attributes (e.g. add `X-Client-IP` $remote_addr), need to buidl a
-  list of useful attributes that can be templated
-- [ ] Bait domains, e.g. `admin.yourdomain.com`, these would be domains that have no reason to receive any traffic, so
-  any request to them would be highly suspicious. I can potentialy have a DNS provider integration that automatically
-  creates and removes these bait domains, so they can be rotated periodically. This would be a great way to catch bots
-  that are targeting specific subdomains (e.g. `admin`, `dev`, `staging`) without exposing any real services on those
-  subdomains. Bonus points that this would serve as a legitimate IP trap, where any IP hitting this would be instantly
-  blocked, and the funny thing is, they need to connect before they can verify it's legit or not, I only need for them
-  to connect before banning them.
-- [ ] CrowdSec integration: implement Torii as a CrowdSec bouncer using the streaming mode. Long-poll from the CrowdSec
-  LAPI, so IP checks are pure in-memory lookups with no per-request latency. CrowdSec runs as a separate daemon, parses
-  Torii's logs, and benefits from the community blocklist. Two directions: Torii as enforcer (reads decisions) and Torii
-  as sensor (feeds logs to CrowdSec for scenario detection).
-- [ ] Detect the slick ones. Most traffic is easy to catch with the right rules, but there are always going to be some
-  bots that fly under the radar. Implement a "suspicious activity" score based on request patterns (e.g. high request
-  rate, odd paths, inconsistent UAs) and flag IPs that exceed a certain threshold for manual review. This would be a way
-  to catch the bots that are just good enough to avoid the traps, but still exhibit behavior that's not typical of real
-  users.
-- [ ] Active backend health checks, periodically probe backends in the background so they're marked down before real
-  traffic is affected, rather than relying solely on the circuit breaker's passive failure detection. Config
-  per-backend: health check path, interval, timeout, and consecutive failure/success thresholds to transition between
-  healthy/unhealthy. Unhealthy backends should be shown in the dashboard. Health check state and circuit breaker state
-  should share the same backend status so they don't contradict each other.
-- [x] Internal event bus, a lightweight pub/sub backbone so middlewares and subsystems can emit and react to events (
-  request blocked, honeypot triggered, backend went down, suspicious IP flagged, etc.) without direct coupling. This
-  seems unavoidable as I keep seeing the need for it emerging everywhere. is the prerequisite that makes CrowdSec sensor
-  mode, suspicious activity scoring, bait domain blocking, where the IP is shared across middleware's, UA rotation
-  detection, and alerting/webhooks all clean to implement. Without it, each new feature needs to reach into other
-  components directly.
-
-### Known Bugs
-
-- [ ] Create proxy button doesn't work when a middleware is not configured correctly. e.g static response missing status code. No error is shown, and the UI just doesn't respond to the click. 
-
-### Maybe
-
-- [ ] Proxy-level authentication: login pages so the proxy handles auth before forwarding to backends
-- [ ] Dedicated tar pitting middleware (separate from the honeypot trickster mode)
-- [ ] Anubis integration (I really want this, but need to figure out how to best integrate it, given anubis has a pretty
-  large config surface)
-- [ ] Webhooks/alerts: notify on suspicious activity, blocked IPs, backend health changes, etc. via webhooks or
-  integrations with services like Slack/Discord.
-- [ ] JA3/JA4 fingerprinting, not sure how this will fit in yet, but it would be interesting to be able to fingerprint TLS clients JA3/JA4 hashes,
-    but, this is way more complex that a middleware, since it needs to hook into the TLS handshake.  Not sure if i'll be able to do thi cleanly.
-
+- [Full Example Config](config-example.yaml)
 
 ## Requirements
 
 - Go 1.26+
+- CGO for local source builds
 
 ## License
 
 [GNU Affero General Public License v3.0](LICENSE)
+
+<details>
+<summary>Project notes</summary>
+
+This is a working scratchpad, not a public roadmap.
+
+### Needs Work
+
+- [ ] HTTP proxy UI: works, but the UX needs another pass
+- [ ] ACME UI: add a revoke button for individual certificates; reset button placement needs work
+- [ ] Proxy Routes UI: host names should be clickable links that open in a new tab
+
+### Up Next
+
+- [ ] Enable API server middlewares to be fully configurable through the config file
+- [ ] TCP proxying: config schema is there, implementation is not
+- [ ] UA fingerprint rotation detection: bots that rotate user agents mid-scan are easy to spot. Track UA consistency per IP and flag or block IPs whose OS/browser family changes unnaturally fast.
+- [ ] ForwardAuth middleware: delegate auth decisions to an external service, like Traefik ForwardAuth or nginx `auth_request`
+- [ ] Bait domains, such as `admin.yourdomain.com`, that have no reason to receive traffic. Any request to them would be suspicious enough to block the source IP.
+- [ ] CrowdSec integration: implement Torii as a CrowdSec bouncer using streaming mode, with Torii as both enforcer and possible sensor.
+- [ ] Suspicious activity scoring based on request patterns, odd paths, high request rates, and inconsistent user agents.
+- [ ] Active backend health checks with per-backend path, interval, timeout, and success/failure thresholds.
+
+### Recently Done
+
+- [x] Internal event bus for request-blocked, honeypot-triggered, backend-down, suspicious-IP, and related events
+- [x] Header values based on request attributes, such as `X-Client-IP: $remote_addr`
+- [x] Rolling logs decoupled from metrics
+
+### Known Bugs
+
+- [ ] Create proxy button does not show an error when middleware is configured incorrectly, such as a static response missing a status code
+
+### Maybe
+
+- [ ] Proxy-level authentication: login pages so the proxy handles auth before forwarding to backends
+- [ ] Dedicated tarpitting middleware separate from honeypot trickster mode
+- [ ] Anubis integration, pending a good approach for its larger config surface
+- [ ] Webhooks and alerts for suspicious activity, blocked IPs, backend health changes, and similar events
+- [ ] JA3/JA4 fingerprinting if it can fit cleanly around TLS handshake handling
+
+</details>
