@@ -86,6 +86,14 @@ type TLSConfig struct {
 }
 
 type BackendConfig struct {
-	Address           string `yaml:"address" json:"address"`
-	ReplaceHostHeader bool   `yaml:"replace-host-header" json:"replace-host-header,omitempty"`
+	Address           string            `yaml:"address" json:"address"`
+	ReplaceHostHeader bool              `yaml:"replace-host-header" json:"replace-host-header,omitempty"`
+	TLS               *BackendTlsConfig `yaml:"tls" json:"tls,omitempty"`
+}
+
+type BackendTlsConfig struct {
+	InsecureSkipVerify bool   `yaml:"insecure-skip-verify" json:"insecure-skip-verify,omitempty"`
+	CaCert             string `yaml:"ca-cert" json:"ca-cert,omitempty"`
+	ClientCert         string `yaml:"client-cert" json:"client-cert,omitempty"`
+	ClientKey          string `yaml:"client-key" json:"client-key,omitempty"`
 }

@@ -15,12 +15,21 @@ package proxy
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -112,6 +121,85 @@ func newEchoBackend(t *testing.T) *httptest.Server {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv
+}
+
+func newTLSEchoBackend(t *testing.T) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		resp := echoResponse{
+			Method:  r.Method,
+			URL:     r.URL.String(),
+			Host:    r.Host,
+			Headers: r.Header,
+			Path:    r.URL.Path,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Backend", "tls-echo")
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+	srv := httptest.NewTLSServer(mux)
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func newMutualTLSEchoBackend(t *testing.T) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+			http.Error(w, "missing client certificate", http.StatusUnauthorized)
+			return
+		}
+		resp := echoResponse{
+			Method:  r.Method,
+			URL:     r.URL.String(),
+			Host:    r.Host,
+			Headers: r.Header,
+			Path:    r.URL.Path,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Backend", "mtls-echo")
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+	srv := httptest.NewUnstartedServer(mux)
+	srv.TLS = &tls.Config{ClientAuth: tls.RequireAnyClientCert}
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func writeCertPEM(t *testing.T, name string, der []byte) string {
+	t.Helper()
+	return writeTestFile(t, name, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+}
+
+func writeTestFile(t *testing.T, name string, data []byte) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
+	require.NoError(t, os.WriteFile(path, data, 0600))
+	return path
+}
+
+func generateClientCertificateFiles(t *testing.T) (string, string) {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "torii-proxy-integration-client"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	require.NoError(t, err)
+
+	certPath := writeTestFile(t, "client.pem", pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+	keyPath := writeTestFile(t, "client-key.pem", pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+	return certPath, keyPath
 }
 
 // createTestContext builds a context suitable for buildHttpServer.
@@ -213,6 +301,68 @@ func TestLifecycle_NoRoutes_Errors(t *testing.T) {
 	}, nil)
 	require.Error(t, err, "buildHttpServer with no routes and no default must fail")
 	assert.Contains(t, err.Error(), "no valid routes")
+}
+
+func TestBackendTLS_SelfSignedBackendFailsWithoutTLSOptions(t *testing.T) {
+	backend := newTLSEchoBackend(t)
+	port := getFreePort(t)
+	baseURL := buildAndStart(t, simpleListener(port, backend.URL, nil), nil)
+
+	resp := doGet(t, baseURL+"/tls-fail")
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusBadGateway, resp.StatusCode)
+}
+
+func TestBackendTLS_InsecureSkipVerifyProxiesToSelfSignedBackend(t *testing.T) {
+	backend := newTLSEchoBackend(t)
+	port := getFreePort(t)
+	listener := simpleListener(port, backend.URL, nil)
+	listener.Default.Backend.TLS = &config.BackendTlsConfig{InsecureSkipVerify: true}
+
+	baseURL := buildAndStart(t, listener, nil)
+	resp := doGet(t, baseURL+"/tls-skip")
+	echo := readEcho(t, resp)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "/tls-skip", echo.Path)
+	assert.Equal(t, "tls-echo", resp.Header.Get("X-Backend"))
+}
+
+func TestBackendTLS_CustomCAProxiesToSelfSignedBackend(t *testing.T) {
+	backend := newTLSEchoBackend(t)
+	caPath := writeCertPEM(t, "backend-ca.pem", backend.Certificate().Raw)
+	port := getFreePort(t)
+	listener := simpleListener(port, backend.URL, nil)
+	listener.Default.Backend.TLS = &config.BackendTlsConfig{CaCert: caPath}
+
+	baseURL := buildAndStart(t, listener, nil)
+	resp := doGet(t, baseURL+"/tls-ca")
+	echo := readEcho(t, resp)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "/tls-ca", echo.Path)
+	assert.Equal(t, "tls-echo", resp.Header.Get("X-Backend"))
+}
+
+func TestBackendTLS_ClientCertificatePresentedToBackend(t *testing.T) {
+	backend := newMutualTLSEchoBackend(t)
+	caPath := writeCertPEM(t, "backend-ca.pem", backend.Certificate().Raw)
+	clientCertPath, clientKeyPath := generateClientCertificateFiles(t)
+	port := getFreePort(t)
+	listener := simpleListener(port, backend.URL, nil)
+	listener.Default.Backend.TLS = &config.BackendTlsConfig{
+		CaCert:     caPath,
+		ClientCert: clientCertPath,
+		ClientKey:  clientKeyPath,
+	}
+
+	baseURL := buildAndStart(t, listener, nil)
+	resp := doGet(t, baseURL+"/mtls")
+	echo := readEcho(t, resp)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "/mtls", echo.Path)
+	assert.Equal(t, "mtls-echo", resp.Header.Get("X-Backend"))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -608,6 +758,30 @@ func TestMiddleware_Redirect_Internal(t *testing.T) {
 	// Must reach the redirect target, not the original backend.
 	assert.Equal(t, "/internal-test", echo.Path)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestMiddleware_Redirect_InternalWithBackendTLS(t *testing.T) {
+	redirectTarget := newTLSEchoBackend(t)
+	originalBackend := newEchoBackend(t)
+	port := getFreePort(t)
+	mws := []middleware.Config{{
+		Type: "Redirect",
+		Options: map[string]interface{}{
+			"mode":                 "internal",
+			"target":               redirectTarget.URL,
+			"drop-path":            false,
+			"drop-query":           false,
+			"insecure-skip-verify": true,
+		},
+	}}
+	baseURL := buildAndStart(t, simpleListener(port, originalBackend.URL, mws), nil)
+
+	resp := doGet(t, baseURL+"/internal-tls")
+	echo := readEcho(t, resp)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "/internal-tls", echo.Path)
+	assert.Equal(t, "tls-echo", resp.Header.Get("X-Backend"))
 }
 
 func TestMiddleware_Redirect_External_DefaultStatusCode(t *testing.T) {

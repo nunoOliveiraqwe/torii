@@ -1,11 +1,14 @@
 package proxyutil
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -30,6 +33,14 @@ type ProxyOptions struct {
 	DropPath          bool
 	DropQuery         bool
 	ReplaceHostHeader bool
+	TLS               *ProxyTlsOptions
+}
+
+type ProxyTlsOptions struct {
+	InsecureSkipVerify bool
+	CaCert             string
+	ClientCert         string
+	ClientKey          string
 }
 
 func NewReverseProxy(backend string, opts ProxyOptions) (*httputil.ReverseProxy, error) {
@@ -42,15 +53,70 @@ func NewReverseProxy(backend string, opts ProxyOptions) (*httputil.ReverseProxy,
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse proxy URL: %w", err)
 	}
+
 	proxy := &httputil.ReverseProxy{
-		Rewrite:   rewriteFunc(parsedUrl, opts),
-		Transport: sharedTransport,
+		Rewrite: rewriteFunc(parsedUrl, opts),
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			zap.S().Warnf("proxy error: backend=%s path=%s err=%v", parsedUrl.Host, r.URL.Path, err)
 			w.WriteHeader(http.StatusBadGateway)
 		},
 	}
+	if opts.TLS != nil {
+		transport, err := newSharedTransportWithTls(*opts.TLS)
+		if err != nil {
+			return nil, err
+		}
+		proxy.Transport = transport
+	} else {
+		proxy.Transport = sharedTransport
+	}
 	return proxy, nil
+}
+
+func newTlsConfig(opts ProxyTlsOptions) (*tls.Config, error) {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: opts.InsecureSkipVerify,
+		MinVersion:         tls.VersionTLS12,
+	}
+
+	if opts.CaCert != "" {
+		caCert, err := os.ReadFile(opts.CaCert)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read proxy backend CA certificate %q: %w", opts.CaCert, err)
+		}
+		certPool, err := x509.SystemCertPool()
+		if err != nil {
+			certPool = x509.NewCertPool()
+		}
+		if !certPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to parse proxy backend CA certificate %q", opts.CaCert)
+		}
+		tlsConfig.RootCAs = certPool
+	}
+
+	if opts.ClientCert != "" || opts.ClientKey != "" {
+		if opts.ClientCert == "" || opts.ClientKey == "" {
+			return nil, fmt.Errorf("proxy backend client certificate and key must both be configured")
+		}
+		clientCert, err := tls.LoadX509KeyPair(opts.ClientCert, opts.ClientKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load proxy backend client certificate/key: %w", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{clientCert}
+	}
+
+	return tlsConfig, nil
+}
+
+func newSharedTransportWithTls(opts ProxyTlsOptions) (*http.Transport, error) {
+	tlsConfig, err := newTlsConfig(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	transport := sharedTransport.Clone()
+	transport.TLSClientConfig = tlsConfig
+	return transport, nil
 }
 
 func rewriteFunc(proxyUrl *url.URL, opts ProxyOptions) func(r *httputil.ProxyRequest) {

@@ -19,6 +19,7 @@ type redirectOptions struct {
 	targetUrl  *url.URL
 	dropPath   bool
 	dropQuery  bool
+	tls        *proxyutil.ProxyTlsOptions
 }
 
 type redirecter interface {
@@ -96,6 +97,7 @@ func newInternalRedirecter(opts *redirectOptions) (*internalRedirecter, error) {
 	proxy, err := proxyutil.NewReverseProxy(opts.targetUrl.String(), proxyutil.ProxyOptions{
 		DropPath:  opts.dropPath,
 		DropQuery: opts.dropQuery,
+		TLS:       opts.tls,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to build internal redirect proxy: %w", err)
@@ -170,6 +172,10 @@ func parseRedirectConf(conf Config) (*redirectOptions, error) {
 	}
 
 	zap.S().Debugf("RedirectMiddleware: successfully parsed configuration with mode %q, status code %d and target %q", mode, statusCode, target)
+	tlsOpts, err := parseRedirectTLSOptions(conf.Options)
+	if err != nil {
+		return nil, err
+	}
 
 	// external-scheme-only requires target to be a plain scheme ("https" or "http").
 	if mode == "external-scheme-only" {
@@ -183,6 +189,7 @@ func parseRedirectConf(conf Config) (*redirectOptions, error) {
 			targetUrl:  &url.URL{Scheme: scheme},
 			dropPath:   ParseBoolOpt(conf.Options, "drop-path", false),
 			dropQuery:  ParseBoolOpt(conf.Options, "drop-query", false),
+			tls:        tlsOpts,
 		}, nil
 	}
 
@@ -217,5 +224,31 @@ func parseRedirectConf(conf Config) (*redirectOptions, error) {
 		targetUrl:  parsed,
 		dropPath:   ParseBoolOpt(conf.Options, "drop-path", true),
 		dropQuery:  ParseBoolOpt(conf.Options, "drop-query", true),
+		tls:        tlsOpts,
 	}, nil
+}
+
+func parseRedirectTLSOptions(opts map[string]interface{}) (*proxyutil.ProxyTlsOptions, error) {
+	tlsOpts := &proxyutil.ProxyTlsOptions{
+		InsecureSkipVerify: ParseBoolOpt(opts, "insecure-skip-verify", false),
+	}
+	caCert, err := ParseStringOpt(opts, "ca-cert", "")
+	if err != nil {
+		return nil, err
+	}
+	tlsOpts.CaCert = caCert
+	clientCert, err := ParseStringOpt(opts, "client-cert", "")
+	if err != nil {
+		return nil, err
+	}
+	tlsOpts.ClientCert = clientCert
+	clientKey, err := ParseStringOpt(opts, "client-key", "")
+	if err != nil {
+		return nil, err
+	}
+	tlsOpts.ClientKey = clientKey
+	if !tlsOpts.InsecureSkipVerify && tlsOpts.CaCert == "" && tlsOpts.ClientCert == "" && tlsOpts.ClientKey == "" {
+		return nil, nil
+	}
+	return tlsOpts, nil
 }

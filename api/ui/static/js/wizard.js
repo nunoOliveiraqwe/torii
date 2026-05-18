@@ -82,6 +82,10 @@ function lfValidateStep2() {
         if (!backend && !lfHasTerminatingMiddleware(lfDefaultMwChain)) {
             showToast('Default route requires a backend URL or a terminating middleware (e.g. Redirect).', 'error'); return false;
         }
+        if (!lfValidateBackendTls(document.getElementById('lf-default-route-fields'), 'Default route')) return false;
+        for (var d = 0; d < lfDefaultPaths.length; d++) {
+            if (!lfValidateBackendTls(lfDefaultPaths[d].el, 'Default path #' + (d + 1))) return false;
+        }
     }
     for (var i = 0; i < lfHostRoutes.length; i++) {
         var r = lfHostRoutes[i];
@@ -89,6 +93,10 @@ function lfValidateStep2() {
         var bk = r.el.querySelector('.lf-route-backend').value.trim();
         if (!host) { showToast('Route #' + (i+1) + ' requires a host.', 'error'); return false; }
         if (!bk && !lfHasTerminatingMiddleware(r.mwChain)) { showToast('Route "' + host + '" requires a backend URL or a terminating middleware (e.g. Redirect).', 'error'); return false; }
+        if (!lfValidateBackendTls(r.el, 'Route "' + host + '"')) return false;
+        for (var p = 0; p < r.paths.length; p++) {
+            if (!lfValidateBackendTls(r.paths[p].el, 'Route "' + host + '" path #' + (p + 1))) return false;
+        }
     }
     return true;
 }
@@ -100,6 +108,156 @@ document.getElementById('lf-tls-enable').addEventListener('change', function() {
 document.getElementById('lf-tls-acme').addEventListener('change', function() {
     document.getElementById('lf-tls-cert-fields').style.display = this.checked ? 'none' : '';
 });
+
+function lfBackendTlsFieldsHtml(replaceHostClass, replaceHostLabel) {
+	return '' +
+		'<div class="lf-backend-options">' +
+		'<div class="lf-backend-options-title">Backend options</div>' +
+		'<div class="lf-backend-option-row">' +
+		'<label><input type="checkbox" class="' + replaceHostClass + '"> ' + replaceHostLabel + '</label>' +
+		'<label><input type="checkbox" class="lf-backend-tls-insecure"> Skip verification</label>' +
+		'<label><input type="checkbox" class="lf-backend-ca-enable"> Add custom CA</label>' +
+		'<label><input type="checkbox" class="lf-backend-client-cert-enable"> Use client certificate</label>' +
+		'</div>' +
+		'<p class="lf-backend-warning" style="display:none;">Skips backend certificate chain and hostname validation.</p>' +
+		'<div class="lf-backend-ca-fields lf-grid-3" style="display:none;">' +
+		'<label style="font-size:0.78rem;margin-bottom:0.25rem;">CA Cert <small>(optional)</small>' +
+		'<input type="text" class="lf-backend-tls-ca" placeholder="/path/to/ca.pem" style="margin-bottom:0.4rem;font-size:0.8rem;padding:0.3rem 0.5rem;"></label>' +
+		'</div>' +
+        '<div class="lf-backend-client-cert-fields lf-grid-3" style="display:none;">' +
+        '<label style="font-size:0.78rem;margin-bottom:0.25rem;">Client Cert' +
+        '<input type="text" class="lf-backend-tls-client-cert" placeholder="/path/to/client.pem" style="margin-bottom:0.4rem;font-size:0.8rem;padding:0.3rem 0.5rem;"></label>' +
+        '<label style="font-size:0.78rem;margin-bottom:0.25rem;">Client Key' +
+        '<input type="text" class="lf-backend-tls-client-key" placeholder="/path/to/client-key.pem" style="margin-bottom:0.4rem;font-size:0.8rem;padding:0.3rem 0.5rem;"></label>' +
+        '</div>' +
+        '</div>';
+}
+
+function lfInitBackendTlsControls(scope) {
+	if (!scope) return;
+	var clientCertEnable = scope.querySelector('.lf-backend-client-cert-enable');
+	var insecure = scope.querySelector('.lf-backend-tls-insecure');
+	var caEnable = scope.querySelector('.lf-backend-ca-enable');
+	var warning = scope.querySelector('.lf-backend-warning');
+	var caFields = scope.querySelector('.lf-backend-ca-fields');
+	var clientCertFields = scope.querySelector('.lf-backend-client-cert-fields');
+	if (!clientCertEnable || !insecure || !caEnable || !caFields || !clientCertFields) return;
+	function sync() {
+		if (insecure.checked && caEnable.checked) caEnable.checked = false;
+		insecure.disabled = caEnable.checked;
+		caEnable.disabled = insecure.checked;
+		if (warning) warning.style.display = insecure.checked ? '' : 'none';
+		caFields.style.display = caEnable.checked ? '' : 'none';
+		clientCertFields.style.display = clientCertEnable.checked ? '' : 'none';
+		scope.querySelectorAll('.lf-backend-tls-ca').forEach(function(el) {
+			el.disabled = !caEnable.checked;
+		});
+		scope.querySelectorAll('.lf-backend-tls-client-cert, .lf-backend-tls-client-key').forEach(function(el) {
+			el.disabled = !clientCertEnable.checked;
+		});
+	}
+	insecure.addEventListener('change', sync);
+	caEnable.addEventListener('change', sync);
+	clientCertEnable.addEventListener('change', sync);
+	sync();
+}
+
+function lfCollectBackendTls(scope) {
+	if (!scope) return null;
+	var clientCertEnable = scope.querySelector('.lf-backend-client-cert-enable');
+	var insecure = scope.querySelector('.lf-backend-tls-insecure');
+	var caEnable = scope.querySelector('.lf-backend-ca-enable');
+	var ca = scope.querySelector('.lf-backend-tls-ca');
+	var clientCert = scope.querySelector('.lf-backend-tls-client-cert');
+	var clientKey = scope.querySelector('.lf-backend-tls-client-key');
+	if (!clientCertEnable || !insecure || !caEnable || !ca || !clientCert || !clientKey) return null;
+
+	var tls = {};
+	if (insecure.checked) tls.insecure_skip_verify = true;
+	if (!insecure.checked && caEnable.checked && ca.value.trim()) tls.ca_cert = ca.value.trim();
+	if (clientCertEnable.checked) {
+		if (clientCert.value.trim()) tls.client_cert = clientCert.value.trim();
+        if (clientKey.value.trim()) tls.client_key = clientKey.value.trim();
+    }
+    return Object.keys(tls).length > 0 ? tls : null;
+}
+
+function lfPopulateBackendTls(scope, tls) {
+	if (!scope || !tls) return;
+	var clientCertEnable = scope.querySelector('.lf-backend-client-cert-enable');
+	var insecure = scope.querySelector('.lf-backend-tls-insecure');
+	var caEnable = scope.querySelector('.lf-backend-ca-enable');
+	var warning = scope.querySelector('.lf-backend-warning');
+	var caFields = scope.querySelector('.lf-backend-ca-fields');
+	var clientCertFields = scope.querySelector('.lf-backend-client-cert-fields');
+	var ca = scope.querySelector('.lf-backend-tls-ca');
+	var clientCert = scope.querySelector('.lf-backend-tls-client-cert');
+	var clientKey = scope.querySelector('.lf-backend-tls-client-key');
+	if (!clientCertEnable || !insecure || !caEnable || !ca || !clientCert || !clientKey) return;
+	insecure.checked = !!tls.insecure_skip_verify;
+	caEnable.checked = !!tls.ca_cert && !insecure.checked;
+	caEnable.disabled = insecure.checked;
+	insecure.disabled = caEnable.checked;
+	clientCertEnable.checked = !!(tls.client_cert || tls.client_key);
+	if (warning) warning.style.display = insecure.checked ? '' : 'none';
+	if (caFields) caFields.style.display = caEnable.checked ? '' : 'none';
+	if (clientCertFields) clientCertFields.style.display = clientCertEnable.checked ? '' : 'none';
+	ca.disabled = !caEnable.checked;
+	clientCert.disabled = !clientCertEnable.checked;
+	clientKey.disabled = !clientCertEnable.checked;
+    ca.value = tls.ca_cert || '';
+    clientCert.value = tls.client_cert || '';
+    clientKey.value = tls.client_key || '';
+}
+
+function lfClearBackendTls(scope) {
+	if (!scope) return;
+	var clientCertEnable = scope.querySelector('.lf-backend-client-cert-enable');
+	var insecure = scope.querySelector('.lf-backend-tls-insecure');
+	var caEnable = scope.querySelector('.lf-backend-ca-enable');
+	var warning = scope.querySelector('.lf-backend-warning');
+	var caFields = scope.querySelector('.lf-backend-ca-fields');
+	var clientCertFields = scope.querySelector('.lf-backend-client-cert-fields');
+	var ca = scope.querySelector('.lf-backend-tls-ca');
+	var clientCert = scope.querySelector('.lf-backend-tls-client-cert');
+	var clientKey = scope.querySelector('.lf-backend-tls-client-key');
+	if (insecure) insecure.checked = false;
+	if (insecure) insecure.disabled = false;
+	if (caEnable) { caEnable.checked = false; caEnable.disabled = false; }
+	if (clientCertEnable) clientCertEnable.checked = false;
+	if (warning) warning.style.display = 'none';
+	if (caFields) caFields.style.display = 'none';
+	if (clientCertFields) clientCertFields.style.display = 'none';
+	if (ca) { ca.value = ''; ca.disabled = true; }
+	if (clientCert) { clientCert.value = ''; clientCert.disabled = true; }
+	if (clientKey) { clientKey.value = ''; clientKey.disabled = true; }
+}
+
+function lfValidateBackendTls(scope, label) {
+	if (!scope) return true;
+	var clientCertEnable = scope.querySelector('.lf-backend-client-cert-enable');
+	var insecure = scope.querySelector('.lf-backend-tls-insecure');
+	var caEnable = scope.querySelector('.lf-backend-ca-enable');
+	var ca = scope.querySelector('.lf-backend-tls-ca');
+	var clientCert = scope.querySelector('.lf-backend-tls-client-cert');
+	var clientKey = scope.querySelector('.lf-backend-tls-client-key');
+	if (!clientCertEnable || !insecure || !caEnable || !ca || !clientCert || !clientKey) return true;
+	if (!insecure.checked && caEnable.checked && !ca.value.trim()) {
+		showToast(label + ' backend TLS requires a CA cert path.', 'error');
+		return false;
+	}
+	if (clientCertEnable.checked && !!clientCert.value.trim() !== !!clientKey.value.trim()) {
+		showToast(label + ' backend TLS requires both client cert and client key.', 'error');
+        return false;
+    }
+    if (clientCertEnable.checked && !clientCert.value.trim() && !clientKey.value.trim()) {
+        showToast(label + ' backend TLS requires a client cert/key pair.', 'error');
+        return false;
+    }
+    return true;
+}
+
+lfInitBackendTlsControls(document.getElementById('lf-default-route-fields'));
 
 // --- Default route toggle ---
 document.getElementById('lf-default-enable').addEventListener('change', function() {
@@ -834,9 +992,8 @@ function lfCreatePathCard(pathsContainer, pathsList) {
         '<input type="checkbox" class="lf-path-strip-prefix"> Strip prefix</label>' +
         '<label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.78rem;cursor:pointer;margin:0;">' +
         '<input type="checkbox" class="lf-path-drop-query"> Drop query</label>' +
-        '<label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.78rem;cursor:pointer;margin:0;">' +
-        '<input type="checkbox" class="lf-path-replace-host"> Replace Host header</label>' +
         '</div>' +
+		lfBackendTlsFieldsHtml('lf-path-replace-host', 'Replace Host header') +
         '<details class="lf-mw-section">' +
         '<summary>Path Middleware Chain <span class="lf-mw-badge lf-path-mw-badge"></span></summary>' +
         '<fieldset style="margin:0.5rem 0 0.5rem;padding:0;border:none;">' +
@@ -867,6 +1024,7 @@ function lfCreatePathCard(pathsContainer, pathsList) {
     });
 
     pathsContainer.appendChild(card);
+    lfInitBackendTlsControls(card);
     var pathObj = { id: pathId, el: card, mwChain: mwChain, tpSection: tpSection };
     pathsList.push(pathObj);
     lfUpdatePathBadge(pathsContainer);
@@ -905,8 +1063,7 @@ function lfCreateHostRouteCard() {
         '<label style="font-size:0.85rem;margin-bottom:0.25rem;">Backend URL' +
         '<input type="text" class="lf-route-backend" placeholder="e.g. http://192.168.1.100:8096" style="margin-bottom:0.5rem;"></label>' +
         '</div>' +
-        '<label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.78rem;cursor:pointer;margin:0 0 0.5rem;">' +
-        '<input type="checkbox" class="lf-route-replace-host"> Replace Host header with backend host</label>' +
+		lfBackendTlsFieldsHtml('lf-route-replace-host', 'Replace Host header with backend host') +
         '<details class="lf-mw-section" open>' +
         '<summary>Middleware Chain <span class="lf-mw-badge lf-route-mw-badge"></span></summary>' +
         '<fieldset style="margin:0.5rem 0 0.5rem;padding:0;border:none;">' +
@@ -950,6 +1107,7 @@ function lfCreateHostRouteCard() {
     });
 
     container.appendChild(card);
+    lfInitBackendTlsControls(card);
     lfHostRoutes.push(routeObj);
     return routeObj;
 }
@@ -1054,6 +1212,8 @@ function lfCollectPaths(pathsList) {
         if (backend) {
             entry.backend = { address: backend };
             if (p.el.querySelector('.lf-path-replace-host').checked) entry.backend.replace_host_header = true;
+            var pathTls = lfCollectBackendTls(p.el);
+            if (pathTls) entry.backend.tls = pathTls;
         }
         if (p.el.querySelector('.lf-path-strip-prefix').checked) entry.strip_prefix = true;
         if (p.el.querySelector('.lf-path-drop-query').checked) entry.drop_query = true;
@@ -1103,11 +1263,14 @@ function lfCollectPayload() {
 
     // Default route
     if (document.getElementById('lf-default-enable').checked) {
+        var defaultBackend = {
+            address: document.getElementById('lf-default-backend').value.trim(),
+            replace_host_header: document.getElementById('lf-default-replace-host').checked
+        };
+        var defaultBackendTls = lfCollectBackendTls(document.getElementById('lf-default-route-fields'));
+        if (defaultBackendTls) defaultBackend.tls = defaultBackendTls;
         var defTarget = {
-            backend: {
-                address: document.getElementById('lf-default-backend').value.trim(),
-                replace_host_header: document.getElementById('lf-default-replace-host').checked
-            }
+            backend: defaultBackend
         };
         if (document.getElementById('lf-default-disable-defaults').checked) {
             defTarget.disable_default_middlewares = true;
@@ -1125,11 +1288,14 @@ function lfCollectPayload() {
     if (lfHostRoutes.length > 0) {
         payload.routes = [];
         lfHostRoutes.forEach(function(r) {
+            var routeBackend = {
+                address: r.el.querySelector('.lf-route-backend').value.trim(),
+                replace_host_header: r.el.querySelector('.lf-route-replace-host').checked
+            };
+            var routeBackendTls = lfCollectBackendTls(r.el);
+            if (routeBackendTls) routeBackend.tls = routeBackendTls;
             var target = {
-                backend: {
-                    address: r.el.querySelector('.lf-route-backend').value.trim(),
-                    replace_host_header: r.el.querySelector('.lf-route-replace-host').checked
-                }
+                backend: routeBackend
             };
             if (r.el.querySelector('.lf-route-disable-defaults') && r.el.querySelector('.lf-route-disable-defaults').checked) {
                 target.disable_default_middlewares = true;
@@ -1168,6 +1334,10 @@ var lfYamlKeyMap = {
     'disable_http2': 'disable-http2',
     'disable_default_middlewares': 'disable-default-middlewares',
     'replace_host_header': 'replace-host-header',
+    'insecure_skip_verify': 'insecure-skip-verify',
+    'ca_cert': 'ca-cert',
+    'client_cert': 'client-cert',
+    'client_key': 'client-key',
     'trusted_proxies': 'trusted-proxies',
     'refresh_interval': 'refresh-interval'
 };
@@ -1273,17 +1443,17 @@ function lfRenderReview() {
 
 function lfShowImpactBanner(el, willRebuild) {
     el.style.display = 'block';
-    el.style.color = '#fff';
+    el.classList.remove('is-hot-swap', 'is-rebuild');
+    el.classList.add('lf-impact-banner', willRebuild ? 'is-rebuild' : 'is-hot-swap');
+    el.style.background = '';
+    el.style.borderLeft = '';
+    el.style.color = '';
     if (willRebuild) {
-        el.style.background = 'rgba(231,76,60,0.12)';
-        el.style.borderLeft = '3px solid #e74c3c';
         el.innerHTML = '<strong>\u26A0 Full rebuild required</strong><br>' +
             'Server-level settings changed (TLS, timeouts, bind, or interface). ' +
             'The proxy will be stopped, rebuilt, and restarted. ' +
             'Active connections will be dropped and middleware state will be reset.';
     } else {
-        el.style.background = 'rgba(46,204,113,0.1)';
-        el.style.borderLeft = '3px solid #2ecc71';
         el.innerHTML = '<strong>\u2713 Hot-swap (zero downtime)</strong><br>' +
             'Only routes and middleware changed. The handler will be swapped live \u2014 ' +
             'active connections are preserved.';
@@ -1427,6 +1597,7 @@ function lfResetForm() {
     document.getElementById('lf-default-route-fields').style.display = 'none';
     document.getElementById('lf-default-backend').value = '';
     document.getElementById('lf-default-replace-host').checked = false;
+    lfClearBackendTls(document.getElementById('lf-default-route-fields'));
     document.getElementById('lf-default-disable-defaults').checked = false;
     if (lfDefaultMwChain) lfDefaultMwChain.clear();
     if (lfDefaultTpSection) {

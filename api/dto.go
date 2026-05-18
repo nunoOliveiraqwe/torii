@@ -140,8 +140,16 @@ type PathRuleDTO struct {
 
 // BackendConfigDTO mirrors config.BackendConfig.
 type BackendConfigDTO struct {
-	Address           string `json:"address"`
-	ReplaceHostHeader bool   `json:"replace_host_header,omitempty"`
+	Address           string               `json:"address"`
+	ReplaceHostHeader bool                 `json:"replace_host_header,omitempty"`
+	TLS               *BackendTlsConfigDTO `json:"tls,omitempty"`
+}
+
+type BackendTlsConfigDTO struct {
+	InsecureSkipVerify bool   `json:"insecure_skip_verify,omitempty"`
+	CaCert             string `json:"ca_cert,omitempty"`
+	ClientCert         string `json:"client_cert,omitempty"`
+	ClientKey          string `json:"client_key,omitempty"`
 }
 
 type MiddlewareConfigDTO struct {

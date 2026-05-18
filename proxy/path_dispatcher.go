@@ -101,6 +101,7 @@ func buildPathBackendHandler(rule config.PathRule) (http.HandlerFunc, error) {
 	opts := proxyutil.ProxyOptions{
 		DropQuery:         rule.DropQuery != nil && *rule.DropQuery,
 		ReplaceHostHeader: rule.Backend != nil && rule.Backend.ReplaceHostHeader,
+		TLS:               backendTLSOptions(rule.Backend.TLS),
 	}
 	proxy, err := buildHttpRevProxy(rule.Backend.Address, opts)
 	if err != nil {

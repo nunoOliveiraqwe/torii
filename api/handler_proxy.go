@@ -264,7 +264,7 @@ func convertToHTTPListener(req *CreateProxyServerRequest) (config.HTTPListener, 
 
 func convertRouteTarget(dto RouteTargetDTO) config.RouteTarget {
 	target := config.RouteTarget{
-		Backend:         config.BackendConfig{Address: dto.Backend.Address, ReplaceHostHeader: dto.Backend.ReplaceHostHeader},
+		Backend:         backendConfigFromDTO(dto.Backend),
 		DisableDefaults: dto.DisableDefaults,
 		TrustedProxies:  convertTrustedProxies(dto.TrustedProxies),
 	}
@@ -283,7 +283,8 @@ func convertRouteTarget(dto RouteTargetDTO) config.RouteTarget {
 			TrustedProxies:  convertTrustedProxies(p.TrustedProxies),
 		}
 		if p.Backend != nil {
-			pr.Backend = &config.BackendConfig{Address: p.Backend.Address, ReplaceHostHeader: p.Backend.ReplaceHostHeader}
+			backend := backendConfigFromDTO(*p.Backend)
+			pr.Backend = &backend
 		}
 		for _, m := range p.Middlewares {
 			pr.Middlewares = append(pr.Middlewares, mw.Config{
@@ -294,6 +295,26 @@ func convertRouteTarget(dto RouteTargetDTO) config.RouteTarget {
 		target.Paths = append(target.Paths, pr)
 	}
 	return target
+}
+
+func backendConfigFromDTO(dto BackendConfigDTO) config.BackendConfig {
+	return config.BackendConfig{
+		Address:           dto.Address,
+		ReplaceHostHeader: dto.ReplaceHostHeader,
+		TLS:               backendTLSConfigFromDTO(dto.TLS),
+	}
+}
+
+func backendTLSConfigFromDTO(dto *BackendTlsConfigDTO) *config.BackendTlsConfig {
+	if dto == nil {
+		return nil
+	}
+	return &config.BackendTlsConfig{
+		InsecureSkipVerify: dto.InsecureSkipVerify,
+		CaCert:             dto.CaCert,
+		ClientCert:         dto.ClientCert,
+		ClientKey:          dto.ClientKey,
+	}
 }
 
 func handleGetMiddlewareSchemas(_ app.SystemService) http.HandlerFunc {
@@ -374,7 +395,7 @@ func configToDTO(conf *config.HTTPListener) CreateProxyServerRequest {
 
 func routeTargetToDTO(t config.RouteTarget) RouteTargetDTO {
 	dto := RouteTargetDTO{
-		Backend:         BackendConfigDTO{Address: t.Backend.Address, ReplaceHostHeader: t.Backend.ReplaceHostHeader},
+		Backend:         backendConfigToDTO(t.Backend),
 		DisableDefaults: t.DisableDefaults,
 		TrustedProxies:  trustedProxiesToDTO(t.TrustedProxies),
 	}
@@ -391,7 +412,8 @@ func routeTargetToDTO(t config.RouteTarget) RouteTargetDTO {
 			TrustedProxies:  trustedProxiesToDTO(p.TrustedProxies),
 		}
 		if p.Backend != nil {
-			pDTO.Backend = &BackendConfigDTO{Address: p.Backend.Address, ReplaceHostHeader: p.Backend.ReplaceHostHeader}
+			backend := backendConfigToDTO(*p.Backend)
+			pDTO.Backend = &backend
 		}
 		for _, m := range p.Middlewares {
 			pDTO.Middlewares = append(pDTO.Middlewares, MiddlewareConfigDTO{Type: m.Type, Options: m.Options})
@@ -399,6 +421,26 @@ func routeTargetToDTO(t config.RouteTarget) RouteTargetDTO {
 		dto.Paths = append(dto.Paths, pDTO)
 	}
 	return dto
+}
+
+func backendConfigToDTO(c config.BackendConfig) BackendConfigDTO {
+	return BackendConfigDTO{
+		Address:           c.Address,
+		ReplaceHostHeader: c.ReplaceHostHeader,
+		TLS:               backendTLSConfigToDTO(c.TLS),
+	}
+}
+
+func backendTLSConfigToDTO(c *config.BackendTlsConfig) *BackendTlsConfigDTO {
+	if c == nil {
+		return nil
+	}
+	return &BackendTlsConfigDTO{
+		InsecureSkipVerify: c.InsecureSkipVerify,
+		CaCert:             c.CaCert,
+		ClientCert:         c.ClientCert,
+		ClientKey:          c.ClientKey,
+	}
 }
 
 func handleEditProxy(svc app.SystemService) http.HandlerFunc {

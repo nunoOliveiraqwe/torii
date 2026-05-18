@@ -102,6 +102,7 @@ func buildRouteHandler(ctx middleware.BuildContext, target config.RouteTarget) (
 	if target.Backend.Address != "" {
 		proxy, err := buildHttpRevProxy(target.Backend.Address, proxyutil.ProxyOptions{
 			ReplaceHostHeader: target.Backend.ReplaceHostHeader,
+			TLS:               backendTLSOptions(target.Backend.TLS),
 		})
 		if err != nil {
 			return nil, nil, RouteSnapshot{}, fmt.Errorf("failed to build reverse proxy for backend %s: %w", target.Backend.Address, err)

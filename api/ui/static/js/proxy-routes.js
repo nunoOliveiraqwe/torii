@@ -460,6 +460,9 @@ function lfPopulateForm(data) {
         if (data.default.backend && data.default.backend.replace_host_header) {
             document.getElementById('lf-default-replace-host').checked = true;
         }
+        if (data.default.backend && data.default.backend.tls) {
+            lfPopulateBackendTls(document.getElementById('lf-default-route-fields'), data.default.backend.tls);
+        }
         if (data.default.disable_default_middlewares) {
             document.getElementById('lf-default-disable-defaults').checked = true;
         }
@@ -475,6 +478,7 @@ function lfPopulateForm(data) {
                 pathObj.el.querySelector('.lf-path-pattern').value = p.pattern || '';
                 pathObj.el.querySelector('.lf-path-backend').value = (p.backend && p.backend.address) || '';
                 if (p.backend && p.backend.replace_host_header) pathObj.el.querySelector('.lf-path-replace-host').checked = true;
+                if (p.backend && p.backend.tls) lfPopulateBackendTls(pathObj.el, p.backend.tls);
                 if (p.drop_query) pathObj.el.querySelector('.lf-path-drop-query').checked = true;
                 if (p.strip_prefix) pathObj.el.querySelector('.lf-path-strip-prefix').checked = true;
                 if (p.disable_default_middlewares) {
@@ -500,6 +504,9 @@ function lfPopulateForm(data) {
             if (route.target && route.target.backend && route.target.backend.replace_host_header) {
                 routeObj.el.querySelector('.lf-route-replace-host').checked = true;
             }
+            if (route.target && route.target.backend && route.target.backend.tls) {
+                lfPopulateBackendTls(routeObj.el, route.target.backend.tls);
+            }
             var target = route.target || {};
             if (target.disable_default_middlewares) {
                 var ddCb = routeObj.el.querySelector('.lf-route-disable-defaults');
@@ -518,6 +525,7 @@ function lfPopulateForm(data) {
                     pathObj.el.querySelector('.lf-path-pattern').value = p.pattern || '';
                     pathObj.el.querySelector('.lf-path-backend').value = (p.backend && p.backend.address) || '';
                     if (p.backend && p.backend.replace_host_header) pathObj.el.querySelector('.lf-path-replace-host').checked = true;
+                    if (p.backend && p.backend.tls) lfPopulateBackendTls(pathObj.el, p.backend.tls);
                     if (p.drop_query) pathObj.el.querySelector('.lf-path-drop-query').checked = true;
                     if (p.strip_prefix) pathObj.el.querySelector('.lf-path-strip-prefix').checked = true;
                     if (p.disable_default_middlewares) {
